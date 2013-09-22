@@ -1,0 +1,7 @@
+It has been shown that the use of Trace in Testmon has a significant
+performance hit with CPU intensive tests. For comparison,
+TestMiner.test_target_5 takes about 10 seconds when invoked by standard
+Python unittest runner as opposed to about 70 seconds when run by
+Testmon.
+
+IO intensive tests have shown no major slowdown when executed by Testmon.

@@ -1,7 +1,3 @@
-PyYAML==3.10
-argh==0.23.3
-coverage==3.6
-nose==1.3.0
-pathtools==0.1.2
-watchdog==0.6.0
-wsgiref==0.1.2
+pytest>=2.6,<2.7
+pytest-cache>=1.0
+watchdog>=0.8
