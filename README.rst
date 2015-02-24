@@ -52,6 +52,23 @@ Example on how to use testmon with a sample django project.
 
 Then edit doc\_builder/environments.py and watch.
 
+Try with whoosh
+---------------
+
+Another example on a somewhat computationally intensive project. Not
+using tmon.py but periodically running py.test --testmon .
+
+::
+
+    hg clone https://bitbucket.org/mchaput/whoosh
+    cd whoosh
+    hg update 2.5.x
+
+    py.test --testmon # one test failing
+
+    hg update 999cd5f # some changes, 2 tests failing
+    py.test --testmon
+
 P.S.
 ----
 

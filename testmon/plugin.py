@@ -39,22 +39,28 @@ def pytest_addoption(parser):
 class DepGraph(object):
     
     def __init__(self, config):
-        self.cache = config.cache.get(TESTS_CACHE_KEY, {})
+        self.node_data = config.cache.get(TESTS_CACHE_KEY, {})
 
     def test_should_run(self, nodeid, changed_py_files):
-        if (nodeid not in self.cache) or (self.cache[nodeid]['runs_modules'] is False):
+        if (nodeid not in self.node_data) or (self.node_data[nodeid]['runs_modules'] is False):
             # not enough data, means test should run
             return True
         else:
-            return set(self.cache[nodeid]['runs_modules']) & set(changed_py_files)
+            return set(self.node_data[nodeid]['runs_modules']) & set(changed_py_files)
 
     def by_test_count(self):        
-        tests_for_modules = defaultdict(lambda : 0)
-        for test, value in self.cache.items():
-            runs_modules = value['runs_modules']
-            for rm in runs_modules: 
-                tests_for_modules[rm] += 1
-        return tests_for_modules
+        test_counts = defaultdict(lambda : 0)
+        for nodeid, node in self.node_data.items():
+            runs_modules = node['runs_modules']
+            for module in runs_modules: 
+                test_counts[module] += 1
+        return test_counts
+    
+    def set_runs_modules(self, nodeid, used_files):
+        try:
+            self.node_data[nodeid]['runs_modules'] = used_files
+        except KeyError:
+            self.node_data[nodeid] = {'runs_modules': used_files}
 
 def pytest_cmdline_main(config):
     if config.option.by_test_count:
@@ -108,16 +114,16 @@ def track_changed_files(config, project_directory):
     that have changed since the last run.
     """
     filenames = get_files_recursively(project_directory, "*.py")
-    cached_mtimes = config.cache.get(MTIMES_CACHE_KEY, {})
+    mtimes_to_update = config.cache.get(MTIMES_CACHE_KEY, {})
     res = []
     
     for py_file in filenames:
         current_mtime = os.path.getmtime(py_file)
 
-        if cached_mtimes.get(py_file) != current_mtime:
+        if mtimes_to_update.get(py_file) != current_mtime:
             res.append(py_file)
-            cached_mtimes[py_file] = current_mtime
-    return res, cached_mtimes
+            mtimes_to_update[py_file] = current_mtime
+    return res, mtimes_to_update
 
 def pytest_collection_modifyitems(session, config, items):
     if config.getoption('testmon'):
@@ -130,9 +136,6 @@ def pytest_collection_modifyitems(session, config, items):
         items[:] = selected
         if deselected: config.hook.pytest_deselected(items=deselected)
     
-        #TODO "clearing changed files" - where does this belong? 
-        config.cache.set(MTIMES_CACHE_KEY, config.new_mtimes)
-
 def _get_python_lib_paths():
     res = [sys.prefix]
     for attr in ['exec_prefix', 'real_prefix', 'base_prefix']:
@@ -140,7 +143,7 @@ def _get_python_lib_paths():
             res.append(getattr(sys, attr))
     return [os.path.join(d, "*") for d in res]
 
-def execute_track(callable_to_track, cov):
+def track_execute(callable_to_track, cov):
     cov.erase()
     cov.start()
     ret = callable_to_track()
@@ -155,14 +158,27 @@ def pytest_runtest_call(__multicall__, item):
     
     cache = item.config.cache
 
-    used_files, ret = execute_track(__multicall__.execute, item.config.cov)
+    runs_modules, ret = track_execute(__multicall__.execute, item.config.cov)
     
-    if not used_files:
+    item.config.depgraph.set_runs_modules(item.nodeid, runs_modules)
+    
+    if not runs_modules:
         print "Warning: tracing of %s failed!" % item.nodeid
 
-    tests_meta = cache.get(TESTS_CACHE_KEY, {})
-    test_meta = tests_meta.setdefault(item.nodeid, {})
-    test_meta['runs_modules'] = used_files
-
-    cache.set(TESTS_CACHE_KEY, tests_meta)
     return ret
+
+testmon_save = True
+def pytest_internalerror(excrepr, excinfo):
+    global testmon_save
+    testmon_save = False
+
+def pytest_keyboard_interrupt(excinfo):
+    global testmon_save
+    testmon_save = False 
+    
+def pytest_sessionfinish(session):
+    if testmon_save:
+        config = session.config
+        config.cache.set(MTIMES_CACHE_KEY, config.new_mtimes)
+        config.cache.set(TESTS_CACHE_KEY, config.depgraph.node_data)
+    
