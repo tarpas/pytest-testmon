@@ -7,6 +7,7 @@ import sys
 import hashlib
 import fnmatch
 import pytest
+import coverage
 
 from collections import defaultdict
 
@@ -64,6 +65,11 @@ def pytest_configure(config):
     config.depgraph = DepGraph(config)
     config.changed_py_files, config.new_mtimes = track_changed_files(config,
                                            config.getoption('project_directory'))
+
+    config.cov = coverage.coverage(cover_pylib=False, 
+                            omit=_get_python_lib_paths(),
+                            )
+    config.cov.use_cache(False)
 
 def by_test_count(config, session):
     tests_for_modules = config.depgraph.by_test_count()
@@ -132,14 +138,16 @@ def _get_python_lib_paths():
     for attr in ['exec_prefix', 'real_prefix', 'base_prefix']:
         if getattr(sys, attr, sys.prefix) not in res:
             res.append(getattr(sys, attr))
-    return res
+    return [os.path.join(d, "*") for d in res]
 
-def execute(callable_to_track):
-    t = trace.Trace(trace=False, 
-        ignoredirs=_get_python_lib_paths())
-    ret = t.runfunc(callable_to_track)
-    used_files = {os.path.abspath(py_file) for py_file, line_no in t.results().counts.keys()}
-    return used_files, ret
+def execute_track(callable_to_track, cov):
+    cov.erase()
+    cov.start()
+    ret = callable_to_track()
+    cov.stop()
+    cov.save()
+    
+    return cov.data.measured_files(), ret    
 
 def pytest_runtest_call(__multicall__, item):
     if not item.config.getoption('testmon'):
@@ -147,7 +155,7 @@ def pytest_runtest_call(__multicall__, item):
     
     cache = item.config.cache
 
-    used_files, ret = execute(__multicall__.execute)
+    used_files, ret = execute_track(__multicall__.execute, item.config.cov)
     
     if not used_files:
         print "Warning: tracing of %s failed!" % item.nodeid
