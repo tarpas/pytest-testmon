@@ -69,13 +69,30 @@ using tmon.py but periodically running py.test --testmon .
     hg update 999cd5f # some changes, 2 tests failing
     py.test --testmon
 
-P.S.
+TODO
 ----
 
-The code is a result of stripping down a lot of exploratory code
-originating from researching possibilities and techniques. We're aware
-of many of its deficiencies. Speed-up, reshuffling, clean-up, fancy
-dependency graph output, unit tests, py.test 2.7, python 3+, proper
-directory omitting, dependent packages upgrades detection, field-tested
-bugs. We'll start doing and publishing all that full-force once the
-campaign is successful.
+Speed-up, reshuffling, clean-up, fancy
+dependency graph output, more coverage, py.test 2.7, proper
+directory omitting, dependent packages upgrades detection, fixing edge cases
+after more projects use testmon. We'll start doing and publishing all that full-force 
+once the campaign is successful.
+
+Thoughts
+--------
+Individual test outcomes depend on many things, but let's write a little about some of them. 
+
+1. 'covered' python code inside the tested project (which presumably changes very frequently, little by little)
+2. 'covered' python code in all of the libraries (which presumably change infrequently)
+3. data files (txt, xml, other project assets)  
+4. environment variables (e.g. DJANGO_SETTINGS_MODULE)
+
+This alpha version deals with incrementally running tests when faced with the 1. category of changes.
+
+Later versions can implement some detection of other categories
+
+2. libraries: It's possible to store modification times of directories and files in sys.path and force a full re-execution of tests in case of change
+3. Probably the best bet here is a configuration where the developer would specify which files does a test depend on
+4. environemnt variable (DJANGO_SETTINGS_MODULE is a good example and we plan to implement change tracking here)   
+
+

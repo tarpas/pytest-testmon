@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='testmon',
     description='Test Runner for Python',
-    version='0.1.1a6',
+    version='0.2',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
     packages=['testmon'],
