@@ -9,12 +9,15 @@ import subprocess
 import watchdog.observers
 import watchdog.events
 
+import shlex
+
 
 def run_pytest(changed_file=".py"):
 
-    cmd_line = ['py.test-2.7',
-                '--testmon',
-                '--project-directory=%s' % args.project_directory]
+    cmd_line = shlex.split(args.pytest_cmd)
+    cmd_line += ['--testmon',
+                 '--project-directory=%s' % args.project_directory]
+    print("Calling py.test: {}".format(cmd_line))
 
     try:
         subprocess.check_call(cmd_line)
@@ -36,6 +39,9 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--project-directory',
                         help="Directory to start discovery ('.' default)",
                         default=os.getcwd())
+    parser.add_argument('--pytest-cmd',
+                        help="base py.test command to run (can have arguments)",
+                        default='py.test-2.7')
     args = parser.parse_args()
     run_pytest()
 
