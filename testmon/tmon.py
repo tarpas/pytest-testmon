@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 from __future__ import print_function
+
+import argparse
 import os
+import subprocess
 import sys
 import time
-import argparse
-import subprocess
 
-import watchdog.observers
 import watchdog.events
+import watchdog.observers
 
 
 def run_pytest(changed_file=".py"):
@@ -25,7 +26,7 @@ def run_pytest(changed_file=".py"):
 class EventHandler(watchdog.events.FileSystemEventHandler):
     def __init__(self):
         watchdog.events.FileSystemEventHandler.__init__(self)
-    
+
     def on_any_event(self, e):
         if e.src_path.endswith(".py") or getattr(e, 'dest_path', '').endswith(".py"):
             run_pytest()

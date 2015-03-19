@@ -1,6 +1,7 @@
 import pytest
 from testmon.testmon_models import Block, Module
 
+
 class TestHashCoverage(object):
 
     def test_miss_before(self):
@@ -63,5 +64,3 @@ def hash_coverage(blocks, lines):
 #dependencies - new_state <> []
 
 #new_dependencies = track_executable(nodeid)
-
-
