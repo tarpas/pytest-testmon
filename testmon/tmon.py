@@ -12,17 +12,28 @@ import watchdog.events
 import shlex
 
 
-def run_pytest(changed_file=".py"):
+def run_pytest(event=None):
 
     cmd_line = shlex.split(args.pytest_cmd)
     cmd_line += ['--testmon',
                  '--project-directory=%s' % args.project_directory]
     print("Calling py.test: {}".format(cmd_line))
 
+    callback = None
     try:
         subprocess.check_call(cmd_line)
     except subprocess.CalledProcessError as e:
         print(e, file=sys.stderr)
+        if args.cb_failure:
+            callback = shlex.split(args.cb_failure)
+    else:
+        if args.cb_success:
+            callback = shlex.split(args.cb_success)
+
+    if event and callback:
+        callback = map(lambda x: x.format(event.src_path), callback)
+        print("Calling callback: {}".format(callback))
+        subprocess.call(callback)
 
 
 class EventHandler(watchdog.events.FileSystemEventHandler):
@@ -31,7 +42,7 @@ class EventHandler(watchdog.events.FileSystemEventHandler):
     
     def on_any_event(self, e):
         if e.src_path.endswith(".py") or getattr(e, 'dest_path', '').endswith(".py"):
-            run_pytest()
+            run_pytest(event=e)
 
 
 if __name__ == "__main__":
@@ -42,6 +53,10 @@ if __name__ == "__main__":
     parser.add_argument('--pytest-cmd',
                         help="base py.test command to run (can have arguments)",
                         default='py.test-2.7')
+    parser.add_argument('--cb-success',
+                        help="Command to be run on success")
+    parser.add_argument('--cb-failure',
+                        help="Command to be run on failure")
     args = parser.parse_args()
     run_pytest()
 
