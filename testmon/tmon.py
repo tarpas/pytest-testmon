@@ -17,7 +17,7 @@ def run_pytest(changed_file=".py"):
                 '--project-directory=%s' % args.project_directory]
 
     try:
-        subprocess.call(cmd_line)
+        subprocess.check_call(cmd_line)
     except subprocess.CalledProcessError as e:
         print(e, file=sys.stderr)
 
