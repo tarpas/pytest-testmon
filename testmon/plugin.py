@@ -88,15 +88,15 @@ def pytest_cmdline_main(config):
         return wrap_session(config, by_test_count)
 
 def pytest_configure(config):
-    node_data = config.cache.get(TESTS_CACHE_KEY, {})
-    mtimes = config.cache.get(MTIMES_CACHE_KEY, {})
-    
-    changed_py_files, new_mtimes = track_changed_files(mtimes,
-                                                      config.getoption('project_directory'))
-    
-    depgraph = DepGraph(node_data)
-
     if config.getoption('testmon'):
+        node_data = config.cache.get(TESTS_CACHE_KEY, {})
+        mtimes = config.cache.get(MTIMES_CACHE_KEY, {})
+
+        changed_py_files, new_mtimes = track_changed_files(mtimes,
+                                                           config.getoption('project_directory'))
+
+        depgraph = DepGraph(node_data)
+
         config.pluginmanager.register(TestmonDeselect(config,
                                                       depgraph,
                                                       changed_py_files,
