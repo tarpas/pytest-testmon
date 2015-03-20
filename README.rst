@@ -80,12 +80,13 @@ once the campaign is successful.
 
 Thoughts
 --------
-Individual test outcomes depend on many things, but let's write a little about some of them. 
+Individual test outcomes depend on many things, so let's write a little about some of them. 
 
 1. 'covered' python code inside the tested project (which presumably changes very frequently, little by little)
 2. 'covered' python code in all of the libraries (which presumably change infrequently)
 3. data files (txt, xml, other project assets)  
 4. environment variables (e.g. DJANGO_SETTINGS_MODULE)
+5. external services (reached through network)
 
 This alpha version deals with incrementally running tests when faced with the 1. category of changes.
 

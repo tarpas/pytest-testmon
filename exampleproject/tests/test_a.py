@@ -1,9 +1,10 @@
+import time
 import unittest
+
+import pytest
 
 from ..a import add, subtract
 from ..d import always_fail
-import time
-import pytest
 
 
 class TestA(unittest.TestCase):
@@ -23,4 +24,3 @@ class TestA(unittest.TestCase):
     @pytest.mark.skipif(True, reason="Not available on this platform")
     def test_skip_always_fail(self):
         always_fail()
-

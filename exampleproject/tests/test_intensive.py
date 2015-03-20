@@ -1,9 +1,8 @@
 import unittest
 
-from ..miner import find_nonce, nonce_meets_target
-from ..iohog import touch_file
 from ..a import add
-
+from ..iohog import touch_file
+from ..miner import find_nonce, nonce_meets_target
 
 # class TestMiner(unittest.TestCase):
 #     def test_target_1(self):

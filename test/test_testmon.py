@@ -1,7 +1,8 @@
 import os
-import pytest
 import shutil
+
 import py
+import pytest
 
 pytest_plugins = "pytester",
 

@@ -1,6 +1,7 @@
 import unittest
 
-from ..b import multiply, divide
+from ..b import divide, multiply
+
 
 class TestB(unittest.TestCase):
     def test_multiply(self):
