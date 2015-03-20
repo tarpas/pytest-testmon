@@ -14,7 +14,7 @@ def test_cache_reportheader(testdir):
     cachedir = p.dirpath(".cache")
     result = testdir.runpytest("-v")
     result.stdout.fnmatch_lines([
-        "*igg.me/at/testmon*",
+        "*Thanks Indiegogo contributors, stay tuned for more!*",
     ])
 
 class TestmonDeselect(object):

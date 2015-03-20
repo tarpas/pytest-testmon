@@ -111,15 +111,7 @@ def pytest_configure(config):
 
 
 def pytest_report_header(config):
-    from datetime import datetime as dt
-    delta = dt(2015, 3, 20, 6, 59) - dt.utcnow()
-    if delta.days >= 0:
-        igg = "Crowdfunding more features like per-method granularity, quickest first, failed first:  http://igg.me/at/testmon closes in" \
-            " {} days {} hours".format(delta.days,
-                                       delta.seconds // 3600)
-    else:
-        igg = ""
-    return igg
+    return "Thanks Indiegogo contributors, stay tuned for more!"
 
 
 def by_test_count(config, session):
