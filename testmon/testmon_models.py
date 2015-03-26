@@ -1,10 +1,15 @@
 import os
 from collections import defaultdict
+
 from testmon.process_code import checksum_coverage
 from testmon.process_code import Module
 
 
 class DepGraph(object):
+    """
+    each node is a dict of lists, first level is file names, second level is is checksums of the blocks inside the
+    file on which the node depends. self.node_data is a dict of nodes.
+    """
 
     def __init__(self, node_data):
         self.node_data = node_data
@@ -20,19 +25,21 @@ class DepGraph(object):
         return "\n".join((self.repr_per_node(nodeid) for nodeid in self.node_data))
 
     def test_should_run(self, nodeid, changed_py_files):
-        if (nodeid not in self.node_data) or (self.node_data[nodeid] is False):
+        """
+        See test_testmon::TestDepGraph to understand.
+        """
+        node = self.node_data.get(nodeid)
+        if node:
+            for changed_file_name in set(node) & set(changed_py_files):
+                new_checksums = set([block.checksum
+                                     for block
+                                     in changed_py_files[changed_file_name].blocks])
+                if set(node[changed_file_name]) - new_checksums:
+                    return True
+            return False
+        else:
             # not enough data, means test should run
             return True
-        else:
-            # TODO This can almost certainly be rewritten in half the lines and double the clarity.
-            if set(self.node_data[nodeid]) & set(changed_py_files):
-                for changed_file_name, module in changed_py_files.items():
-                    checksumes_in_changed_files = set()
-                    for block in module.blocks:
-                        checksumes_in_changed_files.add(block.checksum)
-                    if not set(self.node_data[nodeid].get(changed_file_name,())).issubset(checksumes_in_changed_files):
-                        return True
-            return False
 
     def modules_test_counts(self):
         test_counts = defaultdict(lambda: 0)
