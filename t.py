@@ -1,4 +1,5 @@
 import pytest
 
 if __name__ == '__main__':
-    pytest.main("--tb=native")
+    #test/test_testmon.py::TestmonDeselect::test_nonfunc_class
+    pytest.main("--tb=native -v", )
