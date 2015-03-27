@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='testmon',
     description='Test Runner for Python',
-    version='0.2',
+    version='0.2.5',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
     packages=['testmon'],
@@ -17,7 +17,7 @@ setup(
             'testmon = testmon.plugin',
         ]
     },
-    install_requires=['pytest<2.7', 'pytest-cache>=1.0', 'watchdog>=0.8',
+    install_requires=['pytest<2.8', 'pytest-cache>=1.0', 'watchdog>=0.8',
                       'coverage<4.0'],
     classifiers=[
         'Development Status :: 3 - Alpha',
