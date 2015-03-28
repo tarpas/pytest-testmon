@@ -11,7 +11,7 @@ import yaml
 from testmon_models import DepGraph
 from process_code import Module, checksum_coverage
 
-TESTS_CACHE_KEY = '/Testmon/nodeid'
+TESTS_CACHE_KEY = '/Testmon/nodedata-'
 MTIMES_CACHE_KEY = '/Testmon/mtimes'
 
 
@@ -80,6 +80,8 @@ def pytest_addoption(parser):
         dest='testmon',
         help="(testmon) Select only tests affected by recent changes."
     )
+    parser.addini("run_variants", "run variatns",
+                      type="linelist", default=[])
 
 
 def pytest_cmdline_main(config):
@@ -89,9 +91,10 @@ def pytest_cmdline_main(config):
 
 def pytest_configure(config):
     if config.getoption('testmon'):
-        node_data = config.cache.get(TESTS_CACHE_KEY, {})
+        
+        variant = get_variant(config)
+        node_data = config.cache.get(TESTS_CACHE_KEY + variant, {})
         mtimes = config.cache.get(MTIMES_CACHE_KEY, {})
-
 
         changed_py_files, new_mtimes = track_changed_files(mtimes,
                                                           config.getoption('project_directory'))
@@ -101,11 +104,23 @@ def pytest_configure(config):
         config.pluginmanager.register(TestmonDeselect(config,
                                                       depgraph,
                                                       changed_py_files,
-                                                      new_mtimes), "TestmonDeselect")
+                                                      new_mtimes,
+                                                      variant),
+                                      "TestmonDeselect")
+        
+
+def get_variant(config):
+    # TODO get rid of the _ and how to use . instead?
+    eval_locals = {'os_environ': os.environ,
+                   'sys_version': sys.version,
+                   'sys_version_info': sys.version_info}
+    evaluated = [eval(var, {}, eval_locals )
+                    for var in config.getini('run_variants')]
+    return ":".join([str(x) for x in evaluated if x])
 
 
 def pytest_report_header(config):
-    return "Thanks Indiegogo contributors, stay tuned for more!"
+    return("Run variant: {}".format(get_variant(config)))
 
 
 def by_test_count(config, session):
@@ -116,7 +131,7 @@ def by_test_count(config, session):
 
 class TestmonDeselect(object):
 
-    def __init__(self, config, depgraph, changed_files, new_mtimes):
+    def __init__(self, config, depgraph, changed_files, new_mtimes, variant):
         self.testmon_save = True
         self.depgraph = depgraph
         self.changed_files = changed_files
@@ -125,6 +140,7 @@ class TestmonDeselect(object):
                                 omit=_get_python_lib_paths(),
                                 )
         self.cov.use_cache(False)
+        self.variant = variant
 
     def pytest_report_header(self, config):
         if len(self.changed_files) > 10:
@@ -168,5 +184,5 @@ class TestmonDeselect(object):
         if self.testmon_save:
             config = session.config
             config.cache.set(MTIMES_CACHE_KEY, self.new_mtimes)
-            config.cache.set(TESTS_CACHE_KEY, self.depgraph.node_data)
+            config.cache.set(TESTS_CACHE_KEY + self.variant, self.depgraph.node_data)
 

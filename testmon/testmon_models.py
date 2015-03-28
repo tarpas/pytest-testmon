@@ -1,7 +1,7 @@
 import os
 from collections import defaultdict
-from process_code import checksum_coverage
-from process_code import Module
+from testmon.process_code import checksum_coverage
+from testmon.process_code import Module
 
 
 class DepGraph(object):

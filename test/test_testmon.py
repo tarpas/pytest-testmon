@@ -5,23 +5,41 @@ import py
 from testmon.process_code import Module, Block 
 from testmon.testmon_models import DepGraph
 from test_process_code import code_samples, CodeSample
-from testmon.plugin import TESTS_CACHE_KEY
+from testmon.plugin import TESTS_CACHE_KEY, get_variant
 
 pytest_plugins = "pytester",
+
 
 def test_cache_reportheader(testdir):
     p = testdir.makepyfile("""
         def test_hello():
             pass
     """)
-    cachedir = p.dirpath(".cache")
     result = testdir.runpytest("-v")
     result.stdout.fnmatch_lines([
-        "*Thanks Indiegogo contributors, stay tuned for more!*",
+        "*Run variant*",
     ])
 
+
+def test_run_variant_empty(testdir):
+    config = testdir.parseconfigure()
+    assert get_variant(config) == ''
+
+
+def test_run_variant_django(testdir):
+    os.environ['DJANGO_SETTINGS_MODULE'] = 'JUST_A_TEST'
+    testdir.makeini("""
+                    [pytest]
+                    run_variants=os_environ.get('DJANGO_SETTINGS_MODULE')
+                                 None # What evaluates to false is no included
+                    """)
+    config = testdir.parseconfigure()
+    assert get_variant(config) == 'JUST_A_TEST'
+
+
 class TestmonDeselect(object):
-    
+
+
     def test_easy(self, testdir, monkeypatch):
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         a = testdir.makepyfile(test_a="""
