@@ -13,10 +13,10 @@ class Block():
         
     @property
     def checksum(self):
-        if isinstance(self.code, (int, long)):
+        if isinstance(self.code, (int)):
             return self.code
         else:
-            return zlib.adler32(self.code)  
+            return zlib.adler32(self.code.encode('UTF-8'))
 
     def __repr__(self):
         return "{}-{} h: {}, n:{}, repr:{}".format(self.start,
@@ -103,13 +103,13 @@ class Module(object):
 def checksum_coverage(blocks, lines):
     result = []
     line_index = 0
-    lines.sort()
+    sorted_lines = sorted(list(lines))
 
     for current_block in sorted(blocks, key=lambda x: x.start):
         try:
-            while lines[line_index] < current_block.start:
+            while sorted_lines[line_index] < current_block.start:
                 line_index += 1
-            if lines[line_index] <= current_block.end:
+            if sorted_lines[line_index] <= current_block.end:
                 result.append(current_block.checksum)
         except IndexError:
             break

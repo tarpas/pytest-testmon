@@ -2,7 +2,6 @@ import pytest
 from testmon.process_code import Block, Module, checksum_coverage
 import sys
 import os
-from tests.coveragetest import CoverageTest
 import coverage
 from testmon.plugin import track_execute
 
@@ -124,7 +123,7 @@ code_samples = {
         def subtract(a, b):
             return a - b
 
-        assert add(1, 3) == 4
+        assert add(1, 2) == 3
             """,
             {1: None, 2: None, 4: None, 7: None}),
     '3': CodeSample("""
@@ -176,22 +175,15 @@ class TestModule(object):
         blocks2 = module2.blocks
         assert (blocks1[0], blocks1[2]) == (blocks2[0], blocks2[2])
         assert blocks1[1] != blocks2[1]
-    
 
     def test_covdata_intersects_deps(self):
-        module1 = Module(code_samples[1].source_code, 'a.py')
-        covdata = code_samples[1].expected_coverage
-        
-        print module1.blocks
-        assert checksum_coverage(module1.blocks, covdata.keys()) == [1794456906, 117706794]
+        def checksum(code_sample):
+            module = Module(code_sample.source_code, 'a.py')
+            covdata = code_sample.expected_coverage
+            return checksum_coverage(module.blocks, covdata.keys())
 
+        assert checksum(code_samples[1])[1] == checksum(code_samples[2])[1]
 
-        module1 = Module(code_samples[2].source_code, 'a.py')
-        covdata = code_samples[2].expected_coverage
-        
-        print module1.blocks
-        assert checksum_coverage(module1.blocks, covdata.keys()) == [1781883542, 117706794]
-    
     def test_3(self):
         module1 = Module(code_samples['3'].source_code)
         module2 = Module(code_samples['3b'].source_code)
@@ -227,30 +219,35 @@ class TestModule(object):
         assert module1.blocks[2] != module2.blocks[2]
 
 
-class TestCoverageAssumptions(CoverageTest):
-        
-    def setUp(self):
-        super(TestCoverageAssumptions, self).setUp()
-        self.cov = coverage.coverage(cover_pylib=False)
-        self.cov.use_cache(False)
+def test_coverage():
+    """This is importing from coverage.py test suite. Which is quite a bad idea I guess.
+    TODO rewrite so that it doesn't."""
+    coveragetest = pytest.importorskip('tests.coveragetest')
 
-    def test_easy(self):
+    class TestCoverageAssumptions(coveragetest.CoverageTest):
 
-        for name, mod_cov in code_samples.items():
-            if mod_cov.expected_coverage:  
-                modname = self.get_module_name()
-                self.make_file(modname+".py", mod_cov.source_code)
-        
-                def callit():
-                    self.import_local_file(modname)
-        
-                result, cov_data = track_execute(callit, self.cov)
-        
-                del sys.modules[modname]
-        
-                filename = os.path.abspath(modname + '.py')
-                assert cov_data.lines[filename] == mod_cov.expected_coverage, "for code sample: %s" % name
-        
+        def setUp(self):
+            super(TestCoverageAssumptions, self).setUp()
+            self.cov = coverage.coverage(cover_pylib=False)
+            self.cov.use_cache(False)
+
+        def test_easy(self):
+
+            for name, mod_cov in code_samples.items():
+                if mod_cov.expected_coverage:
+                    modname = self.get_module_name()
+                    self.make_file(modname + ".py", mod_cov.source_code)
+
+                    def callit():
+                        self.import_local_file(modname)
+
+                    result, cov_data = track_execute(callit, self.cov)
+
+                    del sys.modules[modname]
+
+                    filename = os.path.abspath(modname + '.py')
+                    assert cov_data.lines[filename] == mod_cov.expected_coverage, "for code sample: %s" % name
+
 # classy: Module(path, mtime, main, [Blocks])
 # ModuleCollection = [Module, Module, Module]
 #last_state=ModuleCollection, new_state=ModuleCollection(), changes=ModuleCollection()

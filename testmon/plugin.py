@@ -6,10 +6,9 @@ import os
 import sys
 import fnmatch
 import coverage
-import yaml
 
-from testmon_models import DepGraph
-from process_code import Module, checksum_coverage
+from testmon.testmon_models import DepGraph
+from testmon.process_code import Module, checksum_coverage
 
 TESTS_CACHE_KEY = '/Testmon/nodedata-'
 MTIMES_CACHE_KEY = '/Testmon/mtimes'

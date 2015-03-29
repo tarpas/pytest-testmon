@@ -86,19 +86,19 @@ class TestmonDeselect(object):
         cs1 = CodeSample("""
             class TestA(object):
                 def test_one(self):
-                    print "1"
+                    print("1")
             
                 def test_two(self):
-                    print "2"
+                    print("2")
         """)
                 
         cs2 = CodeSample("""
             class TestA(object):
                 def test_one(self):
-                    print "1"
+                    print("1")
             
                 def test_twob(self):
-                    print "2"
+                    print("2")
         """)
         module2 = Module(cs2.source_code)
 
@@ -120,10 +120,10 @@ class TestmonDeselect(object):
         cs2 = CodeSample("""
             class TestA(object):
                 def test_one(self):
-                    print "1"
+                    print("1")
             
                 def test_twob(self):
-                    print "2"
+                    print("2")
         """)
         module2 = Module(cs2.source_code)
         test_a = testdir.makepyfile(test_a=cs2.source_code)
@@ -264,10 +264,10 @@ class TestDepGraph():
         module1 = Module(CodeSample("""
             class TestA(object):
                 def test_one(self):
-                    print "1"
+                    print("1")
             
                 def test_two(self):
-                    print "2"
+                    print("2")
         """).source_code)
         bs1=module1.blocks
         
@@ -275,10 +275,10 @@ class TestDepGraph():
         module2 = Module(CodeSample("""
             class TestA(object):
                 def test_one(self):
-                    print "1"
+                    print("1")
             
                 def test_twob(self):
-                    print "2"
+                    print("2")
         """).source_code)
         bs2 = module2.blocks
         
