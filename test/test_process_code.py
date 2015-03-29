@@ -1,13 +1,13 @@
-import pytest
-from testmon.process_code import Block, Module, checksum_coverage
 import sys
 import os
+
+import pytest
+from testmon.process_code import Block, Module, checksum_coverage
 import coverage
 from testmon.plugin import track_execute
 
 
 class TestSourceIntoBlocks(object):
-
     def parse(self, source_code):
         return Module(source_code=source_code, file_name='a.py').blocks
 
@@ -25,47 +25,46 @@ class TestSourceIntoBlocks(object):
 
     def test_2_blocks(self):
         blocks = self.parse(
-"""            print('left')
-            def a():
-                print('right')     """
-                            )
+            """
+                print('left')
+                def a():
+                    print('right') """
+        )
         assert len(blocks) == 2
-        assert blocks[0].start == 3
-        assert blocks[0].end == 3
-        assert blocks[1].start == 1
-        assert blocks[1].end == 3
+        assert blocks[0].start == 4
+        assert blocks[0].end == 4
+        assert blocks[1].start == 2
+        assert blocks[1].end == 4
 
     def test_change_one(self):
         orig = self.parse("""
             print('left')
             def a():
                 print('right')     """
-                                )
+                          )
 
         changed = self.parse("""
             print('left')
             def a():
                 print('left')     """
-                                )
+                             )
 
         assert (orig[0].start,
                 orig[0].end,
                 orig[0].checksum) != (changed[0].start,
                                       changed[0].end,
                                       changed[0].checksum)
-        assert (orig[1].start, 
+        assert (orig[1].start,
                 orig[1].end,
                 orig[1].checksum) == (changed[1].start,
-                                  changed[1].end,
-                                  changed[1].checksum)
+                                      changed[1].end,
+                                      changed[1].checksum)
 
 
 GLOBAL_BLOCK = Block(1, 8, 1000)
 
 
 class TestchecksumCoverage(object):
-
-
     def test_miss_before(self):
         assert checksum_coverage([Block(2, 3, 101), GLOBAL_BLOCK, ], [1]) == [1000, ]
 
@@ -73,10 +72,10 @@ class TestchecksumCoverage(object):
         assert checksum_coverage([Block(2, 3, 102), GLOBAL_BLOCK], [2]) == [1000, 102]
 
     def test_hit_first2(self):
-        assert checksum_coverage([Block(2, 3, 102), Block(6, 7, 103), GLOBAL_BLOCK ], [2]) == [1000, 102]
+        assert checksum_coverage([Block(2, 3, 102), Block(6, 7, 103), GLOBAL_BLOCK], [2]) == [1000, 102]
 
     def test_hit_first3(self):
-        assert checksum_coverage([Block(2, 3, 102), Block(6, 7, 103), GLOBAL_BLOCK ], [6]) == [1000, 103]
+        assert checksum_coverage([Block(2, 3, 102), Block(6, 7, 103), GLOBAL_BLOCK], [6]) == [1000, 103]
 
     def test_miss_after(self):
         assert checksum_coverage([GLOBAL_BLOCK, Block(1, 2, 103)], [3]) == [1000, ]
@@ -93,11 +92,10 @@ class TestchecksumCoverage(object):
 
     @pytest.mark.parametrize("lines", [[4, 7], [7, 4]])
     def test_miss_both(self, lines):
-        assert checksum_coverage([GLOBAL_BLOCK, Block(2, 3, 101), Block(5, 6, 102)], lines) == [1000, ]    
+        assert checksum_coverage([GLOBAL_BLOCK, Block(2, 3, 101), Block(5, 6, 102)], lines) == [1000, ]
 
 
 class CodeSample():
-
     def __init__(self, source_code, expected_coverage=None, file_name='test_a.py', ):
         self.source_code = "\n".join(source_code.splitlines()[1:])
         self.file_name = file_name
@@ -114,7 +112,7 @@ code_samples = {
     
         assert add(1, 2) == 3
             """,
-            {1: None, 2: None, 4: None}),
+                  {1: None, 2: None, 4: None}),
 
     2: CodeSample("""
         def add(a, b):
@@ -125,19 +123,19 @@ code_samples = {
 
         assert add(1, 2) == 3
             """,
-            {1: None, 2: None, 4: None, 7: None}),
+                  {1: None, 2: None, 4: None, 7: None}),
     '3': CodeSample("""
         class A(object):
             def add(self, a, b):
                 return a + b
         """,
-            { 1: None, 2:None }),
+                    {1: None, 2: None}),
     '3b': CodeSample("""
         class A(object):
             def add(self, a, b):
                 return a - b
         """,
-            { 1: None, 2:None }),
+                     {1: None, 2: None}),
     'classes': CodeSample("""
         class A(object):
             def add(self, a, b):
@@ -145,7 +143,7 @@ code_samples = {
             def subtract(self, a, b):
                 return a - b
         """,
-            { 1: None, 2:None, 4:None }),
+                          {1: None, 2: None, 4: None}),
 
     'classes_b': CodeSample("""
         class A(object):
@@ -154,7 +152,7 @@ code_samples = {
             def subtract(self, a, b):
                 return a - b - 1
         """,
-            { 1: None, 2:None, 4:None }),
+                            {1: None, 2: None, 4: None}),
     'classes_c': CodeSample("""
         class A(object):
             def add1(self, a, b):
@@ -162,15 +160,15 @@ code_samples = {
             def subtract(self, a, b):
                 return a - b 
         """,
-            { 1: None, 2:None, 4:None }),
+                            {1: None, 2: None, 4: None}),
 }
-    
+
+
 class TestModule(object):
-    
     def test_base_diff(self):
         module1 = Module(file_name='test/astfixture.py')
         module2 = Module(file_name='test/astfixture2.py')
-        
+
         blocks1 = module1.blocks
         blocks2 = module2.blocks
         assert (blocks1[0], blocks1[2]) == (blocks2[0], blocks2[2])
@@ -187,15 +185,15 @@ class TestModule(object):
     def test_3(self):
         module1 = Module(code_samples['3'].source_code)
         module2 = Module(code_samples['3b'].source_code)
-        
+
         assert len(module1.blocks) == len(module2.blocks) == 2
         assert module1.blocks[0] != module2.blocks[0]
         assert module1.blocks[1] == module2.blocks[1]
-    
+
     def test_classes(self):
         module1 = Module(code_samples['classes'].source_code)
         module2 = Module(code_samples['classes_b'].source_code)
-        
+
         assert len(module1.blocks) == len(module2.blocks) == 3
         assert module1.blocks[0] == module2.blocks[0]
         assert module1.blocks[1] != module2.blocks[1]
@@ -205,7 +203,7 @@ class TestModule(object):
     def test_classes_header(self):
         module1 = Module(code_samples['classes'].source_code)
         module2 = Module(code_samples['classes_c'].source_code)
-        
+
         assert len(module1.blocks) == len(module2.blocks) == 3
         b1 = module1.blocks[0]
         b2 = module2.blocks[0]
@@ -250,9 +248,9 @@ def test_coverage():
 
 # classy: Module(path, mtime, main, [Blocks])
 # ModuleCollection = [Module, Module, Module]
-#last_state=ModuleCollection, new_state=ModuleCollection(), changes=ModuleCollection()
+# last_state=ModuleCollection, new_state=ModuleCollection(), changes=ModuleCollection()
 # DepGraph {for all nodeid: dependencies [ModuleCollection] intersect changes } or
-#dependencies - new_state <> []
+# dependencies - new_state <> []
 
 #new_dependencies = track_executable(nodeid)
 

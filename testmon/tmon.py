@@ -12,7 +12,6 @@ import watchdog.observers
 
 
 def run_pytest(changed_file=".py"):
-
     cmd_line = ['py.test-2.7',
                 '-v',
                 '--testmon',

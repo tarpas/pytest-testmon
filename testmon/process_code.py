@@ -2,44 +2,43 @@ import ast
 import textwrap
 import zlib
 
-class Block():
 
+class Block():
     def __init__(self, start, end, code=0, name=''):
-        #assert start <= end
+        # assert start <= end
         self.start = start
         self.end = end
         self.name = name
         self.code = code
-        
+
     @property
     def checksum(self):
-        if isinstance(self.code, (int)):
+        if isinstance(self.code, int):
             return self.code
         else:
             return zlib.adler32(self.code.encode('UTF-8'))
 
     def __repr__(self):
         return "{}-{} h: {}, n:{}, repr:{}".format(self.start,
-                                                 self.end,
-                                                 self.checksum,
-                                                 self.name,
-                                                 self.code)
+                                                   self.end,
+                                                   self.checksum,
+                                                   self.name,
+                                                   self.code)
 
     def __eq__(self, other):
-        return (self.start, 
-                self.end, 
-                self.checksum, 
-                self.name) == (other.start, 
-                               other.end, 
-                               other.checksum, 
+        return (self.start,
+                self.end,
+                self.checksum,
+                self.name) == (other.start,
+                               other.end,
+                               other.checksum,
                                other.name)
-        
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
 
 class Module(object):
-
     def __init__(self, source_code=None, file_name='<unknown>'):
         self.blocks = []
         if source_code is None:
@@ -52,7 +51,6 @@ class Module(object):
             self.dump_and_block(tree, len(lines), name=file_name)
         except SyntaxError:
             pass
-        
 
     def dump_and_block(self, node, end, name='unknown', into_block=False):
         """Frame of this method is taken from ast.dump
@@ -64,9 +62,10 @@ class Module(object):
         and appended to self.blocks. More can be probably understood from
         (at the time rather messy) test_process_code.py examples.
         """
+
         def _next_lineno(i, end):
             try:
-                return node[i+1].lineno - 1
+                return node[i + 1].lineno - 1
             except IndexError:
                 return end
             except AttributeError:
@@ -113,7 +112,7 @@ def checksum_coverage(blocks, lines):
                 result.append(current_block.checksum)
         except IndexError:
             break
-    
+
     return result
 
 

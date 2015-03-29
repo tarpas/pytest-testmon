@@ -5,10 +5,11 @@ from __future__ import division
 import os
 import sys
 import fnmatch
-import coverage
 
+import coverage
 from testmon.testmon_models import DepGraph
-from testmon.process_code import Module, checksum_coverage
+from testmon.process_code import Module
+
 
 TESTS_CACHE_KEY = '/Testmon/nodedata-'
 MTIMES_CACHE_KEY = '/Testmon/mtimes'
@@ -31,15 +32,15 @@ def track_changed_files(mtimes, project_directory):
     filenames = get_files_recursively(project_directory, "*.py")
     mtimes_to_update = mtimes
     res = {}
-    
+
     for py_file in filenames:
         current_mtime = os.path.getmtime(py_file)
 
         if mtimes_to_update.get(py_file) != current_mtime:
-            res[py_file]= Module(file_name=py_file)
+            res[py_file] = Module(file_name=py_file)
             mtimes_to_update[py_file] = current_mtime
     return res, mtimes_to_update
-            
+
 
 def _get_python_lib_paths():
     res = [sys.prefix]
@@ -56,7 +57,7 @@ def track_execute(callable_to_track, cov):
     cov.stop()
     cov.save()
     return result, cov.data
-    
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -80,23 +81,24 @@ def pytest_addoption(parser):
         help="(testmon) Select only tests affected by recent changes."
     )
     parser.addini("run_variants", "run variatns",
-                      type="linelist", default=[])
+                  type="linelist", default=[])
 
 
 def pytest_cmdline_main(config):
     if config.option.by_test_count:
         from _pytest.main import wrap_session
+
         return wrap_session(config, by_test_count)
+
 
 def pytest_configure(config):
     if config.getoption('testmon'):
-        
         variant = get_variant(config)
         node_data = config.cache.get(TESTS_CACHE_KEY + variant, {})
         mtimes = config.cache.get(MTIMES_CACHE_KEY, {})
 
         changed_py_files, new_mtimes = track_changed_files(mtimes,
-                                                          config.getoption('project_directory'))
+                                                           config.getoption('project_directory'))
 
         depgraph = DepGraph(node_data)
 
@@ -106,38 +108,38 @@ def pytest_configure(config):
                                                       new_mtimes,
                                                       variant),
                                       "TestmonDeselect")
-        
+
 
 def get_variant(config):
     # TODO get rid of the _ and how to use . instead?
     eval_locals = {'os_environ': os.environ,
                    'sys_version': sys.version,
                    'sys_version_info': sys.version_info}
-    evaluated = [eval(var, {}, eval_locals )
-                    for var in config.getini('run_variants')]
+    evaluated = [eval(var, {}, eval_locals)
+                 for var in config.getini('run_variants')]
     return ":".join([str(x) for x in evaluated if x])
 
 
 def pytest_report_header(config):
-    return("Run variant: {}".format(get_variant(config)))
+    return "Run variant: {}".format(get_variant(config))
 
 
 def by_test_count(config, session):
-    test_counts = DepGraph(config.cache.get(TESTS_CACHE_KEY, {}),
-                        ).modules_test_counts()
-    for k in sorted(test_counts.items(), key=lambda ite:ite[1]):
+    test_counts = DepGraph(config.cache.get(TESTS_CACHE_KEY + get_variant(config), {}),
+                           ).modules_test_counts()
+    for k in sorted(test_counts.items(), key=lambda ite: ite[1]):
         print("%s: %s" % (k[1], os.path.relpath(k[0])))
 
-class TestmonDeselect(object):
 
+class TestmonDeselect(object):
     def __init__(self, config, depgraph, changed_files, new_mtimes, variant):
         self.testmon_save = True
         self.depgraph = depgraph
         self.changed_files = changed_files
         self.new_mtimes = new_mtimes
         self.cov = coverage.coverage(cover_pylib=False,
-                                omit=_get_python_lib_paths(),
-                                )
+                                     omit=_get_python_lib_paths(),
+                                     )
         self.cov.use_cache(False)
         self.variant = variant
 
