@@ -111,13 +111,16 @@ def pytest_configure(config):
 
 
 def get_variant(config):
-    # TODO get rid of the _ and how to use . instead?
-    eval_locals = {'os_environ': os.environ,
-                   'sys_version': sys.version,
-                   'sys_version_info': sys.version_info}
-    evaluated = [eval(var, {}, eval_locals)
-                 for var in config.getini('run_variants')]
-    return ":".join([str(x) for x in evaluated if x])
+    eval_locals = {'os': os, 'sys': sys}
+
+    eval_values = []
+    for var in config.getini('run_variants'):
+        try:
+            eval_values.append(eval(var, {}, eval_locals))
+        except Exception as e:
+            eval_values.append(repr(e))
+
+    return ":".join([str(value) for value in eval_values if value])
 
 
 def pytest_report_header(config):

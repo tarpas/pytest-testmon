@@ -1,4 +1,5 @@
 import os
+import re
 
 import pytest
 from testmon.process_code import Module, Block
@@ -25,15 +26,27 @@ def test_run_variant_empty(testdir):
     assert get_variant(config) == ''
 
 
-def test_run_variant_django(testdir):
-    os.environ['DJANGO_SETTINGS_MODULE'] = 'JUST_A_TEST'
+def test_run_variant_env(testdir):
+    test_v_before = os.environ.get('TEST_V')
+    os.environ['TEST_V'] = 'JUST_A_TEST'
     testdir.makeini("""
                     [pytest]
-                    run_variants=os_environ.get('DJANGO_SETTINGS_MODULE')
+                    run_variants=os.environ.get('TEST_V')
                                  None # What evaluates to false is no included
                     """)
     config = testdir.parseconfigure()
     assert get_variant(config) == 'JUST_A_TEST'
+    del os.environ['TEST_V']
+    if test_v_before is not None:
+        os.environ['TEST_V']
+
+def test_run_variant_nonsense(testdir):
+    testdir.makeini("""
+                    [pytest]
+                    run_variants=nonsense
+                    """)
+    config = testdir.parseconfigure()
+    assert 'NameError' in get_variant(config)
 
 
 class TestmonDeselect(object):
