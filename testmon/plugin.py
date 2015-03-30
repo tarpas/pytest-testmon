@@ -132,6 +132,7 @@ def by_test_count(config, session):
 
 
 class TestmonDeselect(object):
+
     def __init__(self, config, depgraph, changed_files, new_mtimes, variant):
         self.testmon_save = True
         self.depgraph = depgraph
@@ -144,15 +145,13 @@ class TestmonDeselect(object):
         self.variant = variant
 
     def pytest_report_header(self, config):
-        if len(self.changed_files) > 10:
-            return "changed_files: too many to list"
-        else:
-            pdir = config.getoption('project_directory')
-            changed_repr = "changed files:"
-            for changed_file_name, module in self.changed_files.items():
-                checksums = [str(block.checksum) for block in module.blocks]
-                changed_repr += " {}:{}".format(os.path.relpath(changed_file_name, pdir), ",".join(checksums))
-            return changed_repr
+        pdir = config.getoption('project_directory')
+        result = "changed files: {}".format(",".join([os.path.relpath(fpath, pdir)
+                                                      for fpath
+                                                      in self.changed_files]))
+        if len(result) > 240:
+            result = result[:230] + "... + more"
+        return result
 
     def pytest_collection_modifyitems(self, session, config, items):
         selected, deselected = [], []
