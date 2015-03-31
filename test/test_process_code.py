@@ -6,25 +6,27 @@ from testmon.process_code import Block, Module, checksum_coverage
 import coverage
 from testmon.plugin import track_execute
 
+def parse(source_code, file_name='a.py'):
+    return Module(source_code=source_code, file_name=file_name).blocks
+
 
 class TestSourceIntoBlocks(object):
-    def parse(self, source_code):
-        return Module(source_code=source_code, file_name='a.py').blocks
+
 
     def test_empty(self):
-        self.parse(source_code="")
+        assert parse(source_code="") == []
 
     def test_syntax_error(self):
-        self.parse(source_code="(")
+        parse(source_code="(")
 
     def test_simple(self):
-        blocks = self.parse("""print('high')\nprint('low')""")
+        blocks = parse("""print('high')\nprint('low')""")
         assert len(blocks) == 1
         assert blocks[0].start == 1
         assert blocks[0].end == 2
 
     def test_2_blocks(self):
-        blocks = self.parse(
+        blocks = parse(
             """
                 print('left')
                 def a():
@@ -37,17 +39,17 @@ class TestSourceIntoBlocks(object):
         assert blocks[1].end == 4
 
     def test_change_one(self):
-        orig = self.parse("""
-            print('left')
-            def a():
-                print('right')     """
-                          )
+        orig = parse("""
+                    print('left')
 
-        changed = self.parse("""
-            print('left')
-            def a():
-                print('left')     """
-                             )
+                    def a():
+                        print('right')  """)
+
+        changed = parse("""
+                    print('left')
+
+                    def a():
+                        print('left')   """)
 
         assert (orig[0].start,
                 orig[0].end,
@@ -59,6 +61,31 @@ class TestSourceIntoBlocks(object):
                 orig[1].checksum) == (changed[1].start,
                                       changed[1].end,
                                       changed[1].checksum)
+
+    @pytest.mark.xfail
+    def test_same_even_names_but_different_blocks(self):
+        blocks = parse("""
+                    print('left')
+
+                    def a():
+                        print(1)
+
+                    def a():
+                        print(1)    """)
+        assert len(set([block.checksum for block in blocks])) == len(blocks)
+
+
+    @pytest.mark.xfail
+    def test_same_but_different_blocks(self):
+        blocks = parse("""
+                    print('left')
+
+                    def a():
+                        print(1)
+
+                    def b():
+                        print(1)    """)
+        assert len(set([block.checksum for block in blocks])) == len(blocks)
 
 
 GLOBAL_BLOCK = Block(1, 8, 1000)
@@ -166,12 +193,48 @@ code_samples = {
 
 class TestModule(object):
     def test_base_diff(self):
-        module1 = Module(file_name='test/astfixture.py')
-        module2 = Module(file_name='test/astfixture2.py')
+        blocks1 = parse("""
+            a = 1
 
-        blocks1 = module1.blocks
-        blocks2 = module2.blocks
-        assert (blocks1[0], blocks1[2]) == (blocks2[0], blocks2[2])
+
+            def identity(ob):
+                return ob
+
+
+            @identity
+            def method(st):
+                return 1
+
+
+            class Klass(object):
+                pass
+
+
+            for i in range(1):
+                pass                """)
+
+        blocks2 = parse("""
+            a = 1
+
+
+            def identity(ob):
+                return ob
+
+
+            @identity
+            def method(st):
+                return 5
+
+
+            class Klass(object):
+                pass
+
+
+            for i in range(1):
+                pass                """)
+
+        assert blocks1[0] == blocks2[0]
+        assert blocks1[2] == blocks2[2]
         assert blocks1[1] != blocks2[1]
 
     def test_covdata_intersects_deps(self):
