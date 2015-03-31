@@ -60,7 +60,7 @@ class TestmonDeselect(object):
                 return a + b
         """)
         result = testdir.runpytest("--testmon", "--tb=long", "-v")
-        from testmon.plugin import TESTS_CACHE_KEY, MTIMES_CACHE_KEY
+        from testmon.plugin import MTIMES_CACHE_KEY
 
         config = testdir.parseconfigure()
         node_data = config.cache.get(TESTS_CACHE_KEY, {})

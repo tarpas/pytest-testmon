@@ -12,7 +12,7 @@ from testmon.process_code import Module
 
 
 TESTS_CACHE_KEY = '/Testmon/nodedata-'
-MTIMES_CACHE_KEY = '/Testmon/mtimes'
+MTIMES_CACHE_KEY = '/Testmon/mtimes-'
 
 
 def get_files_recursively(path, pattern):
@@ -95,7 +95,7 @@ def pytest_configure(config):
     if config.getoption('testmon'):
         variant = get_variant(config)
         node_data = config.cache.get(TESTS_CACHE_KEY + variant, {})
-        mtimes = config.cache.get(MTIMES_CACHE_KEY, {})
+        mtimes = config.cache.get(MTIMES_CACHE_KEY + variant, {})
 
         changed_py_files, new_mtimes = track_changed_files(mtimes,
                                                            config.getoption('project_directory'))
@@ -186,6 +186,6 @@ class TestmonDeselect(object):
     def pytest_sessionfinish(self, session):
         if self.testmon_save:
             config = session.config
-            config.cache.set(MTIMES_CACHE_KEY, self.new_mtimes)
+            config.cache.set(MTIMES_CACHE_KEY + self.variant, self.new_mtimes)
             config.cache.set(TESTS_CACHE_KEY + self.variant, self.depgraph.node_data)
 
