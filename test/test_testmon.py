@@ -50,6 +50,17 @@ def test_run_variant_nonsense(testdir):
 
 
 class TestmonDeselect(object):
+
+    def test_dont_readcoveragerc(self, testdir, monkeypatch):
+        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
+        p = testdir.tmpdir.join('.coveragerc')
+        p.write("[")
+        a = testdir.makepyfile(test_a="""
+            def test_add():
+                pass
+        """)
+        testdir.inprocess_run(["--testmon", ])
+
     def test_easy(self, testdir, monkeypatch):
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         a = testdir.makepyfile(test_a="""

@@ -143,7 +143,7 @@ class TestmonDeselect(object):
         self.new_mtimes = new_mtimes
         self.cov = coverage.coverage(cover_pylib=False,
                                      omit=_get_python_lib_paths(),
-                                     )
+                                     config_file=False)
         self.cov.use_cache(False)
         self.variant = variant
 
