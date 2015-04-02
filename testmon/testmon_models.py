@@ -1,19 +1,69 @@
 import os
 from collections import defaultdict
+import sys
+import coverage
 
 from testmon.process_code import checksum_coverage
 from testmon.process_code import Module
 
 
-class DepGraph(object):
-    """
-    each node is a dict of lists, first level is file names, second level is is checksums of the blocks inside the
-    file on which the node depends. self.node_data is a dict of nodes.
-    """
+def _get_python_lib_paths():
+    res = [sys.prefix]
+    for attr in ['exec_prefix', 'real_prefix', 'base_prefix']:
+        if getattr(sys, attr, sys.prefix) not in res:
+            res.append(getattr(sys, attr))
+    return [os.path.join(d, "*") for d in res]
 
-    def __init__(self, node_data):
+
+def yes_no_test(node, changed_py_files):
+    if node:
+        for changed_file_name in set(node) & set(changed_py_files):
+            new_checksums = set(changed_py_files[changed_file_name])
+            if set(node[changed_file_name]) - new_checksums:
+                return True
+        return False
+    else:
+        # not enough data, means test should run
+        return True
+
+
+class Testmon(object):
+
+    def __init__(self, node_data, mtimes):
         self.node_data = node_data
+        self.mtimes = mtimes
         self.modules_cache = {}
+        self.read_fs()
+
+
+    def init2(self, project_dirs, variant=None):
+        self.testmon_save = True
+        self.cov = coverage.coverage(cover_pylib=False,
+                                     omit=_get_python_lib_paths(),
+                                     config_file=False,
+                                     include=[os.path.join(path, '*') for path in project_dirs])
+        self.cov.use_cache(False)
+        self.variant = variant
+
+
+    def parse_cache(self, module):
+        if module not in self.modules_cache:
+                        self.modules_cache[module] = Module(file_name=module).blocks
+        return self.modules_cache[module]
+
+    def read_fs(self):
+        """
+
+        """
+        for py_file in self.modules_test_counts():
+            try:
+                current_mtime = os.path.getmtime(py_file)
+                if self.mtimes.get(py_file) != current_mtime:
+                    self.parse_cache(py_file)
+                    self.mtimes[py_file] = current_mtime
+
+            except OSError:
+                self.mtimes[py_file] = [-2]
 
     def repr_per_node(self, key):
         return "{}: {}\n".format(key,
@@ -24,22 +74,14 @@ class DepGraph(object):
     def __repr__(self):
         return "\n".join((self.repr_per_node(nodeid) for nodeid in self.node_data))
 
-    def test_should_run(self, nodeid, changed_py_files):
+    def test_should_run(self, nodeid):
         """
-        See test_testmon::TestDepGraph to understand.
+        TODO
         """
         node = self.node_data.get(nodeid)
-        if node:
-            for changed_file_name in set(node) & set(changed_py_files):
-                new_checksums = set([block.checksum
-                                     for block
-                                     in changed_py_files[changed_file_name].blocks])
-                if set(node[changed_file_name]) - new_checksums:
-                    return True
-            return False
-        else:
-            # not enough data, means test should run
-            return True
+        return yes_no_test(node, {filename: [block.checksum for block in blocks]
+                                  for filename, blocks
+                                  in self.modules_cache.items()})
 
     def modules_test_counts(self):
         test_counts = defaultdict(lambda: 0)
@@ -51,8 +93,25 @@ class DepGraph(object):
     def set_dependencies(self, nodeid, coverage_data):
         result = {}
         for filename, value in coverage_data.lines.items():
-            if filename not in self.modules_cache:
-                self.modules_cache[filename] = Module(file_name=filename).blocks
-            result[filename] = checksum_coverage(self.modules_cache[filename], value.keys())
+            result[filename] = checksum_coverage(self.parse_cache(filename), value.keys())
         self.node_data[nodeid] = result
+
+    def track_execute(self, callable_to_track, nodeid):
+        self.cov.erase()
+        self.cov.start()
+        try:
+            result = callable_to_track()
+        except:
+            raise
+        finally:
+            self.cov.stop()
+            self.cov.save()
+
+            self.set_dependencies(nodeid, self.cov.data)
+
+            if not self.cov.data:
+                # TODO warning with chance of beeing propagated to the user
+                print("Warning: tracing of %s failed!" % nodeid)
+        return result
+
 

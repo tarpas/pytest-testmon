@@ -1,10 +1,9 @@
 import os
-import re
 
 import pytest
 from testmon.process_code import Module, Block
-from testmon.testmon_models import DepGraph
-from test_process_code import CodeSample
+from testmon.testmon_models import Testmon, yes_no_test
+from test.test_process_code import CodeSample
 from testmon.plugin import TESTS_CACHE_KEY, get_variant
 import sys
 
@@ -12,14 +11,14 @@ import sys
 pytest_plugins = "pytester",
 
 
-def test_cache_reportheader(testdir):
-    p = testdir.makepyfile("""
-        def test_hello():
-            pass
-    """)
+def test_run_variant_header(testdir):
+    testdir.makeini("""
+                    [pytest]
+                    run_variants=1
+                    """)
     result = testdir.runpytest("-v")
     result.stdout.fnmatch_lines([
-        "*Run variant*",
+        "*Run variant: 1*",
     ])
 
 
@@ -63,10 +62,9 @@ class TestmonDeselect(object):
         """)
         testdir.inprocess_run(["--testmon", ])
 
-    @pytest.mark.xfail
     def test_not_running_after_failure(self, testdir, monkeypatch):
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
-
+        pass
         tf = testdir.makepyfile(test_a="""
             def test_add():
                 pass
@@ -193,12 +191,8 @@ class TestmonDeselect(object):
                 def test_twob(self):
                     print("2")
         """)
-        module2 = Module(cs2.source_code)
-        test_a = testdir.makepyfile(test_a=cs2.source_code)
+        testdir.makepyfile(test_a=cs2.source_code)
 
-        dep_graph = DepGraph({'test_a.py::TestA::()::test_one': {test_a.strpath: [1718898506, 2057111600]}})
-        assert dep_graph.test_should_run('test_a.py::TestA::()::test_one', {test_a.strpath: module2}) == True
-        config.cache.set(TESTS_CACHE_KEY, dep_graph.node_data)
         result = testdir.runpytest("-vv", "--collectonly", "--testmon")
         result.stdout.fnmatch_lines([
             "*test_one*",
@@ -271,62 +265,45 @@ class TestmonDeselect(object):
 
 
 def get_modules(hashes):
-    m1 = Module("print 1", "a.py")
-    m1.blocks = [Block(-1, 0, hass) for hass in hashes]
-    return m1
+    return hashes
 
 
 class TestDepGraph():
     def test_dep_graph1(self):
-        dg = DepGraph({'a.py::test_1': {'a.py': [101, 102]}})
-        assert dg.test_should_run('a.py::test_1', {'a.py': get_modules([101, 102, 3])}) == False
+        assert yes_no_test({'a.py': [101, 102]}, {'a.py': [101, 102, 3]}) == False
 
     def test_dep_graph_new(self):
-        dg = DepGraph({'a.py::test_1': {'a.py': [101, 102]}})
-        assert dg.test_should_run('a.py::test_1', {'new.py': get_modules([101, 102, 3]),
+        assert yes_no_test({'a.py': [101, 102]}, {'new.py': get_modules([101, 102, 3]),
                                                    'a.py': get_modules([101, 102, 3])}) == False
 
     def test_dep_graph2(self):
-        dg = DepGraph({'a.py::test_1': {'a.py': [101, 102]}})
-        assert dg.test_should_run('a.py::test_1', {'a.py': get_modules([101, 102])}) == False
+        assert yes_no_test({'a.py': [101, 102]}, {'a.py': get_modules([101, 102])}) == False
 
     def test_dep_graph3(self):
-        dep_graph = DepGraph({'a.py::test_1': {'a.py': [101, 102]}})
-        assert dep_graph.test_should_run('a.py::test_1', {'a.py': get_modules([101, 102, 103])}) == False
+        assert yes_no_test({'a.py': [101, 102]}, {'a.py': get_modules([101, 102, 103])}) == False
 
     def test_dep_graph4(self):
-        dep_graph = DepGraph({'a.py::test_1': {'a.py': [101, 102]}})
-        assert dep_graph.test_should_run('a.py::test_1', {'a.py': get_modules([101, 103])}) == True
+        assert yes_no_test({'a.py': [101, 102]}, {'a.py': get_modules([101, 103])}) == True
 
     def test_dep_graph_two_modules(self):
-        dep_graph = DepGraph({'test_1': {'a.py': [101, 102]}, 'test_2': {'b.py': [103, 104]}})
         changed_py_files = {'b.py': get_modules([])}
-        assert dep_graph.test_should_run('test_1', changed_py_files) == False
-        assert dep_graph.test_should_run('test_2', changed_py_files) == True
+        assert yes_no_test({'a.py': [101, 102]}, changed_py_files) == False
+        assert yes_no_test({'b.py': [103, 104]}, changed_py_files) == True
 
     def test_two_modules_combination(self):
-        dep_graph = DepGraph({'test_1': {'a.py': [101, 102]},
-                              'test_2': {'b.py': [103, 104]},
-                              'test_both': {'a.py': [105, 106], 'b.py': [107, 108]}})
         changed_py_files = {'b.py': get_modules([])}
-        assert dep_graph.test_should_run('test_1', changed_py_files) == False
-        assert dep_graph.test_should_run('test_both', changed_py_files) == True
+        assert yes_no_test( {'a.py': [101, 102]}, changed_py_files) == False
+        assert yes_no_test({'a.py': [105, 106], 'b.py': [107, 108]}, changed_py_files) == True
 
     def test_two_modules_combination2(self):
-        dep_graph = DepGraph({'test_1': {'a.py': [101, 102]},
-                              'test_2': {'b.py': [103, 104]},
-                              'test_both': {'a.py': [101], 'b.py': [107]}})
         changed_py_files = {'b.py': get_modules([103, 104])}
-        assert dep_graph.test_should_run('test_1', changed_py_files) == False
-        assert dep_graph.test_should_run('test_both', changed_py_files) == True
+        assert yes_no_test({'a.py': [101, 102]}, changed_py_files) == False
+        assert yes_no_test({'a.py': [101], 'b.py': [107]}, changed_py_files) == True
 
     def test_two_modules_combination3(self):
-        dep_graph = DepGraph({'test_1': {'a.py': [101, 102]},
-                              'test_2': {'b.py': [103, 104]},
-                              'test_both': {'a.py': [101], 'b.py': [103]}})
         changed_py_files = {'b.py': get_modules([103, 104])}
-        assert dep_graph.test_should_run('test_1', changed_py_files) == False
-        assert dep_graph.test_should_run('test_both', changed_py_files) == False
+        assert yes_no_test('test_1', changed_py_files) == False
+        assert yes_no_test('test_both', changed_py_files) == False
 
     def test_classes_depggraph(self):
         module1 = Module(CodeSample("""
@@ -361,11 +338,9 @@ class TestDepGraph():
                                      bs2[1].checksum)
         assert (bs1[1].name) != (bs2[1].name)
 
-        dep_graph = DepGraph({'test_s.py::TestA::test_one': {'test_s.py': [bs1[0].checksum, bs1[2].checksum]},
-                              'test_s.py::TestA::test_two': {'test_s.py': [bs1[1].checksum, bs1[2].checksum]}})
 
-        assert dep_graph.test_should_run('test_s.py::TestA::test_one', {'test_s.py': module2}) == True
-        assert dep_graph.test_should_run('test_s.py::TestA::test_twob', {'test_s.py': module2}) == True
+        assert yes_no_test({'test_s.py': [bs1[0].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
+        assert yes_no_test({'test_s.py': [bs1[1].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
 
 
 if __name__ == '__main__':

@@ -4,7 +4,8 @@ import os
 import pytest
 from testmon.process_code import Block, Module, checksum_coverage
 import coverage
-from testmon.plugin import track_execute
+from testmon.testmon_models import Testmon
+
 
 def parse(source_code, file_name='a.py'):
     return Module(source_code=source_code, file_name=file_name).blocks
@@ -279,35 +280,23 @@ class TestModule(object):
         assert module1.blocks[1] == module2.blocks[1]
         assert module1.blocks[2] != module2.blocks[2]
 
+from test.coveragepy.coveragetest import CoverageTest
+@pytest.mark.xfail
+class TestCoverageAssumptions(CoverageTest):
 
-def test_coverage():
-    """This is importing from coverage.py test suite. Which is quite a bad idea I guess.
-    TODO rewrite so that it doesn't."""
-    coveragetest = pytest.importorskip('tests.coveragetest')
+    def setUp(self):
+        super(TestCoverageAssumptions, self).setUp()
+        self.testmon = Testmon({}, {})
+        self.testmon.init2([os.getcwd()])
 
-    class TestCoverageAssumptions(coveragetest.CoverageTest):
+    def test_easy(self):
+        for name, mod_cov in code_samples.items():
+            if mod_cov.expected_coverage:
+                try:
+                    self.check_coverage(mod_cov.source_code, mod_cov.expected_coverage)
+                except Exception as e:
+                    raise Exception(e, "This is for code_sample['{}']".format(name))
 
-        def setUp(self):
-            super(TestCoverageAssumptions, self).setUp()
-            self.cov = coverage.coverage(cover_pylib=False)
-            self.cov.use_cache(False)
-
-        def test_easy(self):
-
-            for name, mod_cov in code_samples.items():
-                if mod_cov.expected_coverage:
-                    modname = self.get_module_name()
-                    self.make_file(modname + ".py", mod_cov.source_code)
-
-                    def callit():
-                        self.import_local_file(modname)
-
-                    result, cov_data = track_execute(callit, self.cov)
-
-                    del sys.modules[modname]
-
-                    filename = os.path.abspath(modname + '.py')
-                    assert cov_data.lines[filename] == mod_cov.expected_coverage, "for code sample: %s" % name
 
 # classy: Module(path, mtime, main, [Blocks])
 # ModuleCollection = [Module, Module, Module]
