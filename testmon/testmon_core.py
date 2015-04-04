@@ -15,7 +15,7 @@ def _get_python_lib_paths():
     return [os.path.join(d, "*") for d in res]
 
 
-def yes_no_test(node, changed_py_files):
+def is_dependent(node, changed_py_files):
     if node:
         for changed_file_name in set(node) & set(changed_py_files):
             new_checksums = set(changed_py_files[changed_file_name])
@@ -76,7 +76,7 @@ class Testmon(object):
         TODO
         """
         node = self.node_data.get(nodeid)
-        return yes_no_test(node, {filename: [block.checksum for block in blocks]
+        return is_dependent(node, {filename: [block.checksum for block in blocks]
                                   for filename, blocks
                                   in self.modules_cache.items()})
 

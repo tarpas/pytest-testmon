@@ -2,7 +2,7 @@ import os
 
 import pytest
 from testmon.process_code import Module, Block
-from testmon.testmon_core import Testmon, yes_no_test
+from testmon.testmon_core import Testmon, is_dependent
 from test.test_process_code import CodeSample
 from testmon.pytest_testmon import TESTS_CACHE_KEY, get_variant
 import sys
@@ -270,40 +270,40 @@ def get_modules(hashes):
 
 class TestDepGraph():
     def test_dep_graph1(self):
-        assert yes_no_test({'a.py': [101, 102]}, {'a.py': [101, 102, 3]}) == False
+        assert is_dependent({'a.py': [101, 102]}, {'a.py': [101, 102, 3]}) == False
 
     def test_dep_graph_new(self):
-        assert yes_no_test({'a.py': [101, 102]}, {'new.py': get_modules([101, 102, 3]),
+        assert is_dependent({'a.py': [101, 102]}, {'new.py': get_modules([101, 102, 3]),
                                                    'a.py': get_modules([101, 102, 3])}) == False
 
     def test_dep_graph2(self):
-        assert yes_no_test({'a.py': [101, 102]}, {'a.py': get_modules([101, 102])}) == False
+        assert is_dependent({'a.py': [101, 102]}, {'a.py': get_modules([101, 102])}) == False
 
     def test_dep_graph3(self):
-        assert yes_no_test({'a.py': [101, 102]}, {'a.py': get_modules([101, 102, 103])}) == False
+        assert is_dependent({'a.py': [101, 102]}, {'a.py': get_modules([101, 102, 103])}) == False
 
     def test_dep_graph4(self):
-        assert yes_no_test({'a.py': [101, 102]}, {'a.py': get_modules([101, 103])}) == True
+        assert is_dependent({'a.py': [101, 102]}, {'a.py': get_modules([101, 103])}) == True
 
     def test_dep_graph_two_modules(self):
         changed_py_files = {'b.py': get_modules([])}
-        assert yes_no_test({'a.py': [101, 102]}, changed_py_files) == False
-        assert yes_no_test({'b.py': [103, 104]}, changed_py_files) == True
+        assert is_dependent({'a.py': [101, 102]}, changed_py_files) == False
+        assert is_dependent({'b.py': [103, 104]}, changed_py_files) == True
 
     def test_two_modules_combination(self):
         changed_py_files = {'b.py': get_modules([])}
-        assert yes_no_test( {'a.py': [101, 102]}, changed_py_files) == False
-        assert yes_no_test({'a.py': [105, 106], 'b.py': [107, 108]}, changed_py_files) == True
+        assert is_dependent( {'a.py': [101, 102]}, changed_py_files) == False
+        assert is_dependent({'a.py': [105, 106], 'b.py': [107, 108]}, changed_py_files) == True
 
     def test_two_modules_combination2(self):
         changed_py_files = {'b.py': get_modules([103, 104])}
-        assert yes_no_test({'a.py': [101, 102]}, changed_py_files) == False
-        assert yes_no_test({'a.py': [101], 'b.py': [107]}, changed_py_files) == True
+        assert is_dependent({'a.py': [101, 102]}, changed_py_files) == False
+        assert is_dependent({'a.py': [101], 'b.py': [107]}, changed_py_files) == True
 
     def test_two_modules_combination3(self):
         changed_py_files = {'b.py': get_modules([103, 104])}
-        assert yes_no_test('test_1', changed_py_files) == False
-        assert yes_no_test('test_both', changed_py_files) == False
+        assert is_dependent('test_1', changed_py_files) == False
+        assert is_dependent('test_both', changed_py_files) == False
 
     def test_classes_depggraph(self):
         module1 = Module(CodeSample("""\
@@ -339,8 +339,8 @@ class TestDepGraph():
         assert (bs1[1].name) != (bs2[1].name)
 
 
-        assert yes_no_test({'test_s.py': [bs1[0].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
-        assert yes_no_test({'test_s.py': [bs1[1].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
+        assert is_dependent({'test_s.py': [bs1[0].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
+        assert is_dependent({'test_s.py': [bs1[1].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
 
 
 if __name__ == '__main__':
