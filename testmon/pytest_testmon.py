@@ -5,7 +5,7 @@ from __future__ import division
 import os
 import sys
 
-from testmon.testmon_models import Testmon
+from testmon.testmon_core import Testmon
 
 
 TESTS_CACHE_KEY = '/Testmon/nodedata-'

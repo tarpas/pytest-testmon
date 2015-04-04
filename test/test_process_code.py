@@ -4,7 +4,7 @@ import os
 import pytest
 from testmon.process_code import Block, Module, checksum_coverage
 import coverage
-from testmon.testmon_models import Testmon
+from testmon.testmon_core import Testmon
 
 
 def parse(source_code, file_name='a.py'):

@@ -14,7 +14,7 @@ setup(
     data_files=([('', ['README.rst']), ]),
     entry_points={
         'pytest11': [
-            'testmon = testmon.plugin',
+            'testmon = testmon.pytest_testmon',
         ]
     },
     install_requires=['pytest<2.8', 'pytest-cache>=1.0', 'watchdog>=0.8',

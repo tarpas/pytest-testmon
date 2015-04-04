@@ -2,9 +2,9 @@ import os
 
 import pytest
 from testmon.process_code import Module, Block
-from testmon.testmon_models import Testmon, yes_no_test
+from testmon.testmon_core import Testmon, yes_no_test
 from test.test_process_code import CodeSample
-from testmon.plugin import TESTS_CACHE_KEY, get_variant
+from testmon.pytest_testmon import TESTS_CACHE_KEY, get_variant
 import sys
 
 
@@ -114,7 +114,7 @@ class TestmonDeselect(object):
                 return a + b
         """)
         result = testdir.runpytest("--testmon", "--tb=long", "-v")
-        from testmon.plugin import MTIMES_CACHE_KEY
+        from testmon.pytest_testmon import MTIMES_CACHE_KEY
 
         config = testdir.parseconfigure()
         node_data = config.cache.get(TESTS_CACHE_KEY, {})
@@ -136,7 +136,7 @@ class TestmonDeselect(object):
         a = testdir.makepyfile(test_a=test_a)
         Module(source_code=test_a, file_name='test_a')
         result = testdir.runpytest("--testmon", "--tb=long", "-v")
-        from testmon.plugin import TESTS_CACHE_KEY, MTIMES_CACHE_KEY
+        from testmon.pytest_testmon import TESTS_CACHE_KEY, MTIMES_CACHE_KEY
 
         config = testdir.parseconfigure()
         node_data = config.cache.get(TESTS_CACHE_KEY, {})
