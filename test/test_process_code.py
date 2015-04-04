@@ -124,17 +124,17 @@ class TestchecksumCoverage(object):
 
 
 class CodeSample():
-    def __init__(self, source_code, expected_coverage=None, file_name='test_a.py', ):
-        self.source_code = "\n".join(source_code.splitlines()[1:])
-        self.file_name = file_name
+    def __init__(self, source_code, expected_coverage=None, possible_lines=None):
+        self.source_code = source_code
         self.expected_coverage = expected_coverage or {}
+        self.possible_lines = possible_lines or []
 
     def line_count(self):
         return len(self.source_code.splitlines())
 
 
 code_samples = {
-    1: CodeSample("""
+    1: CodeSample("""\
         def add(a, b):
             return a + b
     
@@ -142,7 +142,7 @@ code_samples = {
             """,
                   {1: None, 2: None, 4: None}),
 
-    2: CodeSample("""
+    2: CodeSample("""\
         def add(a, b):
             return a + b
             
@@ -152,19 +152,19 @@ code_samples = {
         assert add(1, 2) == 3
             """,
                   {1: None, 2: None, 4: None, 7: None}),
-    '3': CodeSample("""
+    '3': CodeSample("""\
         class A(object):
             def add(self, a, b):
                 return a + b
         """,
                     {1: None, 2: None}),
-    '3b': CodeSample("""
+    '3b': CodeSample("""\
         class A(object):
             def add(self, a, b):
                 return a - b
         """,
                      {1: None, 2: None}),
-    'classes': CodeSample("""
+    'classes': CodeSample("""\
         class A(object):
             def add(self, a, b):
                 return a + b
@@ -173,7 +173,7 @@ code_samples = {
         """,
                           {1: None, 2: None, 4: None}),
 
-    'classes_b': CodeSample("""
+    'classes_b': CodeSample("""\
         class A(object):
             def add(self, a, b):
                 return a + b
@@ -181,7 +181,7 @@ code_samples = {
                 return a - b - 1
         """,
                             {1: None, 2: None, 4: None}),
-    'classes_c': CodeSample("""
+    'classes_c': CodeSample("""\
         class A(object):
             def add1(self, a, b):
                 return a + b
@@ -194,7 +194,7 @@ code_samples = {
 
 class TestModule(object):
     def test_base_diff(self):
-        blocks1 = parse("""
+        blocks1 = parse("""\
             a = 1
 
 
@@ -214,7 +214,7 @@ class TestModule(object):
             for i in range(1):
                 pass                """)
 
-        blocks2 = parse("""
+        blocks2 = parse("""\
             a = 1
 
 
@@ -281,29 +281,13 @@ class TestModule(object):
         assert module1.blocks[2] != module2.blocks[2]
 
 from test.coveragepy.coveragetest import CoverageTest
-@pytest.mark.xfail
-class TestCoverageAssumptions(CoverageTest):
 
-    def setUp(self):
-        super(TestCoverageAssumptions, self).setUp()
-        self.testmon = Testmon({}, {})
-        self.testmon.init2([os.getcwd()])
+class TestCoverageAssumptions(CoverageTest):
 
     def test_easy(self):
         for name, mod_cov in code_samples.items():
             if mod_cov.expected_coverage:
-                try:
-                    self.check_coverage(mod_cov.source_code, mod_cov.expected_coverage)
-                except Exception as e:
-                    raise Exception(e, "This is for code_sample['{}']".format(name))
-
-
-# classy: Module(path, mtime, main, [Blocks])
-# ModuleCollection = [Module, Module, Module]
-# last_state=ModuleCollection, new_state=ModuleCollection(), changes=ModuleCollection()
-# DepGraph {for all nodeid: dependencies [ModuleCollection] intersect changes } or
-# dependencies - new_state <> []
-
-#new_dependencies = track_executable(nodeid)
-
+                self.check_coverage(mod_cov.source_code,
+                                    cov_data = mod_cov.expected_coverage,
+                                    msg="This is for code_sample['{}']".format(name))
 

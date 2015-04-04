@@ -310,9 +310,9 @@ class CoverageTest(TestCase):
         s2 = "\n".join([repr(a) for a in a2]) + "\n"
         self.assertMultiLineEqual(s1, s2, msg)
 
-    def check_coverage(self, text, lines=None, missing="", report="",
+    def check_coverage(self, text, cov_data=None, lines=None, missing="", report="",
             excludes=None, partials="",
-            arcz=None, arcz_missing="", arcz_unpredicted=""):
+            arcz=None, arcz_missing="", arcz_unpredicted="", msg=None):
         """Check the coverage measurement of `text`.
 
         The source `text` is run and measured.  `lines` are the line numbers
@@ -353,9 +353,13 @@ class CoverageTest(TestCase):
         # Clean up our side effects
         del sys.modules[modname]
 
+
+
         # Get the analysis results, and check that they are right.
         analysis = cov._analyze(mod)
         statements = sorted(analysis.statements)
+        if cov_data:
+            self.assertEqual(cov.data.lines[os.path.abspath(modname + ".py")], cov_data, msg)
         if lines is not None:
             if type(lines[0]) == type(1):
                 # lines is just a list of numbers, it must match the statements

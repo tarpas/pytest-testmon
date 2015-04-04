@@ -149,7 +149,7 @@ class TestmonDeselect(object):
         """"
         """
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
-        cs1 = CodeSample("""
+        cs1 = CodeSample("""\
             class TestA(object):
                 def test_one(self):
                     print("1")
@@ -158,7 +158,7 @@ class TestmonDeselect(object):
                     print("2")
         """)
 
-        cs2 = CodeSample("""
+        cs2 = CodeSample("""\
             class TestA(object):
                 def test_one(self):
                     print("1")
@@ -183,7 +183,7 @@ class TestmonDeselect(object):
 
     def test_nonfunc_class_2(self, testdir):
         config = testdir.parseconfigure()
-        cs2 = CodeSample("""
+        cs2 = CodeSample("""\
             class TestA(object):
                 def test_one(self):
                     print("1")
@@ -306,7 +306,7 @@ class TestDepGraph():
         assert yes_no_test('test_both', changed_py_files) == False
 
     def test_classes_depggraph(self):
-        module1 = Module(CodeSample("""
+        module1 = Module(CodeSample("""\
             class TestA(object):
                 def test_one(self):
                     print("1")
@@ -316,7 +316,7 @@ class TestDepGraph():
         """).source_code)
         bs1 = module1.blocks
 
-        module2 = Module(CodeSample("""
+        module2 = Module(CodeSample("""\
             class TestA(object):
                 def test_one(self):
                     print("1")

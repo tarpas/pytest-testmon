@@ -29,22 +29,19 @@ def yes_no_test(node, changed_py_files):
 
 class Testmon(object):
 
-    def __init__(self, node_data, mtimes):
+    def __init__(self, node_data, mtimes, project_dirs, variant=None):
+        self.modules_cache = {}
+
         self.node_data = node_data
         self.mtimes = mtimes
-        self.modules_cache = {}
-        self.read_fs()
-
-
-    def init2(self, project_dirs, variant=None):
-        self.testmon_save = True
-        self.cov = coverage.coverage(cover_pylib=False,
-                                     omit=_get_python_lib_paths(),
-                                     config_file=False,
-                                     include=[os.path.join(path, '*') for path in project_dirs])
-        self.cov.use_cache(False)
         self.variant = variant
 
+        self.cov = coverage.coverage(include=[os.path.join(path, '*') for path in project_dirs],
+                                     omit=_get_python_lib_paths(),
+                                     config_file=False,)
+        self.cov.use_cache(False)
+
+        self.read_fs()
 
     def parse_cache(self, module):
         if module not in self.modules_cache:

@@ -52,10 +52,10 @@ def pytest_configure(config):
         node_data = config.cache.get(TESTS_CACHE_KEY + variant, {})
         mtimes = config.cache.get(MTIMES_CACHE_KEY + variant, {})
 
-        testmon = Testmon(node_data, mtimes)
-
-        testmon.init2(config.getoption('project_directory'),
-                       variant)
+        testmon = Testmon(node_data,
+                          mtimes,
+                          config.getoption('project_directory'),
+                          variant)
 
         config.pluginmanager.register(TestmonDeselect(testmon),
                                       "TestmonDeselect")
@@ -80,7 +80,9 @@ def pytest_report_header(config):
 
 
 def by_test_count(config, session):
-    test_counts = Testmon(config.cache.get(TESTS_CACHE_KEY + get_variant(config), {}), {}
+    test_counts = Testmon(config.cache.get(TESTS_CACHE_KEY + get_variant(config), {}),
+                          {},
+                          [],
                            ).modules_test_counts()
     for k in sorted(test_counts.items(), key=lambda ite: ite[1]):
         print("%s: %s" % (k[1], os.path.relpath(k[0])))
