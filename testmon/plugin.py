@@ -4,15 +4,13 @@ Main module of testmon pytest plugin.
 from __future__ import division
 import os
 import sys
-import fnmatch
 
-import coverage
 from testmon.testmon_models import Testmon
-from testmon.process_code import Module
 
 
 TESTS_CACHE_KEY = '/Testmon/nodedata-'
 MTIMES_CACHE_KEY = '/Testmon/mtimes-'
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -57,7 +55,7 @@ def pytest_configure(config):
                           config.getoption('project_directory'),
                           variant)
 
-        config.pluginmanager.register(TestmonDeselect(testmon),
+        config.pluginmanager.register(TestmonDeselect(testmon, config),
                                       "TestmonDeselect")
 
 
@@ -83,16 +81,17 @@ def by_test_count(config, session):
     test_counts = Testmon(config.cache.get(TESTS_CACHE_KEY + get_variant(config), {}),
                           {},
                           [],
-                           ).modules_test_counts()
+                          ).modules_test_counts()
     for k in sorted(test_counts.items(), key=lambda ite: ite[1]):
         print("%s: %s" % (k[1], os.path.relpath(k[0])))
 
 
 class TestmonDeselect(object):
 
-    def __init__(self, testmon):
+    def __init__(self, testmon, config):
         self.testmon_save = True
         self.testmon = testmon
+        self.lastfailed = config.cache.get("cache/lastfailed", set())
 
     def pytest_report_header(self, config):
         # TODO changed method names?
@@ -102,7 +101,7 @@ class TestmonDeselect(object):
     def pytest_collection_modifyitems(self, session, config, items):
         selected, deselected = [], []
         for item in items:
-            if self.testmon.test_should_run(item.nodeid):
+            if item.nodeid in self.lastfailed or self.testmon.test_should_run(item.nodeid):
                 selected.append(item)
             else:
                 deselected.append(item)
@@ -125,4 +124,3 @@ class TestmonDeselect(object):
             config = session.config
             config.cache.set(MTIMES_CACHE_KEY + self.testmon.variant, self.testmon.mtimes)
             config.cache.set(TESTS_CACHE_KEY + self.testmon.variant, self.testmon.node_data)
-
