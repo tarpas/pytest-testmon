@@ -29,11 +29,10 @@ def is_dependent(node, changed_py_files):
 
 class Testmon(object):
 
-    def __init__(self, node_data, mtimes, project_dirs, variant=None):
+    def __init__(self, node_data, project_dirs, variant=None):
         self.modules_cache = {}
 
         self.node_data = node_data
-        self.mtimes = mtimes
         self.variant = variant
 
         self.cov = coverage.coverage(include=[os.path.join(path, '*') for path in project_dirs],
@@ -41,17 +40,17 @@ class Testmon(object):
                                      config_file=False,)
         self.cov.use_cache(False)
 
-        self.read_fs()
 
     def parse_cache(self, module):
         if module not in self.modules_cache:
                         self.modules_cache[module] = Module(file_name=module).blocks
         return self.modules_cache[module]
 
-    def read_fs(self):
+    def read_fs(self, mtimes):
         """
 
         """
+        self.mtimes = mtimes
         for py_file in self.modules_test_counts():
             try:
                 current_mtime = os.path.getmtime(py_file)
