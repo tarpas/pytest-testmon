@@ -44,6 +44,7 @@ class Testmon(object):
     def parse_cache(self, module):
         if module not in self.modules_cache:
                         self.modules_cache[module] = Module(file_name=module).blocks
+                        self.mtimes[module] = os.path.getmtime(module)
         return self.modules_cache[module]
 
     def read_fs(self, mtimes):
@@ -56,7 +57,6 @@ class Testmon(object):
                 current_mtime = os.path.getmtime(py_file)
                 if self.mtimes.get(py_file) != current_mtime:
                     self.parse_cache(py_file)
-                    self.mtimes[py_file] = current_mtime
 
             except OSError:
                 self.mtimes[py_file] = [-2]
