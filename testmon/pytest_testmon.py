@@ -6,6 +6,8 @@ import os
 import sys
 
 from testmon.testmon_core import Testmon
+import json
+import gzip
 
 
 TESTS_CACHE_KEY = '/Testmon/nodedata-'
@@ -44,11 +46,19 @@ def pytest_cmdline_main(config):
         return wrap_session(config, by_test_count)
 
 
+def read_data(variant):
+    try:
+        with gzip.GzipFile(".testmondata", "r") as f:
+            return json.loads(f.read().decode('UTF-8')).get(variant, ({}, {}))
+    except IOError:
+        return {}, {}
+
+
 def pytest_configure(config):
     if config.getoption('testmon'):
         variant = get_variant(config)
-        node_data = config.cache.get(TESTS_CACHE_KEY + variant, {})
-        mtimes = config.cache.get(MTIMES_CACHE_KEY + variant, {})
+
+        mtimes, node_data = read_data(variant)
 
         testmon = Testmon(node_data,
                           config.getoption('project_directory'),
@@ -78,7 +88,8 @@ def pytest_report_header(config):
 
 
 def by_test_count(config, session):
-    test_counts = Testmon(config.cache.get(TESTS_CACHE_KEY + get_variant(config), {}),
+    mtimes, nodes = read_data(get_variant(config))
+    test_counts = Testmon(nodes,
                           [],
                           ).modules_test_counts()
     for k in sorted(test_counts.items(), key=lambda ite: ite[1]):
@@ -121,5 +132,7 @@ class TestmonDeselect(object):
     def pytest_sessionfinish(self, session):
         if self.testmon_save:
             config = session.config
-            config.cache.set(MTIMES_CACHE_KEY + self.testmon.variant, self.testmon.mtimes)
-            config.cache.set(TESTS_CACHE_KEY + self.testmon.variant, self.testmon.node_data)
+            with gzip.GzipFile(".testmondata", "w", 1) as f:
+                f.write(json.dumps({self.testmon.variant:
+                               [self.testmon.mtimes,
+                                self.testmon.node_data,]}).encode('UTF-8'))
