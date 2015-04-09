@@ -2,13 +2,13 @@ from setuptools import setup
 
 setup(
     name='testmon',
-    description='Test Runner for Python',
-    version='0.2.6',
+    description='take TDD to a new level with py.test and testmon',
+    version='0.2.8',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
     packages=['testmon'],
     scripts=['testmon/tmon.py'],
-    url='http://igg.me/at/testmon',
+    url='https://github.com/tarpas/testmon/',
     author_email='tibor.arpas@infinit.sk',
     author='Tibor Arpas, Jozef Knaperek, Martin Riesz',
     data_files=([('', ['README.rst']), ]),
@@ -20,7 +20,7 @@ setup(
     install_requires=['pytest>=2.7.0,<2.8', 'pytest-cache>=1.0', 'watchdog>=0.8',
                       'coverage>=3.7.1,<4.0'],
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Operating System :: POSIX',
         'Operating System :: Microsoft :: Windows',
