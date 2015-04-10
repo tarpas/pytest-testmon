@@ -16,9 +16,9 @@ def test_run_variant_header(testdir):
                     [pytest]
                     run_variants=1
                     """)
-    result = testdir.runpytest("-v")
+    result = testdir.runpytest("-v", "--testmon")
     result.stdout.fnmatch_lines([
-        "*Run variant: 1*",
+        "*Testmon active, run variant: 1*",
     ])
 
 
@@ -169,7 +169,7 @@ class TestmonDeselect(object):
         module2 = Module(cs2.source_code)
 
         test_a = testdir.makepyfile(test_a=cs1.source_code)
-        result = testdir.runpytest("--testmon", "test_a.py::TestA::test_one")
+        result = testdir.runpytest("--testmon=yes", "test_a.py::TestA::test_one")
         result.stdout.fnmatch_lines([
             "*1 passed*",
         ])
@@ -179,6 +179,35 @@ class TestmonDeselect(object):
         result = testdir.runpytest("-v", "--collectonly", "--testmon", "--capture=no")
         result.stdout.fnmatch_lines([
             "*test_one*",
+        ])
+
+    @pytest.mark.xfail(reason="Why is this failing? (see the diff)")
+    def test_strange_argparse_handling(self, testdir, monkeypatch):
+        """"
+        """
+        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
+        cs1 = CodeSample("""\
+            class TestA(object):
+                def test_one(self):
+                    print("1")
+
+                def test_two(self):
+                    print("2")
+        """)
+
+        cs2 = CodeSample("""\
+            class TestA(object):
+                def test_one(self):
+                    print("1")
+
+                def test_twob(self):
+                    print("2")
+        """)
+
+        testdir.makepyfile(test_a=cs1.source_code)
+        result = testdir.runpytest("-v", "--testmon", "test_a.py::TestA::test_one")
+        result.stdout.fnmatch_lines([
+            "*1 passed*",
         ])
 
     def test_nonfunc_class_2(self, testdir):

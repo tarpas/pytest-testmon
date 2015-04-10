@@ -31,9 +31,12 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         '--testmon',
-        action='store_true',
+        action='store',
         dest='testmon',
-        help="(testmon) Select only tests affected by recent changes."
+        nargs='?',
+        const="yes",
+        default="no",
+        help="(testmon) Select only tests affected by recent changes.",
     )
     parser.addini("run_variants", "run variatns",
                   type="linelist", default=[])
@@ -53,9 +56,11 @@ def read_data(variant):
     except IOError:
         return {}, {}
 
+def is_active(config):
+    return config.getoption("testmon") != u"no"
 
 def pytest_configure(config):
-    if config.getoption('testmon'):
+    if is_active(config):
         variant = get_variant(config)
 
         mtimes, node_data = read_data(variant)
@@ -82,11 +87,6 @@ def get_variant(config):
     return ":".join([str(value) for value in eval_values if value])
 
 
-def pytest_report_header(config):
-    if get_variant(config):
-        return "Run variant: {}".format(get_variant(config))
-
-
 def by_test_count(config, session):
     mtimes, nodes = read_data(get_variant(config))
     test_counts = Testmon(nodes,
@@ -101,12 +101,14 @@ class TestmonDeselect(object):
     def __init__(self, testmon, config):
         self.testmon_save = True
         self.testmon = testmon
+        self.config = config
         self.lastfailed = config.cache.get("cache/lastfailed", set())
 
     def pytest_report_header(self, config):
-        # TODO changed method names?
-        # That would require
-        pass
+        if get_variant(self.config):
+            return "Testmon active, run variant: {}".format(get_variant(config))
+        else:
+            return "Testmon active."
 
     def pytest_collection_modifyitems(self, session, config, items):
         selected, deselected = [], []
