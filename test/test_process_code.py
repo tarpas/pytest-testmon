@@ -282,6 +282,22 @@ class TestModule(object):
 
 from test.coveragepy.coveragetest import CoverageTest
 
+class TestCoverageSubprocess(CoverageTest):
+
+        @pytest.mark.xfail
+        def test_subprocess(self):
+            path1 = self.make_file("subprocesstest.py", """\
+            a=1
+            """)
+            self.make_file('.testmoncoveragerc', """\
+[run]
+data_file = .testmoncoverage
+            """)
+            os.environ['COVERAGE_PROCESS_START']='.testmoncoveragerc'
+            self.run_command('python {}'.format(path1))
+            assert os.path.exists('.testmoncoverage')
+
+
 class TestCoverageAssumptions(CoverageTest):
 
     def test_easy(self):
@@ -290,4 +306,5 @@ class TestCoverageAssumptions(CoverageTest):
                 self.check_coverage(mod_cov.source_code,
                                     cov_data = mod_cov.expected_coverage,
                                     msg="This is for code_sample['{}']".format(name))
+
 

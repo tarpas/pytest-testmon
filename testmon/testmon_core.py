@@ -1,7 +1,9 @@
 import os
 from collections import defaultdict
 import sys
+import textwrap
 import coverage
+import random
 
 from testmon.process_code import checksum_coverage
 from testmon.process_code import Module
@@ -27,19 +29,46 @@ def is_dependent(node, changed_py_files):
         return True
 
 
+
 class Testmon(object):
 
-    def __init__(self, node_data, project_dirs, variant=None):
+    def setup_coverage(self, includes, subprocess):
+
+        if subprocess:
+            if not os.path.exists('.tmonsub'):
+                os.makedirs('.tmonsub')
+
+            self.sub_cov_file = os.path.abspath('.tmonsub/.testmoncoverage' + str(random.randint(0, 1000000)))
+            with open(self.sub_cov_file + "_rc", "w") as subprocess_rc:
+                rc_content = textwrap.dedent("""\
+                    [run]
+                    data_file = {}
+                    include = {}
+                    omit = {}
+                    parallel=True
+                    """).format(self.sub_cov_file,
+                                "\n ".join(includes),
+                                "\n ".join(_get_python_lib_paths())
+                                )
+                subprocess_rc.write(rc_content)
+            os.environ['COVERAGE_PROCESS_START'] = self.sub_cov_file + "_rc"
+
+        self.cov = coverage.coverage(include=includes,
+                                     omit=_get_python_lib_paths(),
+                                     data_file=getattr(self, 'sub_cov_file', None),
+                                     config_file=False, )
+        self.cov.use_cache(False)
+
+    def __init__(self, node_data, project_dirs, testmon="yes", variant=None):
         self.modules_cache = {}
 
         self.node_data = node_data
+        self.mtimes = {}
         self.variant = variant
 
-        self.cov = coverage.coverage(include=[os.path.join(path, '*') for path in project_dirs],
-                                     omit=_get_python_lib_paths(),
-                                     config_file=False,)
-        self.cov.use_cache(False)
+        includes = [os.path.join(path, '*') for path in project_dirs]
 
+        self.setup_coverage(includes, subprocess=testmon == 'subprocess')
 
     def parse_cache(self, module):
         if module not in self.modules_cache:
@@ -102,6 +131,8 @@ class Testmon(object):
         finally:
             self.cov.stop()
             self.cov.save()
+            if hasattr(self, 'sub_cov_file'):
+                self.cov.combine()
 
             self.set_dependencies(nodeid, self.cov.data)
 
@@ -110,4 +141,7 @@ class Testmon(object):
                 print("Warning: tracing of %s failed!" % nodeid)
         return result
 
+    def close(self):
+        if hasattr(self, 'sub_cov_file'):
+            os.remove(self.sub_cov_file + "_rc")
 

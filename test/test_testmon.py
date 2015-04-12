@@ -1,7 +1,7 @@
 import os
 
 import pytest
-from testmon.process_code import Module, Block
+from testmon.process_code import Module, checksum_coverage
 from testmon.testmon_core import Testmon, is_dependent
 from test.test_process_code import CodeSample
 from testmon.pytest_testmon import TESTS_CACHE_KEY, get_variant
@@ -18,7 +18,7 @@ def test_run_variant_header(testdir):
                     """)
     result = testdir.runpytest("-v", "--testmon")
     result.stdout.fnmatch_lines([
-        "*Testmon active, run variant: 1*",
+        "*testmon=yes, run variant: 1*",
     ])
 
 
@@ -49,6 +49,35 @@ def test_run_variant_nonsense(testdir):
     config = testdir.parseconfigure()
     assert 'NameError' in get_variant(config)
 
+@pytest.mark.xfail
+def test_subprocesss(testdir, monkeypatch):
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
+    a = testdir.makepyfile(test_a="""\
+    def test_1():
+        a=1
+    """)
+    def runit():
+        testdir.runpytest("test_a.py",)
+    tm = Testmon({},[testdir.tmpdir.strpath])
+    tm.track_execute(runit,'testnode')
+
+    assert {os.path.abspath(a.strpath):
+                checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == tm.node_data['testnode']
+
+@pytest.mark.xfail
+def test_subprocesss_recursive(testdir, monkeypatch):
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
+    a = testdir.makepyfile(test_a="""\
+    def test_1():
+        a=1
+    """)
+    def runit():
+        testdir.runpytest("test_a.py", "--testmon", "--capture=no")
+    tm = Testmon({},[testdir.tmpdir.strpath])
+    tm.track_execute(runit,'testnode')
+
+    assert {os.path.abspath(a.strpath):
+                checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == tm.node_data['testnode']
 
 class TestmonDeselect(object):
 

@@ -67,6 +67,7 @@ def pytest_configure(config):
 
         testmon = Testmon(node_data,
                           config.getoption('project_directory'),
+                          config.getoption("testmon"),
                           variant)
         testmon.read_fs(mtimes)
 
@@ -105,10 +106,11 @@ class TestmonDeselect(object):
         self.lastfailed = config.cache.get("cache/lastfailed", set())
 
     def pytest_report_header(self, config):
+        active_message="testmon={}".format(config.getoption('testmon'))
         if get_variant(self.config):
-            return "Testmon active, run variant: {}".format(get_variant(config))
+            return active_message + ", run variant: {}".format(get_variant(config))
         else:
-            return "Testmon active."
+            return active_message + "."
 
     def pytest_collection_modifyitems(self, session, config, items):
         selected, deselected = [], []
@@ -122,6 +124,8 @@ class TestmonDeselect(object):
             config.hook.pytest_deselected(items=deselected)
 
     def pytest_runtest_call(self, __multicall__, item):
+        if self.config.getoption('testmon') == u'ro':
+            return __multicall__.execute()
         result = self.testmon.track_execute(__multicall__.execute, item.nodeid)
         return result
 
@@ -132,6 +136,7 @@ class TestmonDeselect(object):
         self.testmon_save = False
 
     def pytest_sessionfinish(self, session):
+        self.testmon.close()
         if self.testmon_save:
             config = session.config
             with gzip.GzipFile(".testmondata", "w", 1) as f:
