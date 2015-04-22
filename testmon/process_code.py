@@ -44,7 +44,8 @@ class Module(object):
         if source_code is None:
             with open(file_name) as f:
                 source_code = f.read()
-        source_code = textwrap.dedent(source_code)
+        else:
+            source_code = textwrap.dedent(source_code)
         lines = source_code.splitlines()
         try:
             tree = ast.parse("\n".join(lines), file_name)

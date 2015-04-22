@@ -31,6 +31,28 @@ class Tee(object):
             return getattr(self._files[0], name)
 
 
+def import_local_file(modname):
+    """Import a local file as a module.
+
+    Opens a file in the current directory named `modname`.py, imports it
+    as `modname`, and returns the module object.
+
+    """
+    modfile = modname + '.py'
+    f = open(modfile, 'r')
+
+    for suff in imp.get_suffixes():
+        if suff[0] == '.py':
+            break
+    try:
+        # pylint: disable=W0631
+        # (Using possibly undefined loop variable 'suff')
+        mod = imp.load_module(modname, f, modfile, suff)
+    finally:
+        f.close()
+    return mod
+
+
 # Status returns for the command line.
 OK, ERR = 0, 1
 
@@ -216,27 +238,6 @@ class CoverageTest(TestCase):
         if os.path.exists("__pycache__"):
             shutil.rmtree("__pycache__")
 
-    def import_local_file(self, modname):
-        """Import a local file as a module.
-
-        Opens a file in the current directory named `modname`.py, imports it
-        as `modname`, and returns the module object.
-
-        """
-        modfile = modname + '.py'
-        f = open(modfile, 'r')
-
-        for suff in imp.get_suffixes():
-            if suff[0] == '.py':
-                break
-        try:
-            # pylint: disable=W0631
-            # (Using possibly undefined loop variable 'suff')
-            mod = imp.load_module(modname, f, modfile, suff)
-        finally:
-            f.close()
-        return mod
-
     def start_import_stop(self, cov, modname):
         """Start coverage, import a file, then stop coverage.
 
@@ -249,7 +250,7 @@ class CoverageTest(TestCase):
         cov.start()
         try:                                    # pragma: nested
             # Import the python file, executing it.
-            mod = self.import_local_file(modname)
+            mod = import_local_file(modname)
         finally:                                # pragma: nested
             # Stop Coverage.
             cov.stop()

@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from test.coveragepy import coveragetest
 from testmon.process_code import Module, checksum_coverage
 from testmon.testmon_core import Testmon, is_dependent
 from test.test_process_code import CodeSample
@@ -78,6 +79,28 @@ def test_subprocesss_recursive(testdir, monkeypatch):
 
     assert {os.path.abspath(a.strpath):
                 checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == tm.node_data['testnode']
+
+
+def test_run_disappearing(testdir):
+    a = testdir.makepyfile(a="""\
+    import sys
+    import os
+    with open('b.py', 'w') as f:
+        f.write("print('printing from b.py')")
+    sys.path.append('.')
+    import b
+    os.remove('b.py')
+    """)
+
+    def runit():
+        coveragetest.import_local_file('a')
+        del sys.modules['a']
+
+    tm = Testmon({}, [testdir.tmpdir.strpath])
+    tm.track_execute(runit, 'testnode')
+    assert a.strpath in tm.node_data['testnode']
+    assert len(tm.node_data['testnode']) == 1
+
 
 class TestmonDeselect(object):
 

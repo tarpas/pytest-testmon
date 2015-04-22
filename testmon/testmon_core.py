@@ -72,8 +72,9 @@ class Testmon(object):
 
     def parse_cache(self, module):
         if module not in self.modules_cache:
-                        self.modules_cache[module] = Module(file_name=module).blocks
-                        self.mtimes[module] = os.path.getmtime(module)
+            self.modules_cache[module] = Module(file_name=module).blocks
+            self.mtimes[module] = os.path.getmtime(module)
+
         return self.modules_cache[module]
 
     def read_fs(self, mtimes):
@@ -118,7 +119,8 @@ class Testmon(object):
     def set_dependencies(self, nodeid, coverage_data):
         result = {}
         for filename, value in coverage_data.lines.items():
-            result[filename] = checksum_coverage(self.parse_cache(filename), value.keys())
+            if os.path.exists(filename):
+                result[filename] = checksum_coverage(self.parse_cache(filename), value.keys())
         self.node_data[nodeid] = result
 
     def track_execute(self, callable_to_track, nodeid):
