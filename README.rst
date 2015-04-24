@@ -21,7 +21,7 @@ Usage
 
     # start from scratch (if needed)
     rm .testmondata
-    
+
     # a simple watchdog command for file changes in source tree
     tmon.py
 
@@ -29,7 +29,9 @@ Usage
 Other switches
 ~~~~~~~~~~~~~~
 
-**--project-directory=** the root directory of tracked files (untested), default: current dir.
+**--project-directory=** only files in under this directory will be tracked by coveragepy. Default is rootdir, can be repeated
+
+**--recollect=** Switch off a shortcut which doesn't run the test collection in case there is no changes in tracked files. (Used when you add tests or test_files)
 
 
 Configuration

@@ -23,13 +23,15 @@ def run_pytest(changed_file=".py"):
         print(e, file=sys.stderr)
 
 
+
 class EventHandler(watchdog.events.FileSystemEventHandler):
     def __init__(self):
         watchdog.events.FileSystemEventHandler.__init__(self)
 
     def on_any_event(self, e):
         if e.src_path.endswith(".py") or getattr(e, 'dest_path', '').endswith(".py"):
-            run_pytest()
+            if not isinstance(e, watchdog.events.FileDeletedEvent):
+                run_pytest()
 
 
 if __name__ == "__main__":
@@ -46,7 +48,7 @@ if __name__ == "__main__":
     print("Ready. Watching for changes.")
     try:
         while True:
-            time.sleep(1)
+            time.sleep(0.2)
     except KeyboardInterrupt:
         observer.stop()
     observer.join()

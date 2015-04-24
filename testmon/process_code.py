@@ -100,6 +100,11 @@ class Module(object):
         return repr(node)
 
 
+    @property
+    def checksums(self):
+        return [block.checksum for block in self.blocks]
+
+
 def checksum_coverage(blocks, lines):
     result = []
     line_index = 0

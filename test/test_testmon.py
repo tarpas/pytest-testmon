@@ -1,13 +1,12 @@
 import os
+import sys
 
 import pytest
 from test.coveragepy import coveragetest
 from testmon.process_code import Module, checksum_coverage
-from testmon.testmon_core import Testmon, is_dependent
+from testmon.testmon_core import Testmon, is_dependent, affected_nodeids, eval_variants
 from test.test_process_code import CodeSample
-from testmon.pytest_testmon import TESTS_CACHE_KEY, get_variant
-import sys
-from functools import partial
+from testmon.pytest_testmon import TESTS_CACHE_KEY
 
 
 pytest_plugins = "pytester",
@@ -20,13 +19,13 @@ def test_run_variant_header(testdir):
                     """)
     result = testdir.runpytest("-v", "--testmon")
     result.stdout.fnmatch_lines([
-        "*testmon=yes, run variant: 1*",
+        "*testmon=True, *, run variant: 1*",
     ])
 
 
 def test_run_variant_empty(testdir):
     config = testdir.parseconfigure()
-    assert get_variant(config) == ''
+    assert eval_variants(config.getini('run_variants')) == ''
 
 
 def test_run_variant_env(testdir):
@@ -38,7 +37,7 @@ def test_run_variant_env(testdir):
                                  None # What evaluates to false is no included
                     """)
     config = testdir.parseconfigure()
-    assert get_variant(config) == 'JUST_A_TEST'
+    assert eval_variants(config.getini('run_variants')) == 'JUST_A_TEST'
     del os.environ['TEST_V']
     if test_v_before is not None:
         os.environ['TEST_V']
@@ -49,11 +48,11 @@ def test_run_variant_nonsense(testdir):
                     run_variants=nonsense
                     """)
     config = testdir.parseconfigure()
-    assert 'NameError' in get_variant(config)
+    assert 'NameError' in eval_variants(config.getini('run_variants'))
 
 def track_it(testdir, func):
     testmon = Testmon(project_dirs=[testdir.tmpdir.strpath],
-                      testmon='subprocess')
+                      testmon_labels=set())
     testmon.track_dependencies(func, 'testnode')
     return testmon.node_data['testnode']
 
@@ -88,7 +87,12 @@ def test_subprocesss_recursive(testdir, monkeypatch):
                 checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
 
 
-def test_run_disappearing(testdir):
+def test_run_dissapearing(testdir):
+    testdir.makeini("""
+                [pytest]
+                run_variants=1
+                """)
+
     a = testdir.makepyfile(a="""\
     import sys
     import os
@@ -107,6 +111,35 @@ def test_run_disappearing(testdir):
     assert len(deps) == 1
 
     del sys.modules['a']
+
+
+def test_variants_separation(testdir):
+    testdir.makeini("""
+                [pytest]
+                run_variants=1
+                """)
+    testmon1 = Testmon([testdir.tmpdir.strpath], variant='1')
+    testmon1.node_data['node1'] = {'a.py': 1}
+    testmon1.save()
+
+    testdir.makeini("""
+                [pytest]
+                run_variants=2
+                """)
+    testmon2 = Testmon([testdir.tmpdir.strpath], variant='2')
+    testmon2.node_data['node1'] = {'a.py': 2}
+    testmon2.save()
+
+    testdir.makeini("""
+                [pytest]
+                run_variants=1
+                """)
+
+    testmon_check = Testmon([testdir.tmpdir.strpath], variant='1')
+    testmon_check.read_fs()
+    assert testmon1.node_data['node1'] == {'a.py': 1 }
+
+
 
 
 class TestmonDeselect(object):
@@ -148,7 +181,7 @@ class TestmonDeselect(object):
                 blas
         """,)
         tf.setmtime(1424880937)
-        reprec = testdir.inline_run( "--testmon", "-v")
+        reprec = testdir.inline_run( "--testmon", "-v", "--recollect")
         res = reprec.countoutcomes()
         assert tuple(res) == (0, 0, 1), res
         del sys.modules['test_a']
@@ -182,7 +215,6 @@ class TestmonDeselect(object):
             "*test_a.py::test_add PASSED*",
         ])
 
-
     def test_easy_by_block(self, testdir, monkeypatch):
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         test_a = """
@@ -194,7 +226,7 @@ class TestmonDeselect(object):
         """
         a = testdir.makepyfile(test_a=test_a)
         Module(source_code=test_a, file_name='test_a')
-        result = testdir.runpytest("--testmon", "--tb=long", "-v")
+        result = testdir.runpytest("--testmon", "--tb=long", "-v", "--recollect")
         from testmon.pytest_testmon import TESTS_CACHE_KEY, MTIMES_CACHE_KEY
 
         config = testdir.parseconfigure()
@@ -212,7 +244,7 @@ class TestmonDeselect(object):
             class TestA(object):
                 def test_one(self):
                     print("1")
-            
+
                 def test_two(self):
                     print("2")
         """)
@@ -221,26 +253,25 @@ class TestmonDeselect(object):
             class TestA(object):
                 def test_one(self):
                     print("1")
-            
+
                 def test_twob(self):
                     print("2")
         """)
         module2 = Module(cs2.source_code)
 
         test_a = testdir.makepyfile(test_a=cs1.source_code)
-        result = testdir.runpytest("--testmon=yes", "test_a.py::TestA::test_one")
+        result = testdir.runpytest("--testmon", "test_a.py::TestA::test_one", "--recollect" )
         result.stdout.fnmatch_lines([
             "*1 passed*",
         ])
 
         testdir.makepyfile(test_a=cs2.source_code)
         test_a.setmtime(1424880935)
-        result = testdir.runpytest("-v", "--collectonly", "--testmon", "--capture=no")
+        result = testdir.runpytest("-v", "--collectonly", "--testmon", "--capture=no", "--recollect")
         result.stdout.fnmatch_lines([
             "*test_one*",
         ])
 
-    @pytest.mark.xfail(reason="Why is this failing? (see the diff)")
     def test_strange_argparse_handling(self, testdir, monkeypatch):
         """"
         """
@@ -251,15 +282,6 @@ class TestmonDeselect(object):
                     print("1")
 
                 def test_two(self):
-                    print("2")
-        """)
-
-        cs2 = CodeSample("""\
-            class TestA(object):
-                def test_one(self):
-                    print("1")
-
-                def test_twob(self):
                     print("2")
         """)
 
@@ -275,13 +297,13 @@ class TestmonDeselect(object):
             class TestA(object):
                 def test_one(self):
                     print("1")
-            
+
                 def test_twob(self):
                     print("2")
         """)
         testdir.makepyfile(test_a=cs2.source_code)
 
-        result = testdir.runpytest("-vv", "--collectonly", "--testmon")
+        result = testdir.runpytest("-vv", "--collectonly", "--testmon", "--recollect")
         result.stdout.fnmatch_lines([
             "*test_one*",
         ])
@@ -293,7 +315,7 @@ class TestmonDeselect(object):
             def add(a, b):
                 a = a
                 return a + b
-            
+
             def subtract(a, b):
                 return a - b
         """)
@@ -301,43 +323,43 @@ class TestmonDeselect(object):
         b = testdir.makepyfile(b="""
             def divide(a, b):
                 return a // b
-            
+
             def multiply(a, b):
                 return a * b
         """)
 
-        test_a = testdir.makepyfile(test_a=""" 
+        test_a = testdir.makepyfile(test_a="""
             from a import add, subtract
             import time
-            
+
             def test_add():
                 assert add(1, 2) == 3
-            
+
             def test_subtract():
                 assert subtract(1, 2) == -1
                     """)
 
         test_a = testdir.makepyfile(test_b="""
             import unittest
-            
+
             from b import multiply, divide
-            
+
             class TestB(unittest.TestCase):
                 def test_multiply(self):
                     self.assertEqual(multiply(1, 2), 2)
-            
+
                 def test_divide(self):
                     self.assertEqual(divide(1, 2), 0)
         """)
 
-        test_ab = testdir.makepyfile(test_ab=""" 
+        test_ab = testdir.makepyfile(test_ab="""
             from a import add
             from b import multiply
             def test_add_and_multiply():
                 assert add(2, 3) == 5
                 assert multiply(2, 3) == 6
         """)
-        result = testdir.runpytest("--testmon")
+        result = testdir.runpytest("--testmon", "--recollect")
         result.stdout.fnmatch_lines([
             "*5 passed*",
         ])
@@ -398,7 +420,7 @@ class TestDepGraph():
             class TestA(object):
                 def test_one(self):
                     print("1")
-            
+
                 def test_two(self):
                     print("2")
         """).source_code)
@@ -408,7 +430,7 @@ class TestDepGraph():
             class TestA(object):
                 def test_one(self):
                     print("1")
-            
+
                 def test_twob(self):
                     print("2")
         """).source_code)
@@ -429,6 +451,33 @@ class TestDepGraph():
 
         assert is_dependent({'test_s.py': [bs1[0].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
         assert is_dependent({'test_s.py': [bs1[1].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
+
+    def test_affected_list(self):
+        changes = {'test_a.py': [102, 103]}
+
+        dependencies = {'node1': {'test_a.py': [101, 102]},
+                        'node2': {'test_a.py': [102, 103], 'test_b.py': [200, 201]}}
+
+        def all_files(dependencies):
+            all_files = set()
+            for files in dependencies.values():
+                all_files.update(files.keys())
+            return all_files
+
+        assert all_files(dependencies) == set(['test_a.py', 'test_b.py'])
+
+        deselected = []
+
+        for m in changes:
+            for nodeid, node in dependencies.items():
+                if m in set(node):
+                    new_checksums = set(changes[m])
+                    if not (set(node) - new_checksums):
+                        deselected.append(nodeid)
+
+        assert affected_nodeids(dependencies, changes) == ['node1']
+
+
 
 
 if __name__ == '__main__':

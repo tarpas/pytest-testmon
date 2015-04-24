@@ -1,12 +1,16 @@
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
 import gzip
 import json
 import os
 from collections import defaultdict
 import sys
 import textwrap
-import coverage
 import random
 
+import coverage
 from testmon.process_code import checksum_coverage
 from testmon.process_code import Module
 
@@ -31,23 +35,50 @@ def is_dependent(node, changed_py_files):
         return True
 
 
-def read_data(variant):
-    try:
-        with gzip.GzipFile(".testmondata", "r") as f:
-            return json.loads(f.read().decode('UTF-8')).get(variant, ({}, {}))
-    except IOError:
-        return {}, {}
+def affected_nodeids(nodes, changes):
+    affected = []
+    for filename in changes:
+        for nodeid, node in nodes.items():
+            if filename in node:
+                new_checksums = set(changes[filename])
+                if set(node[filename]) - new_checksums:
+                    affected.append(nodeid)
+    return affected
 
 
 class Testmon(object):
 
-    def setup_coverage(self, includes, subprocess):
+    def __init__(self, project_dirs, testmon_labels=set(), variant=None):
 
+        self.variant = variant if variant else 'default'
+
+        self.alldata = {}
+        self.mtimes = {}
+        self.node_data = {}
+        self.modules_cache = {}
+        self.project_dirs = project_dirs
+        self.lastfailed = []
+        self.testmon_labels = testmon_labels
+
+        self.setup_coverage(not('singleprocess' in testmon_labels))
+
+    def read_data(self):
+        try:
+            with gzip.GzipFile(os.path.join(self.project_dirs[0], ".testmondata"), "r") as f:
+                self.alldata = json.loads(f.read().decode('UTF-8'))
+                if self.variant in self.alldata:
+                    self.mtimes, self.node_data, self.lastfailed = self.alldata[self.variant]
+        except IOError:
+            self.alldata = {}
+
+    def setup_coverage(self, subprocess):
+
+        includes = [os.path.join(path, '*') for path in self.project_dirs]
         if subprocess:
-            if not os.path.exists('.tmonsub'):
-                os.makedirs('.tmonsub')
+            if not os.path.exists('.tmontmp'):
+                os.makedirs('.tmontmp')
 
-            self.sub_cov_file = os.path.abspath('.tmonsub/.testmoncoverage' + str(random.randint(0, 1000000)))
+            self.sub_cov_file = os.path.abspath('.tmontmp/.testmoncoverage' + str(random.randint(0, 1000000)))
             with open(self.sub_cov_file + "_rc", "w") as subprocess_rc:
                 rc_content = textwrap.dedent("""\
                     [run]
@@ -68,20 +99,9 @@ class Testmon(object):
                                      config_file=False, )
         self.cov.use_cache(False)
 
-    def __init__(self, project_dirs, testmon="yes", variant=None):
-
-        self.variant = variant
-
-        self.mtimes = {}
-        self.node_data = {}
-        self.modules_cache = {}
-
-        self.setup_coverage([os.path.join(path, '*') for path in project_dirs],
-                            testmon == 'subprocess')
-
     def parse_cache(self, module):
         if module not in self.modules_cache:
-            self.modules_cache[module] = Module(file_name=module).blocks
+            self.modules_cache[module] = Module(file_name=module)
             self.mtimes[module] = os.path.getmtime(module)
 
         return self.modules_cache[module]
@@ -90,7 +110,8 @@ class Testmon(object):
         """
 
         """
-        self.mtimes, self.node_data = read_data(self.variant)
+        self.read_data()
+        self.old_mtimes = self.mtimes.copy()
         for py_file in self.modules_test_counts():
             try:
                 current_mtime = os.path.getmtime(py_file)
@@ -99,6 +120,16 @@ class Testmon(object):
 
             except OSError:
                 self.mtimes[py_file] = [-2]
+
+        self.affected = affected_nodeids(self.node_data,
+                                         {filename: module.checksums for filename, module in
+                                          self.modules_cache.items()})
+
+
+## possible data structures
+## nodeid1 -> [filename -> [block_a, block_b]]
+## filename -> [block_a -> [nodeid1, ], block_b -> [nodeid1], block_c -> [] ]
+
 
     def repr_per_node(self, key):
         return "{}: {}\n".format(key,
@@ -114,14 +145,14 @@ class Testmon(object):
         TODO
         """
         node = self.node_data.get(nodeid)
-        return is_dependent(node, {filename: [block.checksum for block in blocks]
-                                  for filename, blocks
-                                  in self.modules_cache.items()})
+        return is_dependent(node, {filename: module.checksums
+                                   for filename, module
+                                   in self.modules_cache.items()})
 
     def modules_test_counts(self):
         test_counts = defaultdict(lambda: 0)
-        for _, node in self.node_data.items():
-            for module in node:
+        for files in self.node_data.values():
+            for module in files:
                 test_counts[module] += 1
         return test_counts
 
@@ -129,7 +160,7 @@ class Testmon(object):
         result = {}
         for filename, value in coverage_data.lines.items():
             if os.path.exists(filename):
-                result[filename] = checksum_coverage(self.parse_cache(filename), value.keys())
+                result[filename] = checksum_coverage(self.parse_cache(filename).blocks, value.keys())
         self.node_data[nodeid] = result
 
 
@@ -155,13 +186,38 @@ class Testmon(object):
 
 
     def save(self):
-        with gzip.GzipFile(".testmondata", "w", 1) as f:
-            f.write(json.dumps({self.variant:
-                           [self.mtimes,
-                            self.node_data,]}).encode('UTF-8'))
+        if 'readonly' not in self.testmon_labels:
+            with gzip.GzipFile(os.path.join(self.project_dirs[0], ".testmondata"), "w", 1) as f:
+                self.alldata[self.variant] = (self.mtimes,
+                                              self.node_data,
+                                              self.lastfailed)
+                f.write(json.dumps(self.alldata).encode('UTF-8'))
 
 
     def close(self):
         if hasattr(self, 'sub_cov_file'):
             os.remove(self.sub_cov_file + "_rc")
 
+
+def eval_variants(run_variants):
+    eval_locals = {'os': os, 'sys': sys}
+
+    eval_values = []
+    for var in run_variants:
+        try:
+            eval_values.append(eval(var, {}, eval_locals))
+        except Exception as e:
+            eval_values.append(repr(e))
+
+    return ":".join([str(value) for value in eval_values if value])
+
+
+def get_variant_inifile(inifile):
+    config = configparser.ConfigParser()
+    config.read(str(inifile),)
+    if config.has_section('pytest') and config.has_option('pytest', 'run_variants'):
+        run_variants = config.get('pytest', 'run_variants').split('\n')
+    else:
+        run_variants = []
+
+    return eval_variants(run_variants)

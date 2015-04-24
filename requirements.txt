@@ -1,4 +1,3 @@
 pytest>=2.6,<2.8
-pytest-cache>=1.0
 watchdog>=0.8
 -e hg+https://bitbucket.org/ned/coveragepy@coverage-3.7.1#egg=coverage

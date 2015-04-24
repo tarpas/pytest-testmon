@@ -13,7 +13,6 @@ def parse(source_code, file_name='a.py'):
 
 class TestSourceIntoBlocks(object):
 
-
     def test_empty(self):
         assert parse(source_code="") == []
 
@@ -186,7 +185,7 @@ code_samples = {
             def add1(self, a, b):
                 return a + b
             def subtract(self, a, b):
-                return a - b 
+                return a - b
         """,
                             {1: None, 2: None, 4: None}),
 }
@@ -289,8 +288,8 @@ class TestCoverageSubprocess(CoverageTest):
             a=1
             """)
             self.make_file('.testmoncoveragerc', """\
-[run]
-data_file = .testmoncoverage
+                [run]
+                data_file = .testmoncoverage
             """)
             os.environ['COVERAGE_PROCESS_START']='.testmoncoveragerc'
             self.run_command('python {}'.format(path1))
@@ -305,5 +304,3 @@ class TestCoverageAssumptions(CoverageTest):
                 self.check_coverage(mod_cov.source_code,
                                     cov_data = mod_cov.expected_coverage,
                                     msg="This is for code_sample['{}']".format(name))
-
-
