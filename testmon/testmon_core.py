@@ -1,3 +1,5 @@
+import gzip
+import json
 import os
 from collections import defaultdict
 import sys
@@ -29,6 +31,13 @@ def is_dependent(node, changed_py_files):
         return True
 
 
+def read_data(variant):
+    try:
+        with gzip.GzipFile(".testmondata", "r") as f:
+            return json.loads(f.read().decode('UTF-8')).get(variant, ({}, {}))
+    except IOError:
+        return {}, {}
+
 
 class Testmon(object):
 
@@ -59,16 +68,16 @@ class Testmon(object):
                                      config_file=False, )
         self.cov.use_cache(False)
 
-    def __init__(self, node_data, project_dirs, testmon="yes", variant=None):
-        self.modules_cache = {}
+    def __init__(self, project_dirs, testmon="yes", variant=None):
 
-        self.node_data = node_data
-        self.mtimes = {}
         self.variant = variant
 
-        includes = [os.path.join(path, '*') for path in project_dirs]
+        self.mtimes = {}
+        self.node_data = {}
+        self.modules_cache = {}
 
-        self.setup_coverage(includes, subprocess=testmon == 'subprocess')
+        self.setup_coverage([os.path.join(path, '*') for path in project_dirs],
+                            testmon == 'subprocess')
 
     def parse_cache(self, module):
         if module not in self.modules_cache:
@@ -77,11 +86,11 @@ class Testmon(object):
 
         return self.modules_cache[module]
 
-    def read_fs(self, mtimes):
+    def read_fs(self):
         """
 
         """
-        self.mtimes = mtimes
+        self.mtimes, self.node_data = read_data(self.variant)
         for py_file in self.modules_test_counts():
             try:
                 current_mtime = os.path.getmtime(py_file)
@@ -123,7 +132,8 @@ class Testmon(object):
                 result[filename] = checksum_coverage(self.parse_cache(filename), value.keys())
         self.node_data[nodeid] = result
 
-    def track_execute(self, callable_to_track, nodeid):
+
+    def track_dependencies(self, callable_to_track, nodeid):
         self.cov.erase()
         self.cov.start()
         try:
@@ -142,6 +152,14 @@ class Testmon(object):
                 # TODO warning with chance of beeing propagated to the user
                 print("Warning: tracing of %s failed!" % nodeid)
         return result
+
+
+    def save(self):
+        with gzip.GzipFile(".testmondata", "w", 1) as f:
+            f.write(json.dumps({self.variant:
+                           [self.mtimes,
+                            self.node_data,]}).encode('UTF-8'))
+
 
     def close(self):
         if hasattr(self, 'sub_cov_file'):

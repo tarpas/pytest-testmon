@@ -49,29 +49,13 @@ def pytest_cmdline_main(config):
         return wrap_session(config, by_test_count)
 
 
-def read_data(variant):
-    try:
-        with gzip.GzipFile(".testmondata", "r") as f:
-            return json.loads(f.read().decode('UTF-8')).get(variant, ({}, {}))
-    except IOError:
-        return {}, {}
-
 def is_active(config):
     return config.getoption("testmon") != u"no"
 
+
 def pytest_configure(config):
     if is_active(config):
-        variant = get_variant(config)
-
-        mtimes, node_data = read_data(variant)
-
-        testmon = Testmon(node_data,
-                          config.getoption('project_directory'),
-                          config.getoption("testmon"),
-                          variant)
-        testmon.read_fs(mtimes)
-
-        config.pluginmanager.register(TestmonDeselect(testmon, config),
+        config.pluginmanager.register(TestmonDeselect(config),
                                       "TestmonDeselect")
 
 
@@ -89,17 +73,24 @@ def get_variant(config):
 
 
 def by_test_count(config, session):
-    mtimes, nodes = read_data(get_variant(config))
-    test_counts = Testmon(nodes,
-                          [],
-                          ).modules_test_counts()
+    testmon = Testmon(project_dirs=[],
+                      testmon='ro',
+                      variant=get_variant(config))
+    testmon.read_fs()
+    test_counts = testmon.modules_test_counts()
     for k in sorted(test_counts.items(), key=lambda ite: ite[1]):
         print("%s: %s" % (k[1], os.path.relpath(k[0])))
 
 
 class TestmonDeselect(object):
 
-    def __init__(self, testmon, config):
+    def __init__(self, config):
+
+        testmon = Testmon(config.getoption('project_directory'),
+                          config.getoption("testmon"),
+                          get_variant(config))
+        testmon.read_fs()
+
         self.testmon_save = True
         self.testmon = testmon
         self.config = config
@@ -126,7 +117,7 @@ class TestmonDeselect(object):
     def pytest_runtest_call(self, __multicall__, item):
         if self.config.getoption('testmon') == u'ro':
             return __multicall__.execute()
-        result = self.testmon.track_execute(__multicall__.execute, item.nodeid)
+        result = self.testmon.track_dependencies(__multicall__.execute, item.nodeid)
         return result
 
     def pytest_internalerror(self, excrepr, excinfo):
@@ -136,10 +127,6 @@ class TestmonDeselect(object):
         self.testmon_save = False
 
     def pytest_sessionfinish(self, session):
-        self.testmon.close()
         if self.testmon_save:
-            config = session.config
-            with gzip.GzipFile(".testmondata", "w", 1) as f:
-                f.write(json.dumps({self.testmon.variant:
-                               [self.testmon.mtimes,
-                                self.testmon.node_data,]}).encode('UTF-8'))
+            self.testmon.save()
+        self.testmon.close()

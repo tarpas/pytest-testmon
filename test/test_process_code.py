@@ -284,7 +284,6 @@ from test.coveragepy.coveragetest import CoverageTest
 
 class TestCoverageSubprocess(CoverageTest):
 
-        @pytest.mark.xfail
         def test_subprocess(self):
             path1 = self.make_file("subprocesstest.py", """\
             a=1

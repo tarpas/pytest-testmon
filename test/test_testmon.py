@@ -7,6 +7,7 @@ from testmon.testmon_core import Testmon, is_dependent
 from test.test_process_code import CodeSample
 from testmon.pytest_testmon import TESTS_CACHE_KEY, get_variant
 import sys
+from functools import partial
 
 
 pytest_plugins = "pytester",
@@ -50,20 +51,26 @@ def test_run_variant_nonsense(testdir):
     config = testdir.parseconfigure()
     assert 'NameError' in get_variant(config)
 
-@pytest.mark.xfail
+def track_it(testdir, func):
+    testmon = Testmon(project_dirs=[testdir.tmpdir.strpath],
+                      testmon='subprocess')
+    testmon.track_dependencies(func, 'testnode')
+    return testmon.node_data['testnode']
+
+
 def test_subprocesss(testdir, monkeypatch):
     monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
     a = testdir.makepyfile(test_a="""\
     def test_1():
         a=1
     """)
-    def runit():
-        testdir.runpytest("test_a.py",)
-    tm = Testmon({},[testdir.tmpdir.strpath])
-    tm.track_execute(runit,'testnode')
+    def func():
+        testdir.runpytest("test_a.py")
+
+    deps = track_it(testdir, func)
 
     assert {os.path.abspath(a.strpath):
-                checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == tm.node_data['testnode']
+                checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
 
 @pytest.mark.xfail
 def test_subprocesss_recursive(testdir, monkeypatch):
@@ -72,13 +79,13 @@ def test_subprocesss_recursive(testdir, monkeypatch):
     def test_1():
         a=1
     """)
-    def runit():
+    def func():
         testdir.runpytest("test_a.py", "--testmon", "--capture=no")
-    tm = Testmon({},[testdir.tmpdir.strpath])
-    tm.track_execute(runit,'testnode')
+
+    deps = track_it(testdir, func)
 
     assert {os.path.abspath(a.strpath):
-                checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == tm.node_data['testnode']
+                checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
 
 
 def test_run_disappearing(testdir):
@@ -92,14 +99,14 @@ def test_run_disappearing(testdir):
     os.remove('b.py')
     """)
 
-    def runit():
+    def f():
         coveragetest.import_local_file('a')
-        del sys.modules['a']
 
-    tm = Testmon({}, [testdir.tmpdir.strpath])
-    tm.track_execute(runit, 'testnode')
-    assert a.strpath in tm.node_data['testnode']
-    assert len(tm.node_data['testnode']) == 1
+    deps=track_it(testdir, f)
+    assert a.strpath in deps
+    assert len(deps) == 1
+
+    del sys.modules['a']
 
 
 class TestmonDeselect(object):

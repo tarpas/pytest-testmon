@@ -3,10 +3,11 @@ from setuptools import setup
 setup(
     name='testmon',
     description='take TDD to a new level with py.test and testmon',
-    version='0.2.8',
+    version='0.2.9',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
     packages=['testmon'],
+    py_module=['sitecustomize.py'],
     scripts=['testmon/tmon.py'],
     url='https://github.com/tarpas/testmon/',
     author_email='tibor.arpas@infinit.sk',
@@ -18,7 +19,7 @@ setup(
         ]
     },
     install_requires=['pytest>=2.7.0,<2.8', 'pytest-cache>=1.0', 'watchdog>=0.8',
-                      'coverage>=3.7.1,<4.0'],
+                      'coverage>=3.7.1,<4.0', 'coverage_pth'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
