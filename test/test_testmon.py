@@ -4,7 +4,7 @@ import sys
 import pytest
 from test.coveragepy import coveragetest
 from testmon.process_code import Module, checksum_coverage
-from testmon.testmon_core import Testmon, is_dependent, affected_nodeids, eval_variants
+from testmon.testmon_core import Testmon, is_dependent, affected_nodeids, eval_variant, TestmonData
 from test.test_process_code import CodeSample
 from testmon.pytest_testmon import TESTS_CACHE_KEY
 
@@ -15,7 +15,7 @@ pytest_plugins = "pytester",
 def test_run_variant_header(testdir):
     testdir.makeini("""
                     [pytest]
-                    run_variants=1
+                    run_variant_expression='1'
                     """)
     result = testdir.runpytest("-v", "--testmon")
     result.stdout.fnmatch_lines([
@@ -25,7 +25,7 @@ def test_run_variant_header(testdir):
 
 def test_run_variant_empty(testdir):
     config = testdir.parseconfigure()
-    assert eval_variants(config.getini('run_variants')) == ''
+    assert eval_variant(config.getini('run_variant_expression')) == ''
 
 
 def test_run_variant_env(testdir):
@@ -33,11 +33,10 @@ def test_run_variant_env(testdir):
     os.environ['TEST_V'] = 'JUST_A_TEST'
     testdir.makeini("""
                     [pytest]
-                    run_variants=os.environ.get('TEST_V')
-                                 None # What evaluates to false is no included
+                    run_variant_expression=os.environ.get('TEST_V')
                     """)
     config = testdir.parseconfigure()
-    assert eval_variants(config.getini('run_variants')) == 'JUST_A_TEST'
+    assert eval_variant(config.getini('run_variant_expression')) == 'JUST_A_TEST'
     del os.environ['TEST_V']
     if test_v_before is not None:
         os.environ['TEST_V']
@@ -45,16 +44,19 @@ def test_run_variant_env(testdir):
 def test_run_variant_nonsense(testdir):
     testdir.makeini("""
                     [pytest]
-                    run_variants=nonsense
+                    run_variant_expression=nonsense
                     """)
     config = testdir.parseconfigure()
-    assert 'NameError' in eval_variants(config.getini('run_variants'))
+    assert 'NameError' in eval_variant(config.getini('run_variant_expression'))
 
 def track_it(testdir, func):
     testmon = Testmon(project_dirs=[testdir.tmpdir.strpath],
                       testmon_labels=set())
-    testmon.track_dependencies(func, 'testnode')
-    return testmon.node_data['testnode']
+    testmon_data = TestmonData(testdir.tmpdir.strpath)
+    _result, coverage_data = testmon.track_dependencies(func, 'testnode')
+
+    testmon_data.set_dependencies('testnode', coverage_data)
+    return testmon_data.node_data['testnode']
 
 
 def test_subprocesss(testdir, monkeypatch):
@@ -118,28 +120,26 @@ def test_variants_separation(testdir):
                 [pytest]
                 run_variants=1
                 """)
-    testmon1 = Testmon([testdir.tmpdir.strpath], variant='1')
-    testmon1.node_data['node1'] = {'a.py': 1}
-    testmon1.save()
+    testmon1_data = TestmonData(testdir.tmpdir.strpath, variant='1')
+    testmon1_data.node_data['node1'] = {'a.py': 1}
+    testmon1_data.write_data()
 
     testdir.makeini("""
                 [pytest]
                 run_variants=2
                 """)
-    testmon2 = Testmon([testdir.tmpdir.strpath], variant='2')
-    testmon2.node_data['node1'] = {'a.py': 2}
-    testmon2.save()
+    testmon2_data = TestmonData(testdir.tmpdir.strpath, variant='2')
+    testmon2_data.node_data['node1'] = {'a.py': 2}
+    testmon2_data.write_data()
 
     testdir.makeini("""
                 [pytest]
                 run_variants=1
                 """)
 
-    testmon_check = Testmon([testdir.tmpdir.strpath], variant='1')
-    testmon_check.read_fs()
-    assert testmon1.node_data['node1'] == {'a.py': 1 }
-
-
+    testmon_check_data = TestmonData(testdir.tmpdir.strpath, variant='1')
+    testmon_check_data.read_fs()
+    assert testmon1_data.node_data['node1'] == {'a.py': 1 }
 
 
 class TestmonDeselect(object):

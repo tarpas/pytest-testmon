@@ -45,31 +45,12 @@ def affected_nodeids(nodes, changes):
                     affected.append(nodeid)
     return affected
 
-
 class Testmon(object):
 
-    def __init__(self, project_dirs, testmon_labels=set(), variant=None):
-
-        self.variant = variant if variant else 'default'
-
-        self.alldata = {}
-        self.mtimes = {}
-        self.node_data = {}
-        self.modules_cache = {}
+    def __init__(self, project_dirs, testmon_labels=set()):
         self.project_dirs = project_dirs
-        self.lastfailed = []
         self.testmon_labels = testmon_labels
-
         self.setup_coverage(not('singleprocess' in testmon_labels))
-
-    def read_data(self):
-        try:
-            with gzip.GzipFile(os.path.join(self.project_dirs[0], ".testmondata"), "r") as f:
-                self.alldata = json.loads(f.read().decode('UTF-8'))
-                if self.variant in self.alldata:
-                    self.mtimes, self.node_data, self.lastfailed = self.alldata[self.variant]
-        except IOError:
-            self.alldata = {}
 
     def setup_coverage(self, subprocess):
 
@@ -99,37 +80,114 @@ class Testmon(object):
                                      config_file=False, )
         self.cov.use_cache(False)
 
-    def parse_cache(self, module):
-        if module not in self.modules_cache:
-            self.modules_cache[module] = Module(file_name=module)
-            self.mtimes[module] = os.path.getmtime(module)
+    def track_dependencies(self, callable_to_track, nodeid):
+        self.cov.erase()
+        self.cov.start()
+        try:
+            result = callable_to_track()
+        except:
+            raise
+        finally:
+            self.cov.stop()
+            self.cov.save()
+            if hasattr(self, 'sub_cov_file'):
+                self.cov.combine()
 
-        return self.modules_cache[module]
+        return result, self.cov.data
 
-    def read_fs(self):
-        """
+    def close(self):
+        if hasattr(self, 'sub_cov_file'):
+            os.remove(self.sub_cov_file + "_rc")
 
-        """
+
+def eval_variant(run_variant, **kwargs):
+    if not run_variant:
+        return ''
+
+    eval_locals = {'os': os, 'sys': sys}
+    eval_locals.update(kwargs)
+
+    try:
+        return eval(run_variant, {}, eval_locals)
+    except Exception as e:
+        return repr(e)
+
+
+def get_variant_inifile(inifile):
+    config = configparser.ConfigParser()
+    config.read(str(inifile),)
+    if config.has_section('pytest') and config.has_option('pytest', 'run_variants'):
+        run_variant_expression = config.get('pytest', 'run_variant')
+    else:
+        run_variant = []
+
+    return eval_variant(run_variant_expression)
+
+
+class TestmonData(object):
+    def __init__(self, directory, variant=None):
+
+        self.variant = variant if variant else 'default'
+        self.init_connection(directory)
+        self.mtimes = {}
+        self.node_data = {}
+        self.modules_cache = {}
+        self.lastfailed = []
+
+
+    def __eq__(self, other):
+        return (self.mtimes, \
+                self.node_data, \
+                self.lastfailed == other.mtimes, \
+                other.node_data, \
+                other.lastfailed)
+
+    def init_connection(self, directory):
+        self.datafile = os.path.join(directory, '.testmondata')
+        self.connection = None
+        import sqlite3
+
+        if not os.path.exists(self.datafile):
+            self.newfile = True
+        self.connection = sqlite3.connect(self.datafile)
+        if getattr(self, 'newfile', False):
+            self.init_tables()
+
+    def _fetch_attribute(self, attribute, default=None):
+        cursor = self.connection.execute("SELECT data FROM alldata WHERE dataid=?",
+                                         [self.variant + ':' + attribute])
+        result = cursor.fetchone()
+        if result:
+            return json.loads(result[0])
+        else:
+            return default
+
+    def _write_attribute(self, attribute, data):
+        dataid = self.variant + ':' + attribute
+        cursor = self.connection.execute("UPDATE alldata SET data=? WHERE dataid=?",
+                                         [json.dumps(data), dataid])
+        if not cursor.rowcount:
+            cursor.execute("INSERT INTO alldata VALUES (?, ?)",
+                           [dataid, json.dumps(data)])
+
+    def init_tables(self):
+        self.connection.execute('CREATE TABLE alldata (dataid text primary key, data text)')
+
+    def is_something_changed(self, variant):
         self.read_data()
-        self.old_mtimes = self.mtimes.copy()
-        for py_file in self.modules_test_counts():
-            try:
-                current_mtime = os.path.getmtime(py_file)
-                if self.mtimes.get(py_file) != current_mtime:
-                    self.parse_cache(py_file)
 
-            except OSError:
-                self.mtimes[py_file] = [-2]
+    def read_data(self):
+        self.mtimes, \
+        self.node_data, \
+        self.lastfailed = self._fetch_attribute('mtimes', default={}), \
+                          self._fetch_attribute('node_data', default={}), \
+                          self._fetch_attribute('lastfailed', default=[])
 
-        self.affected = affected_nodeids(self.node_data,
-                                         {filename: module.checksums for filename, module in
-                                          self.modules_cache.items()})
-
-
-## possible data structures
-## nodeid1 -> [filename -> [block_a, block_b]]
-## filename -> [block_a -> [nodeid1, ], block_b -> [nodeid1], block_c -> [] ]
-
+    def write_data(self):
+        with self.connection:
+            self._write_attribute('mtimes', self.mtimes)
+            self._write_attribute('node_data', self.node_data)
+            self._write_attribute('lastfailed', self.lastfailed)
 
     def repr_per_node(self, key):
         return "{}: {}\n".format(key,
@@ -163,61 +221,44 @@ class Testmon(object):
                 result[filename] = checksum_coverage(self.parse_cache(filename).blocks, value.keys())
         self.node_data[nodeid] = result
 
+    def parse_cache(self, module):
+        if module not in self.modules_cache:
+            self.modules_cache[module] = Module(file_name=module)
+            self.mtimes[module] = os.path.getmtime(module)
 
-    def track_dependencies(self, callable_to_track, nodeid):
-        self.cov.erase()
-        self.cov.start()
-        try:
-            result = callable_to_track()
-        except:
-            raise
-        finally:
-            self.cov.stop()
-            self.cov.save()
-            if hasattr(self, 'sub_cov_file'):
-                self.cov.combine()
+        return self.modules_cache[module]
 
-            self.set_dependencies(nodeid, self.cov.data)
+    def read_fs(self):
+        """
 
-            if not self.cov.data:
-                # TODO warning with chance of beeing propagated to the user
-                print("Warning: tracing of %s failed!" % nodeid)
-        return result
+        """
+        self.read_data()
+        self.old_mtimes = self.mtimes.copy()
+        for py_file in self.modules_test_counts():
+            try:
+                current_mtime = os.path.getmtime(py_file)
+                if self.mtimes.get(py_file) != current_mtime:
+                    self.parse_cache(py_file)
 
+            except OSError:
+                self.mtimes[py_file] = [-2]
 
-    def save(self):
-        if 'readonly' not in self.testmon_labels:
-            with gzip.GzipFile(os.path.join(self.project_dirs[0], ".testmondata"), "w", 1) as f:
-                self.alldata[self.variant] = (self.mtimes,
-                                              self.node_data,
-                                              self.lastfailed)
-                f.write(json.dumps(self.alldata).encode('UTF-8'))
+        self.affected = affected_nodeids(self.node_data,
+                                         {filename: module.checksums for filename, module in
+                                          self.modules_cache.items()})
+        return True
 
 
-    def close(self):
-        if hasattr(self, 'sub_cov_file'):
-            os.remove(self.sub_cov_file + "_rc")
+## possible data structures
+## nodeid1 -> [filename -> [block_a, block_b]]
+## filename -> [block_a -> [nodeid1, ], block_b -> [nodeid1], block_c -> [] ]
+
+    def collect_garbage(self, allnodeids):
+        for testmon_nodeid in list(self.node_data.keys()):
+            if testmon_nodeid not in allnodeids:
+                del self.node_data[testmon_nodeid]
+        for lastfailed_nodeid in self.lastfailed:
+            if lastfailed_nodeid not in allnodeids:
+                self.lastfailed.remove(lastfailed_nodeid)
 
 
-def eval_variants(run_variants):
-    eval_locals = {'os': os, 'sys': sys}
-
-    eval_values = []
-    for var in run_variants:
-        try:
-            eval_values.append(eval(var, {}, eval_locals))
-        except Exception as e:
-            eval_values.append(repr(e))
-
-    return ":".join([str(value) for value in eval_values if value])
-
-
-def get_variant_inifile(inifile):
-    config = configparser.ConfigParser()
-    config.read(str(inifile),)
-    if config.has_section('pytest') and config.has_option('pytest', 'run_variants'):
-        run_variants = config.get('pytest', 'run_variants').split('\n')
-    else:
-        run_variants = []
-
-    return eval_variants(run_variants)

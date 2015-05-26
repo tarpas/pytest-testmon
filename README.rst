@@ -31,7 +31,7 @@ Other switches
 
 **--project-directory=** only files in under this directory will be tracked by coveragepy. Default is rootdir, can be repeated
 
-**--recollect=** Switch off a shortcut which doesn't run the test collection in case there is no changes in tracked files. (Used when you add tests or test_files)
+**--recollect** Switch off a shortcut which doesn't run the test collection in case there is no changes in tracked files. (Used when you add tests or test_files)
 
 
 Configuration
@@ -42,8 +42,7 @@ Add testmon to the pytest.ini
 
     [pytest]
     #if you want to separate different environments running the same sources
-    run_variants = os.environ.get('DJANGO_SETTINGS_MODULE')
-                   'python' + str(sys.version_info[:2])
+    run_variant_expression = os.environ.get('DJANGO_SETTINGS_MODULE') + ':python' + str(sys.version_info[:2])
     addopts = --testmon # you can make --testmon a default if you want
 
 
@@ -53,7 +52,7 @@ Individual test outcomes depend on many things, so let's write a little about so
 
 #. executed python code inside the tested project (which presumably changes very frequently, little by little)
 
-#. environment variables (e.g. DJANGO_SETTINGS_MODULE), python version (the run_variants config value denotes these) 
+#. environment variables (e.g. DJANGO_SETTINGS_MODULE), python version (the run_variant_expression config value denotes these)
 
 #. executed python code in all of the **libraries** (which presumably change infrequently)
 

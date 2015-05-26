@@ -4,7 +4,7 @@ Main module of testmon pytest plugin.
 from __future__ import division
 import os
 
-from testmon.testmon_core import Testmon, eval_variants
+from testmon.testmon_core import Testmon, eval_variant, TestmonData
 
 TESTS_CACHE_KEY = '/Testmon/nodedata-'
 MTIMES_CACHE_KEY = '/Testmon/mtimes-'
@@ -63,8 +63,8 @@ def pytest_addoption(parser):
         default=None
     )
 
-    parser.addini("run_variants", "run variatns",
-                  type="linelist", default=[])
+    parser.addini("run_variant_expression", "run variant expression",
+                  default='')
 
 
 def print_nonrun(config, session):
@@ -82,31 +82,30 @@ def testmon_options(config):
     return result
 
 
-def init_testmon(config):
-    if not hasattr(config, 'testmon'):
-        variant = eval_variants(config.getini('run_variants'))
-        project_dirs = config.getoption('project_directory') or [config.rootdir.strpath]
-        testmon = Testmon(project_dirs,
-                          testmon_options(config),
+def init_testmon_data(config):
+    if not hasattr(config, 'testmon_data'):
+        variant = eval_variant(config.getini('run_variant_expression'))
+        config.project_dirs = config.getoption('project_directory') or [config.rootdir.strpath]
+        testmon_data = TestmonData(config.project_dirs[0],
                           variant=variant)
-        testmon.read_fs()
-        config.testmon = testmon
-        return testmon
+        testmon_data.read_fs()
+        config.testmon_data = testmon_data
+        #config.testmon = Testmon(project_dirs, testmon_labels=testmon_options(config) )
+        return testmon_data
     else:
-        return config.testmon
+        return config.testmon_data
 
 def pytest_cmdline_main(config):
+    init_testmon_data(config)
     if config.option.by_test_count:
         from _pytest.main import wrap_session
 
         return wrap_session(config, by_test_count)
     elif config.option.testmon and \
-            not config.option.recollect and \
-            os.path.exists(os.path.join(config.rootdir.strpath, '.testmondata')):
-        config.testmon = init_testmon(config)
+            not config.option.recollect:
 
-        if len(config.testmon.node_data) > 0 and (
-                        len(config.testmon.affected) == 0 and len(config.testmon.lastfailed) == 0):
+
+        if config.testmon_data is False:
             from _pytest.main import wrap_session
 
             return wrap_session(config, print_nonrun)
@@ -118,41 +117,42 @@ def is_active(config):
 
 def pytest_configure(config):
     if is_active(config):
-        config.pluginmanager.register(TestmonDeselect(config),
+        config.pluginmanager.register(TestmonDeselect(config, config.testmon_data),
                                       "TestmonDeselect")
 
 
 def by_test_count(config, session):
-    testmon = init_testmon(config)
-    test_counts = testmon.modules_test_counts()
+    test_counts = config.testmon_data.modules_test_counts()
     for k in sorted(test_counts.items(), key=lambda ite: ite[1]):
         print("%s: %s" % (k[1], os.path.relpath(k[0])))
 
 
 class TestmonDeselect(object):
-    def __init__(self, config):
-        self.testmon = init_testmon(config)
+    def __init__(self, config, testmon_data):
+        self.testmon_data = testmon_data
+        self.testmon = Testmon(config.project_dirs, testmon_labels=testmon_options(config) )
         self.testmon_save = True
         self.config = config
-        self.lastfailed = self.testmon.lastfailed
+        self.lastfailed = self.testmon_data.lastfailed
 
     def pytest_report_header(self, config):
         changed_files = ",".join([os.path.relpath(path, config.rootdir.strpath)
                                   for path
-                                  in self.testmon.modules_cache])
+                                  in self.testmon_data.modules_cache])
         if changed_files=='' or len(changed_files)>100:
-            changed_files = len(self.testmon.modules_cache)
+            changed_files = len(self.testmon_data.modules_cache)
         active_message = "testmon={}, changed files: {}".format(config.getoption('testmon'),
                                                               changed_files)
-        if self.testmon.variant:
-            return active_message + ", run variant: {}".format(self.testmon.variant)
+        if self.testmon_data.variant:
+            return active_message + ", run variant: {}".format(self.testmon_data.variant)
         else:
             return active_message + "."
 
     def pytest_collection_modifyitems(self, session, config, items):
         selected, deselected = [], []
+        self.testmon_data.collect_garbage(allnodeids=[item.nodeid for item in items])
         for item in items:
-            if item.nodeid in self.lastfailed or self.testmon.test_should_run(item.nodeid):
+            if item.nodeid in self.lastfailed or self.testmon_data.test_should_run(item.nodeid):
                 selected.append(item)
             else:
                 deselected.append(item)
@@ -163,7 +163,9 @@ class TestmonDeselect(object):
     def pytest_runtest_call(self, __multicall__, item):
         if self.config.getoption('testmon') == u'readonly':
             return __multicall__.execute()
-        result = self.testmon.track_dependencies(__multicall__.execute, item.nodeid)
+        result, coverage_data = self.testmon.track_dependencies(__multicall__.execute, item.nodeid)
+        self.testmon_data.set_dependencies(item.nodeid, coverage_data)
+
         return result
 
     def pytest_runtest_logreport(self, report):
@@ -186,5 +188,5 @@ class TestmonDeselect(object):
 
     def pytest_sessionfinish(self, session):
         if self.testmon_save:
-            self.testmon.save()
+            self.testmon_data.write_data()
         self.testmon.close()
