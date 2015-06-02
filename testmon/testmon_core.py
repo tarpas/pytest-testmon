@@ -45,6 +45,7 @@ def affected_nodeids(nodes, changes):
                     affected.append(nodeid)
     return affected
 
+
 class Testmon(object):
 
     def __init__(self, project_dirs, testmon_labels=set()):
@@ -116,15 +117,16 @@ def eval_variant(run_variant, **kwargs):
 def get_variant_inifile(inifile):
     config = configparser.ConfigParser()
     config.read(str(inifile),)
-    if config.has_section('pytest') and config.has_option('pytest', 'run_variants'):
-        run_variant_expression = config.get('pytest', 'run_variant')
+    if config.has_section('pytest') and config.has_option('pytest', 'run_variant_expression'):
+        run_variant_expression = config.get('pytest', 'run_variant_expression')
     else:
-        run_variant = []
+        run_variant_expression = None
 
     return eval_variant(run_variant_expression)
 
 
 class TestmonData(object):
+
     def __init__(self, directory, variant=None):
 
         self.variant = variant if variant else 'default'
@@ -134,7 +136,6 @@ class TestmonData(object):
         self.modules_cache = {}
         self.lastfailed = []
 
-
     def __eq__(self, other):
         return (self.mtimes, \
                 self.node_data, \
@@ -142,12 +143,17 @@ class TestmonData(object):
                 other.node_data, \
                 other.lastfailed)
 
+    def is_unchanged(self):
+        return (not self.affected and not self.newfile and not self.lastfailed and len(self.node_data)>0)
+
     def init_connection(self, directory):
         self.datafile = os.path.join(directory, '.testmondata')
         self.connection = None
         import sqlite3
 
-        if not os.path.exists(self.datafile):
+        if os.path.exists(self.datafile):
+            self.newfile = False
+        else:
             self.newfile = True
         self.connection = sqlite3.connect(self.datafile)
         if getattr(self, 'newfile', False):
@@ -172,9 +178,6 @@ class TestmonData(object):
 
     def init_tables(self):
         self.connection.execute('CREATE TABLE alldata (dataid text primary key, data text)')
-
-    def is_something_changed(self, variant):
-        self.read_data()
 
     def read_data(self):
         self.mtimes, \
@@ -246,7 +249,7 @@ class TestmonData(object):
         self.affected = affected_nodeids(self.node_data,
                                          {filename: module.checksums for filename, module in
                                           self.modules_cache.items()})
-        return True
+        return self.affected
 
 
 ## possible data structures

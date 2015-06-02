@@ -70,7 +70,7 @@ def pytest_addoption(parser):
 def print_nonrun(config, session):
     print("Testmon: not running anything because no tracked files changed. To see tracked files use --by-test-count, "
         "to collect new tests and test_files use --testmon --recollect\n"
-          "%s deselected" % len(config.testmon.node_data))
+          "%s deselected" % len(config.testmon_data.node_data))
 
 
 def testmon_options(config):
@@ -87,16 +87,13 @@ def init_testmon_data(config):
         variant = eval_variant(config.getini('run_variant_expression'))
         config.project_dirs = config.getoption('project_directory') or [config.rootdir.strpath]
         testmon_data = TestmonData(config.project_dirs[0],
-                          variant=variant)
-        testmon_data.read_fs()
+                                   variant=variant)
+        affected = testmon_data.read_fs()
         config.testmon_data = testmon_data
-        #config.testmon = Testmon(project_dirs, testmon_labels=testmon_options(config) )
-        return testmon_data
-    else:
-        return config.testmon_data
+        return affected
 
 def pytest_cmdline_main(config):
-    init_testmon_data(config)
+    affected = init_testmon_data(config)
     if config.option.by_test_count:
         from _pytest.main import wrap_session
 
@@ -105,7 +102,7 @@ def pytest_cmdline_main(config):
             not config.option.recollect:
 
 
-        if config.testmon_data is False:
+        if config.testmon_data.is_unchanged():
             from _pytest.main import wrap_session
 
             return wrap_session(config, print_nonrun)

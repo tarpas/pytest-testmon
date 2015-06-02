@@ -4,10 +4,9 @@ import sys
 import pytest
 from test.coveragepy import coveragetest
 from testmon.process_code import Module, checksum_coverage
-from testmon.testmon_core import Testmon, is_dependent, affected_nodeids, eval_variant, TestmonData
+from testmon.testmon_core import Testmon, eval_variant, TestmonData
 from test.test_process_code import CodeSample
 from testmon.pytest_testmon import TESTS_CACHE_KEY
-
 
 pytest_plugins = "pytester",
 
@@ -113,34 +112,6 @@ def test_run_dissapearing(testdir):
     assert len(deps) == 1
 
     del sys.modules['a']
-
-
-def test_variants_separation(testdir):
-    testdir.makeini("""
-                [pytest]
-                run_variants=1
-                """)
-    testmon1_data = TestmonData(testdir.tmpdir.strpath, variant='1')
-    testmon1_data.node_data['node1'] = {'a.py': 1}
-    testmon1_data.write_data()
-
-    testdir.makeini("""
-                [pytest]
-                run_variants=2
-                """)
-    testmon2_data = TestmonData(testdir.tmpdir.strpath, variant='2')
-    testmon2_data.node_data['node1'] = {'a.py': 2}
-    testmon2_data.write_data()
-
-    testdir.makeini("""
-                [pytest]
-                run_variants=1
-                """)
-
-    testmon_check_data = TestmonData(testdir.tmpdir.strpath, variant='1')
-    testmon_check_data.read_fs()
-    assert testmon1_data.node_data['node1'] == {'a.py': 1 }
-
 
 class TestmonDeselect(object):
 
@@ -376,108 +347,6 @@ class TestmonDeselect(object):
 
 def get_modules(hashes):
     return hashes
-
-
-class TestDepGraph():
-    def test_dep_graph1(self):
-        assert is_dependent({'a.py': [101, 102]}, {'a.py': [101, 102, 3]}) == False
-
-    def test_dep_graph_new(self):
-        assert is_dependent({'a.py': [101, 102]}, {'new.py': get_modules([101, 102, 3]),
-                                                   'a.py': get_modules([101, 102, 3])}) == False
-
-    def test_dep_graph2(self):
-        assert is_dependent({'a.py': [101, 102]}, {'a.py': get_modules([101, 102])}) == False
-
-    def test_dep_graph3(self):
-        assert is_dependent({'a.py': [101, 102]}, {'a.py': get_modules([101, 102, 103])}) == False
-
-    def test_dep_graph4(self):
-        assert is_dependent({'a.py': [101, 102]}, {'a.py': get_modules([101, 103])}) == True
-
-    def test_dep_graph_two_modules(self):
-        changed_py_files = {'b.py': get_modules([])}
-        assert is_dependent({'a.py': [101, 102]}, changed_py_files) == False
-        assert is_dependent({'b.py': [103, 104]}, changed_py_files) == True
-
-    def test_two_modules_combination(self):
-        changed_py_files = {'b.py': get_modules([])}
-        assert is_dependent( {'a.py': [101, 102]}, changed_py_files) == False
-        assert is_dependent({'a.py': [105, 106], 'b.py': [107, 108]}, changed_py_files) == True
-
-    def test_two_modules_combination2(self):
-        changed_py_files = {'b.py': get_modules([103, 104])}
-        assert is_dependent({'a.py': [101, 102]}, changed_py_files) == False
-        assert is_dependent({'a.py': [101], 'b.py': [107]}, changed_py_files) == True
-
-    def test_two_modules_combination3(self):
-        changed_py_files = {'b.py': get_modules([103, 104])}
-        assert is_dependent('test_1', changed_py_files) == False
-        assert is_dependent('test_both', changed_py_files) == False
-
-    def test_classes_depggraph(self):
-        module1 = Module(CodeSample("""\
-            class TestA(object):
-                def test_one(self):
-                    print("1")
-
-                def test_two(self):
-                    print("2")
-        """).source_code)
-        bs1 = module1.blocks
-
-        module2 = Module(CodeSample("""\
-            class TestA(object):
-                def test_one(self):
-                    print("1")
-
-                def test_twob(self):
-                    print("2")
-        """).source_code)
-        bs2 = module2.blocks
-
-        assert bs1[0] == bs2[0]
-        assert bs1[1] != bs2[1]
-        assert bs1[2] != bs2[2]
-
-        assert len(module1.blocks) == len(module2.blocks) == 3
-        assert (bs1[1].start,
-                bs1[1].end,
-                bs1[1].checksum) == (bs2[1].start,
-                                     bs2[1].end,
-                                     bs2[1].checksum)
-        assert (bs1[1].name) != (bs2[1].name)
-
-
-        assert is_dependent({'test_s.py': [bs1[0].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
-        assert is_dependent({'test_s.py': [bs1[1].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
-
-    def test_affected_list(self):
-        changes = {'test_a.py': [102, 103]}
-
-        dependencies = {'node1': {'test_a.py': [101, 102]},
-                        'node2': {'test_a.py': [102, 103], 'test_b.py': [200, 201]}}
-
-        def all_files(dependencies):
-            all_files = set()
-            for files in dependencies.values():
-                all_files.update(files.keys())
-            return all_files
-
-        assert all_files(dependencies) == set(['test_a.py', 'test_b.py'])
-
-        deselected = []
-
-        for m in changes:
-            for nodeid, node in dependencies.items():
-                if m in set(node):
-                    new_checksums = set(changes[m])
-                    if not (set(node) - new_checksums):
-                        deselected.append(nodeid)
-
-        assert affected_nodeids(dependencies, changes) == ['node1']
-
-
 
 
 if __name__ == '__main__':
