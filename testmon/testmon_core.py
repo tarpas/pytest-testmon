@@ -1,8 +1,9 @@
+import zlib
+
 try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
-import gzip
 import json
 import os
 from collections import defaultdict
@@ -14,6 +15,8 @@ import coverage
 from testmon.process_code import checksum_coverage
 from testmon.process_code import Module
 
+if sys.version_info > (3,):
+    buffer = memoryview
 
 def _get_python_lib_paths():
     res = [sys.prefix]
@@ -164,20 +167,23 @@ class TestmonData(object):
                                          [self.variant + ':' + attribute])
         result = cursor.fetchone()
         if result:
-            return json.loads(result[0])
+            return json.loads(zlib.decompress(result[0]).decode('utf-8)'))
         else:
             return default
 
     def _write_attribute(self, attribute, data):
         dataid = self.variant + ':' + attribute
+        json_data = json.dumps(data).encode('utf-8')
+        compressed_data_buffer = buffer(zlib.compress(json_data))
         cursor = self.connection.execute("UPDATE alldata SET data=? WHERE dataid=?",
-                                         [json.dumps(data), dataid])
+                                         [compressed_data_buffer, dataid])
         if not cursor.rowcount:
+
             cursor.execute("INSERT INTO alldata VALUES (?, ?)",
-                           [dataid, json.dumps(data)])
+                           [dataid, compressed_data_buffer])
 
     def init_tables(self):
-        self.connection.execute('CREATE TABLE alldata (dataid text primary key, data text)')
+        self.connection.execute('CREATE TABLE alldata (dataid text primary key, data blob)')
 
     def read_data(self):
         self.mtimes, \
