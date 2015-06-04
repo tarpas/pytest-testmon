@@ -41,6 +41,7 @@ class Block():
 class Module(object):
     def __init__(self, source_code=None, file_name='<unknown>'):
         self.blocks = []
+        self.counter = 0
         if source_code is None:
             with open(file_name) as f:
                 source_code = f.read()
@@ -93,12 +94,12 @@ class Module(object):
             if into_block and node:
                 self.blocks.append(Block(node[0].lineno,
                                          end,
-                                         code=", ".join(representations), name=name))
+                                         code=str(self.counter) + ":" + ", ".join(representations), name=name))
+                self.counter += 1
                 return 'transformed_into_block'
             else:
                 return ", ".join(representations)
         return repr(node)
-
 
     @property
     def checksums(self):

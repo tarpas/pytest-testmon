@@ -62,7 +62,6 @@ class TestSourceIntoBlocks(object):
                                       changed[1].end,
                                       changed[1].checksum)
 
-    @pytest.mark.xfail
     def test_same_even_names_but_different_blocks(self):
         blocks = parse("""
                     print('left')
@@ -74,8 +73,6 @@ class TestSourceIntoBlocks(object):
                         print(1)    """)
         assert len(set([block.checksum for block in blocks])) == len(blocks)
 
-
-    @pytest.mark.xfail
     def test_same_but_different_blocks(self):
         blocks = parse("""
                     print('left')
