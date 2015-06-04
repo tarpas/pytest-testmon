@@ -245,29 +245,46 @@ class TestmonData(object):
         self.old_mtimes = self.mtimes.copy()
         for py_file in self.modules_test_counts():
             try:
-                current_mtime = os.path.getmtime(py_file)
-                if self.mtimes.get(py_file) != current_mtime:
+                self.mtimes[py_file] = os.path.getmtime(py_file)
+                if self.old_mtimes.get(py_file) != self.mtimes[py_file]:
                     self.parse_cache(py_file)
 
             except OSError:
                 self.mtimes[py_file] = [-2]
 
-        self.affected = affected_nodeids(self.node_data,
-                                         {filename: module.checksums for filename, module in
-                                          self.modules_cache.items()})
-        return self.affected
+        self.compute_affected()
+
+    def compute_affected(self):
+        self.affected = set()
+        for filename in self.modules_cache:
+            for nodeid, node in self.node_data.items():
+                if filename in node:
+                    new_checksums = set(self.modules_cache[filename].checksums)
+                    if set(node[filename]) - new_checksums:
+                        self.affected.add(nodeid)
+        self.unaffected = set(self.node_data.keys()) - self.affected
+
+    def file_affects(self, rootdir, path):
+        affected = []
+        unaffected = []
+        for nodeid in self.node_data:
+            if os.path.join(rootdir, nodeid.split("::")[0]) == path:
+                if self.test_should_run(nodeid) or nodeid in self.lastfailed:
+                    affected.append(nodeid)
+                else:
+                    unaffected.append(nodeid)
+        return affected, unaffected
 
 
 ## possible data structures
 ## nodeid1 -> [filename -> [block_a, block_b]]
 ## filename -> [block_a -> [nodeid1, ], block_b -> [nodeid1], block_c -> [] ]
 
-    def collect_garbage(self, allnodeids):
+    def collect_garbage(self, allnodeids): # TODO, this was naive a causing loss of data ..
+        return
         for testmon_nodeid in list(self.node_data.keys()):
             if testmon_nodeid not in allnodeids:
                 del self.node_data[testmon_nodeid]
         for lastfailed_nodeid in self.lastfailed:
             if lastfailed_nodeid not in allnodeids:
                 self.lastfailed.remove(lastfailed_nodeid)
-
-

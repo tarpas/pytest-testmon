@@ -3,6 +3,7 @@ Main module of testmon pytest plugin.
 """
 from __future__ import division
 import os
+import pytest
 
 from testmon.testmon_core import Testmon, eval_variant, TestmonData
 
@@ -25,13 +26,6 @@ def pytest_addoption(parser):
         action='store_true',
         dest='by_test_count',
         help="Print modules by test count (from lowest to highest count)"
-    )
-
-    group.addoption(
-        '--recollect',
-        action='store_true',
-        dest='recollect',
-        help="Recollect new tests (and new test files)"
     )
 
     group.addoption(
@@ -67,16 +61,10 @@ def pytest_addoption(parser):
                   default='')
 
 
-def print_nonrun(config, session):
-    print("Testmon: not running anything because no tracked files changed. To see tracked files use --by-test-count, "
-        "to collect new tests and test_files use --testmon --recollect\n"
-          "%s deselected" % len(config.testmon_data.node_data))
-
-
 def testmon_options(config):
     result = []
     for label in ['testmon', 'testmon_singleprocess',
-                  'recollect', 'testmon_off', 'testmon_readonly']:
+                  'testmon_off', 'testmon_readonly']:
         if config.getoption(label):
             result.append(label.replace('testmon_', ''))
     return result
@@ -93,19 +81,11 @@ def init_testmon_data(config):
         return affected
 
 def pytest_cmdline_main(config):
-    affected = init_testmon_data(config)
+    init_testmon_data(config)
     if config.option.by_test_count:
         from _pytest.main import wrap_session
 
         return wrap_session(config, by_test_count)
-    elif config.option.testmon and \
-            not config.option.recollect:
-
-
-        if config.testmon_data.is_unchanged():
-            from _pytest.main import wrap_session
-
-            return wrap_session(config, print_nonrun)
 
 
 def is_active(config):
@@ -176,6 +156,17 @@ class TestmonDeselect(object):
                         self.lastfailed.remove(report.nodeid)
                 except KeyError:
                     pass
+
+    def pytest_ignore_collect(self, path, config):
+        affected, unaffected = config.testmon_data.file_affects(config.rootdir.strpath,
+                                                                path.strpath)
+        if affected:
+            return False
+        if len(unaffected)==0:
+            return False
+        else:
+            config.hook.pytest_deselected(items=unaffected)
+            return True
 
     def pytest_internalerror(self, excrepr, excinfo):
         self.testmon_save = False

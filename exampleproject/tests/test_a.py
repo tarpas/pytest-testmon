@@ -8,11 +8,10 @@ from ..d import always_fail
 
 
 class TestA(unittest.TestCase):
-    # @unittest.skip('')
+    @unittest.skip('')
     def test_add(self):
         """test adding"""
         self.assertEqual(add(1, 2), 3)
-        pass
 
     def test_subtract(self):
         """test subtracting"""
@@ -20,6 +19,7 @@ class TestA(unittest.TestCase):
 
     @pytest.mark.xfail(True, reason="Division by zero not implemented yet.")
     def test_always_fail(self):
+        pass
         always_fail()
 
     #@pytest.mark.skipif(True, reason="Not available on this platform")

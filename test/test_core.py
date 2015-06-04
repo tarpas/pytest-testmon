@@ -25,7 +25,7 @@ def test_read_nonexistent(testdir):
     assert td._fetch_attribute('1') == None
 
 
-def test_write_read_data(testdir):
+def test_write_read_data2(testdir):
     td = TestmonData(testdir.tmpdir.strpath, 'default')
     td.mtimes = {'a.py': 1.0}
     td.node_data = {'n1': {'a.py': [1]}}
@@ -147,4 +147,3 @@ def test_is_unchaged(testdir):
     testmon_check_data = TestmonData(testdir.tmpdir.strpath, variant='1')
     testmon_check_data.read_fs()
     assert testmon_check_data.is_unchanged() == False
-

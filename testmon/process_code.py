@@ -120,5 +120,3 @@ def checksum_coverage(blocks, lines):
             break
 
     return result
-
-

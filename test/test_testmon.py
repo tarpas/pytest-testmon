@@ -152,7 +152,7 @@ class TestmonDeselect(object):
                 blas
         """,)
         tf.setmtime(1424880937)
-        reprec = testdir.inline_run( "--testmon", "-v", "--recollect")
+        reprec = testdir.inline_run( "--testmon", "-v")
         res = reprec.countoutcomes()
         assert tuple(res) == (0, 0, 1), res
         del sys.modules['test_a']
@@ -197,7 +197,7 @@ class TestmonDeselect(object):
         """
         a = testdir.makepyfile(test_a=test_a)
         Module(source_code=test_a, file_name='test_a')
-        result = testdir.runpytest("--testmon", "--tb=long", "-v", "--recollect")
+        result = testdir.runpytest("--testmon", "--tb=long", "-v")
         from testmon.pytest_testmon import TESTS_CACHE_KEY, MTIMES_CACHE_KEY
 
         config = testdir.parseconfigure()
@@ -231,14 +231,14 @@ class TestmonDeselect(object):
         module2 = Module(cs2.source_code)
 
         test_a = testdir.makepyfile(test_a=cs1.source_code)
-        result = testdir.runpytest("--testmon", "test_a.py::TestA::test_one", "--recollect" )
+        result = testdir.runpytest("--testmon", "test_a.py::TestA::test_one",)
         result.stdout.fnmatch_lines([
             "*1 passed*",
         ])
 
         testdir.makepyfile(test_a=cs2.source_code)
         test_a.setmtime(1424880935)
-        result = testdir.runpytest("-v", "--collectonly", "--testmon", "--capture=no", "--recollect")
+        result = testdir.runpytest("-v", "--collectonly", "--testmon", "--capture=no",)
         result.stdout.fnmatch_lines([
             "*test_one*",
         ])
@@ -274,7 +274,7 @@ class TestmonDeselect(object):
         """)
         testdir.makepyfile(test_a=cs2.source_code)
 
-        result = testdir.runpytest("-vv", "--collectonly", "--testmon", "--recollect")
+        result = testdir.runpytest("-vv", "--collectonly", "--testmon",)
         result.stdout.fnmatch_lines([
             "*test_one*",
         ])
@@ -330,13 +330,13 @@ class TestmonDeselect(object):
                 assert add(2, 3) == 5
                 assert multiply(2, 3) == 6
         """)
-        result = testdir.runpytest("--testmon", "--recollect")
+        result = testdir.runpytest("--testmon",)
         result.stdout.fnmatch_lines([
             "*5 passed*",
         ])
         result = testdir.runpytest("--testmon")
         result.stdout.fnmatch_lines([
-            "*5 deselected*",
+            "*collected 0 items*",
         ])
         a.setmtime(1424880935)
         result = testdir.runpytest("--testmon")

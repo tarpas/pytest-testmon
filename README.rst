@@ -1,5 +1,13 @@
 This is a py.test plug-in which automatically selects and re-executes only tests affected by recent changes. How is this possible in dynamic language like Python and how reliable is it? Read here: `Determining affected tests <https://github.com/tarpas/testmon/wiki/Determining-affected-tests>`_
 
+New in version 0.4+ run_variants is no longer. User run_variant_expression (see below)!
+
+New versions usually have new dataformat, don't forget to rm .testmondata after each upgrade.
+
+testmon is approaching completeness. Unfortunatelly the classic console UI is reaching it's usability limits even without testmon.
+With testmon it's even a little more difficult to determine which tests are beeing executed, which are failing and why.
+Next step would be an implementation or integration of GUI. I don't like any  of the existing graphical test runners, so
+if you have some better new concept in mind, get in touch!
 
 Usage
 =====
@@ -17,7 +25,7 @@ Usage
     # change some of your code (with test coverage)
 
     # only run tests affected by recent changes
-    py.test --testmon 
+    py.test --testmon
 
     # start from scratch (if needed)
     rm .testmondata
@@ -30,9 +38,6 @@ Other switches
 ~~~~~~~~~~~~~~
 
 **--project-directory=** only files in under this directory will be tracked by coveragepy. Default is rootdir, can be repeated
-
-**--recollect** Switch off a shortcut which doesn't run the test collection in case there is no changes in tracked files. (Used when you add tests or test_files)
-
 
 Configuration
 =============
@@ -48,7 +53,7 @@ Add testmon to the pytest.ini
 
 Thoughts
 =============
-Individual test outcomes depend on many things, so let's write a little about some of them. 
+Individual test outcomes depend on many things, so let's write a little about some of them.
 
 #. executed python code inside the tested project (which presumably changes very frequently, little by little)
 
@@ -56,7 +61,7 @@ Individual test outcomes depend on many things, so let's write a little about so
 
 #. executed python code in all of the **libraries** (which presumably change infrequently)
 
-#. **data files** (txt, xml, other project assets)  
+#. **data files** (txt, xml, other project assets)
 
 #. external services (reached through network)
 
