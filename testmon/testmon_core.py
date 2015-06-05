@@ -147,9 +147,6 @@ class TestmonData(object):
                 other.node_data, \
                 other.lastfailed)
 
-    def is_unchanged(self):
-        return (not self.affected and not self.newfile and not self.lastfailed and len(self.node_data)>0)
-
     def init_connection(self):
         self.datafile = os.path.join(self.rootdir, '.testmondata')
         self.connection = None
@@ -242,43 +239,32 @@ class TestmonData(object):
         return self.modules_cache[module]
 
     def read_fs(self):
-        """
-
-        """
         self.read_data()
         self.old_mtimes = self.mtimes.copy()
+        self.unchanged_paths = set()
         for py_file in self.modules_test_counts():
             try:
-                self.mtimes[py_file] = os.path.getmtime(py_file)
-                if self.old_mtimes.get(py_file) != self.mtimes[py_file]:
-                    self.parse_cache(py_file)
+                new_mtime = os.path.getmtime(py_file)
+                if self.old_mtimes.get(py_file) != new_mtime:
+                    self.parse_cache(py_file, new_mtime)
 
             except OSError:
                 self.mtimes[py_file] = [-2]
 
-        self.compute_affected()
+        self.compute_unaffected()
 
-    def compute_affected(self):
-        self.affected = set()
-        for filename in self.modules_cache:
-            for nodeid, node in self.node_data.items():
-                if filename in node:
-                    new_checksums = set(self.modules_cache[filename].checksums)
-                    if set(node[filename]) - new_checksums:
-                        self.affected.add(nodeid)
-        self.unaffected = set(self.node_data.keys()) - self.affected
-
-    def file_affects(self, path):
-        affected = []
-        unaffected = []
+    def compute_unaffected(self):
+        affected_paths = set()
+        all_paths = defaultdict(lambda: 0)
         for nodeid in self.node_data:
-            if os.path.join(self.rootdir, nodeid.split("::")[0]) == path:
-                if self.test_should_run(nodeid) or nodeid in self.lastfailed:
-                    affected.append(nodeid)
-                else:
-                    unaffected.append(nodeid)
-        return affected, unaffected
+            path = os.path.join(self.rootdir, nodeid.split("::")[0])
+            all_paths[path] += 1
+            if self.test_should_run(nodeid):
+                affected_paths.add(path)
 
+        affected_paths.update([os.path.join(self.rootdir, nodeid.split("::")[0]) for nodeid in self.lastfailed])
+
+        self.unaffected_paths = {path: all_paths[path] for path in all_paths if path not in affected_paths}
 
 ## possible data structures
 ## nodeid1 -> [filename -> [block_a, block_b]]

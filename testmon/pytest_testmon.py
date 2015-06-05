@@ -118,8 +118,8 @@ class TestmonDeselect(object):
                                   in self.testmon_data.modules_cache])
         if changed_files=='' or len(changed_files)>100:
             changed_files = len(self.testmon_data.modules_cache)
-        active_message = "testmon={}, changed files: {}".format(config.getoption('testmon'),
-                                                              changed_files)
+        active_message = "testmon={}, changed files: {}, skipping collection of {} items".format(config.getoption('testmon'),
+                                                              changed_files, sum(self.testmon_data.unaffected_paths.values()))
         if self.testmon_data.variant:
             return active_message + ", run variant: {}".format(self.testmon_data.variant)
         else:
@@ -158,15 +158,10 @@ class TestmonDeselect(object):
                     pass
 
     def pytest_ignore_collect(self, path, config):
-        if path.strpath.endswith('.py'):
-            affected, unaffected = config.testmon_data.file_affects(path.strpath)
-            if affected:
-                return False
-            if len(unaffected)==0:
-                return False
-            else:
-                config.hook.pytest_deselected(items=unaffected)
-                return True
+        strpath = path.strpath
+        if strpath in self.testmon_data.unaffected_paths:
+            config.hook.pytest_deselected(items=['1'] * self.testmon_data.unaffected_paths[strpath])
+            return True
 
     def pytest_internalerror(self, excrepr, excinfo):
         self.testmon_save = False

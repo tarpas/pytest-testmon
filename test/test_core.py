@@ -142,8 +142,3 @@ def test_variants_separation(testdir):
     testmon_check_data.read_fs()
     assert testmon1_data.node_data['node1'] == {'a.py': 1 }
 
-
-def test_is_unchaged(testdir):
-    testmon_check_data = TestmonData(testdir.tmpdir.strpath, variant='1')
-    testmon_check_data.read_fs()
-    assert testmon_check_data.is_unchanged() == False
