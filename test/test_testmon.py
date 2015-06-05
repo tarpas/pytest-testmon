@@ -54,7 +54,7 @@ def track_it(testdir, func):
     testmon_data = TestmonData(testdir.tmpdir.strpath)
     _result, coverage_data = testmon.track_dependencies(func, 'testnode')
 
-    testmon_data.set_dependencies('testnode', coverage_data)
+    testmon_data.set_dependencies('testnode', coverage_data, testdir.tmpdir.strpath)
     return testmon_data.node_data['testnode']
 
 

@@ -137,11 +137,11 @@ class TestmonDeselect(object):
         if deselected:
             config.hook.pytest_deselected(items=deselected)
 
-    def pytest_runtest_call(self, __multicall__, item):
+    def pytest_runtest_protocol(self, __multicall__, item, nextitem):
         if self.config.getoption('testmon') == u'readonly':
             return __multicall__.execute()
         result, coverage_data = self.testmon.track_dependencies(__multicall__.execute, item.nodeid)
-        self.testmon_data.set_dependencies(item.nodeid, coverage_data)
+        self.testmon_data.set_dependencies(item.nodeid, coverage_data, item.config.rootdir.strpath)
 
         return result
 
@@ -158,15 +158,15 @@ class TestmonDeselect(object):
                     pass
 
     def pytest_ignore_collect(self, path, config):
-        affected, unaffected = config.testmon_data.file_affects(config.rootdir.strpath,
-                                                                path.strpath)
-        if affected:
-            return False
-        if len(unaffected)==0:
-            return False
-        else:
-            config.hook.pytest_deselected(items=unaffected)
-            return True
+        if path.strpath.endswith('.py'):
+            affected, unaffected = config.testmon_data.file_affects(path.strpath)
+            if affected:
+                return False
+            if len(unaffected)==0:
+                return False
+            else:
+                config.hook.pytest_deselected(items=unaffected)
+                return True
 
     def pytest_internalerror(self, excrepr, excinfo):
         self.testmon_save = False

@@ -130,10 +130,11 @@ def get_variant_inifile(inifile):
 
 class TestmonData(object):
 
-    def __init__(self, directory, variant=None):
+    def __init__(self, rootdir, variant=None):
 
         self.variant = variant if variant else 'default'
-        self.init_connection(directory)
+        self.rootdir = rootdir
+        self.init_connection()
         self.mtimes = {}
         self.node_data = {}
         self.modules_cache = {}
@@ -149,8 +150,8 @@ class TestmonData(object):
     def is_unchanged(self):
         return (not self.affected and not self.newfile and not self.lastfailed and len(self.node_data)>0)
 
-    def init_connection(self, directory):
-        self.datafile = os.path.join(directory, '.testmondata')
+    def init_connection(self):
+        self.datafile = os.path.join(self.rootdir, '.testmondata')
         self.connection = None
         import sqlite3
 
@@ -223,17 +224,20 @@ class TestmonData(object):
                 test_counts[module] += 1
         return test_counts
 
-    def set_dependencies(self, nodeid, coverage_data):
+    def set_dependencies(self, nodeid, coverage_data, rootdir):
         result = {}
         for filename, value in coverage_data.lines.items():
             if os.path.exists(filename):
                 result[filename] = checksum_coverage(self.parse_cache(filename).blocks, value.keys())
+        if not result:
+            filename = os.path.join(rootdir, nodeid).split("::",1)[0]
+            result[filename] = checksum_coverage(self.parse_cache(filename).blocks,[1])
         self.node_data[nodeid] = result
 
-    def parse_cache(self, module):
+    def parse_cache(self, module, new_mtime=None):
         if module not in self.modules_cache:
             self.modules_cache[module] = Module(file_name=module)
-            self.mtimes[module] = os.path.getmtime(module)
+            self.mtimes[module] = new_mtime if new_mtime else os.path.getmtime(module)
 
         return self.modules_cache[module]
 
@@ -264,11 +268,11 @@ class TestmonData(object):
                         self.affected.add(nodeid)
         self.unaffected = set(self.node_data.keys()) - self.affected
 
-    def file_affects(self, rootdir, path):
+    def file_affects(self, path):
         affected = []
         unaffected = []
         for nodeid in self.node_data:
-            if os.path.join(rootdir, nodeid.split("::")[0]) == path:
+            if os.path.join(self.rootdir, nodeid.split("::")[0]) == path:
                 if self.test_should_run(nodeid) or nodeid in self.lastfailed:
                     affected.append(nodeid)
                 else:
