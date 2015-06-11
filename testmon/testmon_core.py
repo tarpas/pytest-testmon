@@ -83,6 +83,7 @@ class Testmon(object):
                                      data_file=getattr(self, 'sub_cov_file', None),
                                      config_file=False, )
         self.cov.use_cache(False)
+        self.cov._warn_no_data = False
 
     def track_dependencies(self, callable_to_track, nodeid):
         self.cov.erase()
