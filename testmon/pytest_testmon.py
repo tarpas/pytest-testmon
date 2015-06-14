@@ -7,9 +7,6 @@ import pytest
 
 from testmon.testmon_core import Testmon, eval_variant, TestmonData
 
-TESTS_CACHE_KEY = '/Testmon/nodedata-'
-MTIMES_CACHE_KEY = '/Testmon/mtimes-'
-
 
 def pytest_addoption(parser):
     group = parser.getgroup('testmon')

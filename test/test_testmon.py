@@ -6,7 +6,6 @@ from test.coveragepy import coveragetest
 from testmon.process_code import Module, checksum_coverage
 from testmon.testmon_core import Testmon, eval_variant, TestmonData
 from test.test_process_code import CodeSample
-from testmon.pytest_testmon import TESTS_CACHE_KEY
 
 pytest_plugins = "pytester",
 
@@ -177,11 +176,6 @@ class TestmonDeselect(object):
                 return a + b
         """)
         result = testdir.runpytest("--testmon", "--tb=long", "-v")
-        from testmon.pytest_testmon import MTIMES_CACHE_KEY
-
-        config = testdir.parseconfigure()
-        node_data = config.cache.get(TESTS_CACHE_KEY, {})
-        mtimes = config.cache.get(MTIMES_CACHE_KEY, {})
         result.stdout.fnmatch_lines([
             "*test_a.py::test_add PASSED*",
         ])
@@ -195,14 +189,10 @@ class TestmonDeselect(object):
             def add(a, b):
                 return a + b
         """
-        a = testdir.makepyfile(test_a=test_a)
+        testdir.makepyfile(test_a=test_a)
         Module(source_code=test_a, file_name='test_a')
         result = testdir.runpytest("--testmon", "--tb=long", "-v")
-        from testmon.pytest_testmon import TESTS_CACHE_KEY, MTIMES_CACHE_KEY
 
-        config = testdir.parseconfigure()
-        node_data = config.cache.get(TESTS_CACHE_KEY, {})
-        mtimes = config.cache.get(MTIMES_CACHE_KEY, {})
         result.stdout.fnmatch_lines([
             "*test_a.py::test_add PASSED*",
         ])
