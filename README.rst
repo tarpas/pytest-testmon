@@ -1,9 +1,9 @@
 .. image:: https://secure.travis-ci.org/tarpas/testmon.png?branch=master
    :alt: Build Status
-   :target: https://secure.travis-ci.org/tarpas/testmon.png
+   :target: https://secure.travis-ci.org/tarpas/pytest-testmon.png
 
 
-This is a py.test plug-in which automatically selects and re-executes only tests affected by recent changes. How is this possible in dynamic language like Python and how reliable is it? Read here: `Determining affected tests <https://github.com/tarpas/testmon/wiki/Determining-affected-tests>`_
+This is a py.test plug-in which automatically selects and re-executes only tests affected by recent changes. How is this possible in dynamic language like Python and how reliable is it? Read here: `Determining affected tests <https://github.com/tarpas/pytest-testmon/wiki/Determining-affected-tests>`_
 
 New in version 0.4+ run_variants is no longer. User run_variant_expression (see below)!
 
