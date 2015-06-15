@@ -1,4 +1,4 @@
-.. image:: https://secure.travis-ci.org/tarpas/testmon.png?branch=master
+.. image:: https://secure.travis-ci.org/tarpas/pytest-testmon.png?branch=master
    :alt: Build Status
    :target: https://secure.travis-ci.org/tarpas/pytest-testmon.png
 
@@ -19,7 +19,7 @@ Usage
 
 ::
 
-    pip install testmon
+    pip install pytest-testmon
 
     # build the dependency database and save it to .testmondata
     py.test --testmon
