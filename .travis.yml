@@ -14,7 +14,7 @@ matrix:
           env: TOXENV=py34
 
 install:
-    - ./.travis/install.sh
+    - pip install tox
 
 script:
-    - ./.travis/run.sh
+    - tox
