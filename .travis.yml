@@ -3,18 +3,18 @@ sudo: false
 language: python
 
 cache:
-    directories:
-        - $HOME/.cache/pip
+  directories:
+    - $HOME/.cache/pip
 
 matrix:
-    include:
-        - python: 2.7
-          env: TOXENV=py27
-        - python: 3.4
-          env: TOXENV=py34
+  include:
+    - python: 2.7
+      env: TOXENV=py27
+    - python: 3.4
+      env: TOXENV=py34
 
 install:
-    - pip install tox
+  - pip install tox
 
 script:
-    - tox
+  - tox
