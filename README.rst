@@ -5,8 +5,6 @@
 
 This is a py.test plug-in which automatically selects and re-executes only tests affected by recent changes. How is this possible in dynamic language like Python and how reliable is it? Read here: `Determining affected tests <https://github.com/tarpas/pytest-testmon/wiki/Determining-affected-tests>`_
 
-New in version 0.4+ run_variants is no longer. User run_variant_expression (see below)!
-
 New versions usually have new dataformat, don't forget to rm .testmondata after each upgrade.
 
 testmon is approaching completeness. Unfortunatelly the classic console UI is reaching it's usability limits even without testmon.
@@ -35,8 +33,9 @@ Usage
     # start from scratch (if needed)
     rm .testmondata
 
-    # a simple watchdog command for file changes in source tree
-    tmon.py
+    # automatic re-execution on every file change with pytest-watch (https://github.com/joeyespo/pytest-watch)
+    pip install pytest-watch
+    ptw -- --testmon
 
 
 Other switches
