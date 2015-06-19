@@ -1,0 +1,109 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>pytest-testmon by tarpas</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/github-light.css">
+    <script src="javascripts/scale.fix.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1 class="header">pytest-testmon</h1>
+        <p class="header">taking TDD to a new level with testmon and py.test for Python</p>
+
+        <ul>
+          <li class="download"><a class="buttons" href="https://github.com/tarpas/pytest-testmon/zipball/master">Download ZIP</a></li>
+          <li class="download"><a class="buttons" href="https://github.com/tarpas/pytest-testmon/tarball/master">Download TAR</a></li>
+          <li><a class="buttons github" href="https://github.com/tarpas/pytest-testmon">View On GitHub</a></li>
+        </ul>
+
+        <p class="header">This project is maintained by <a class="header name" href="https://github.com/tarpas">tarpas</a></p>
+
+
+      </header>
+      <section>
+        <p><a href="https://travis-ci.org/tarpas/pytest-testmon"><img src="https://travis-ci.org/tarpas/pytest-testmon.svg?branch=master" alt="Build Status"></a></p>
+
+<p>This is a py.test plug-in which automatically selects and re-executes only tests affected by recent changes. How is this possible in dynamic language like Python and how reliable is it? Read here: <a href="https://github.com/tarpas/pytest-testmon/wiki/Determining-affected-tests">Determining affected tests</a></p>
+
+<p>New versions usually have new dataformat, don’t forget to rm .testmondata after each upgrade.</p>
+
+<p>testmon is approaching completeness. Unfortunatelly the classic console UI is reaching it’s usability limits even without testmon. With testmon it’s even a little more difficult to determine which tests are beeing executed, which are failing and why. Next step would be an implementation or integration of GUI. I don’t like any of the existing graphical test runners, so if you have some better new concept in mind, get in touch!</p>
+
+<h1>
+<a id="usage" class="anchor" href="#usage" aria-hidden="true"><span class="octicon octicon-link"></span></a>Usage</h1>
+
+<pre><code>pip install pytest-testmon
+
+# build the dependency database and save it to .testmondata
+py.test --testmon
+
+# list of watched project files ordered by tests which reach each specific file
+py.test --by-test-count
+
+# change some of your code (with test coverage)
+
+# only run tests affected by recent changes
+py.test --testmon
+
+# start from scratch (if needed)
+rm .testmondata
+
+# automatic re-execution on every file change with pytest-watch (https://github.com/joeyespo/pytest-watch)
+pip install pytest-watch
+ptw -- --testmon
+</code></pre>
+
+<h2>
+<a id="other-switches" class="anchor" href="#other-switches" aria-hidden="true"><span class="octicon octicon-link"></span></a>Other switches</h2>
+
+<p><strong>–project-directory=</strong> only files in under this directory will be tracked by coveragepy. Default is rootdir, can be repeated</p>
+
+<h1>
+<a id="configuration" class="anchor" href="#configuration" aria-hidden="true"><span class="octicon octicon-link"></span></a>Configuration</h1>
+
+<p>Add testmon to the pytest.ini</p>
+
+<pre><code>[pytest]
+#if you want to separate different environments running the same sources
+run_variant_expression = os.environ.get('DJANGO_SETTINGS_MODULE') + ':python' + str(sys.version_info[:2])
+addopts = --testmon # you can make --testmon a default if you want
+</code></pre>
+
+<h1>
+<a id="thoughts" class="anchor" href="#thoughts" aria-hidden="true"><span class="octicon octicon-link"></span></a>Thoughts</h1>
+
+<p>Individual test outcomes depend on many things, so let’s write a little about some of them.</p>
+
+<ol>
+<li> executed python code inside the tested project (which presumably changes very frequently, little by little)</li>
+<li> environment variables (e.g. DJANGO_SETTINGS_MODULE), python version (the run_variant_expression config value denotes these)</li>
+<li> executed python code in all of the <strong>libraries</strong> (which presumably change infrequently)</li>
+<li> <strong>data files</strong> (txt, xml, other project assets)</li>
+<li> external services (reached through network)</li>
+</ol>
+
+<p><strong>testmon</strong> so far deals with incrementally running tests when faced with the 1. and 2. category of changes.</p>
+
+<p>Later versions can implement some detection of other categories</p>
+
+<p><strong>libraries</strong>: we could compare pip freeze between runs, but it’s slow</p>
+
+<p><strong>data files</strong>: Probably the best bet here is a configuration where the developer would specify which files does a</p>
+      </section>
+      <footer>
+        <p><small>Hosted on <a href="https://pages.github.com">GitHub Pages</a> using the Dinky theme</small></p>
+      </footer>
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+		
+  </body>
+</html>
