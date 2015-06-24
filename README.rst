@@ -7,11 +7,6 @@ This is a py.test plug-in which automatically selects and re-executes only tests
 
 New versions usually have new dataformat, don't forget to rm .testmondata after each upgrade.
 
-testmon is approaching completeness. Unfortunatelly the classic console UI is reaching it's usability limits even without testmon.
-With testmon it's even a little more difficult to determine which tests are beeing executed, which are failing and why.
-Next step would be an implementation or integration of GUI. I don't like any  of the existing graphical test runners, so
-if you have some better new concept in mind, get in touch!
-
 Usage
 =====
 
@@ -53,6 +48,33 @@ Add testmon to the pytest.ini
     #if you want to separate different environments running the same sources
     run_variant_expression = os.environ.get('DJANGO_SETTINGS_MODULE') + ':python' + str(sys.version_info[:2])
     addopts = --testmon # you can make --testmon a default if you want
+
+
+Troubleshooting - usual problems
+================================
+Testmon selects too many tests for execution: Depending you your change it most likely is
+by design. If you changed a method parameter name, you effectively changed the whole hierarchy
+parameter -> method -> class -> module, so any test using anything from that module will be
+re-executed.
+
+If you experience different, even random test outcomes with testmon as opposed to plain py.test
+chances are it is NOT a testmon bug. Every time I got a "bug" report about this we found out the tests
+depended on each other through some global state. The set of deselected and executed tests with
+testmon is highly variable, which means testmon is likely to expose the undesired test
+dependencies. That said, hidden test dependencies are a major no-no and you'll run into problems
+even without testmon. Fix your tests! 
+
+For filing a bug report, please isolate one test and report the unexpected outcomes of that one test. 
+(Most probably you'll experience the same behaviour regardless if you use --testmon or not. Of course 
+you should be adding/removing some no-op statement in the test to trigger re-execution)
+
+
+Roadmap
+=======
+testmon is approaching completeness. Unfortunatelly the classic console UI is reaching it's usability limits even without testmon.
+With testmon it's even a little more difficult to determine which tests are beeing executed, which are failing and why.
+Next step would be an implementation or integration of GUI. I don't like any  of the existing graphical test runners, so
+if you have some better new concept in mind, get in touch!
 
 
 Thoughts
