@@ -68,9 +68,9 @@ def track_it(testdir, func):
     testmon = Testmon(project_dirs=[testdir.tmpdir.strpath],
                       testmon_labels=set())
     testmon_data = TestmonData(testdir.tmpdir.strpath)
-    _result, coverage_data = testmon.track_dependencies(func, 'testnode')
-
-    testmon_data.set_dependencies('testnode', coverage_data, testdir.tmpdir.strpath)
+    testmon.start()
+    func()
+    testmon.stop_and_save(testmon_data, testdir.tmpdir.strpath, 'testnode')
     return testmon_data.node_data['testnode']
 
 

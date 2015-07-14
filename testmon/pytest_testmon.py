@@ -134,13 +134,14 @@ class TestmonDeselect(object):
         if deselected:
             config.hook.pytest_deselected(items=deselected)
 
-    def pytest_runtest_protocol(self, __multicall__, item, nextitem):
+    @pytest.mark.hookwrapper
+    def pytest_runtest_protocol(self, item, nextitem):
         if self.config.getoption('testmon') == u'readonly':
-            return __multicall__.execute()
-        result, coverage_data = self.testmon.track_dependencies(__multicall__.execute, item.nodeid)
-        self.testmon_data.set_dependencies(item.nodeid, coverage_data, item.config.rootdir.strpath)
+            yield
 
-        return result
+        self.testmon.start()
+        yield
+        self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid)
 
     def pytest_runtest_logreport(self, report):
         if report.failed and "xfail" not in report.keywords:

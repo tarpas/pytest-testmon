@@ -85,20 +85,29 @@ class Testmon(object):
         self.cov.use_cache(False)
         self.cov._warn_no_data = False
 
-    def track_dependencies(self, callable_to_track, nodeid):
-        self.cov.erase()
-        self.cov.start()
+    def track_dependencies(self, callable_to_track, testmon_data, rootdir, nodeid):
+        self.start()
         try:
-            result = callable_to_track()
+            callable_to_track()
         except:
             raise
         finally:
-            self.cov.stop()
-            self.cov.save()
-            if hasattr(self, 'sub_cov_file'):
-                self.cov.combine()
+            self.stop_and_save(testmon_data, rootdir, nodeid)
 
-        return result, self.cov.data
+
+    def start(self):
+        self.cov.erase()
+        self.cov.start()
+
+    def stop_and_save(self, testmon_data, rootdir, nodeid):
+        self.cov.stop()
+        self.cov.save()
+        if hasattr(self, 'sub_cov_file'):
+            self.cov.combine()
+
+        testmon_data.set_dependencies(nodeid, self.cov.data, rootdir)
+
+
 
     def close(self):
         if hasattr(self, 'sub_cov_file'):
