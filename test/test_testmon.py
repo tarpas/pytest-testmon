@@ -21,6 +21,17 @@ def test_run_variant_header(testdir):
     ])
 
 
+def test_run_variant_header_nonstr(testdir):
+    testdir.makeini("""
+                    [pytest]
+                    run_variant_expression=int(1)
+                    """)
+    result = testdir.runpytest("-v", "--testmon")
+    result.stdout.fnmatch_lines([
+        "*testmon=True, *, run variant: 1*",
+    ])
+
+
 def test_run_variant_empty(testdir):
     config = testdir.parseconfigure()
     assert eval_variant(config.getini('run_variant_expression')) == ''

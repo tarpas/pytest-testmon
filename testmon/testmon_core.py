@@ -113,7 +113,7 @@ def eval_variant(run_variant, **kwargs):
     eval_locals.update(kwargs)
 
     try:
-        return eval(run_variant, {}, eval_locals)
+        return str(eval(run_variant, {}, eval_locals))
     except Exception as e:
         return repr(e)
 
