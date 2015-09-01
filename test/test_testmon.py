@@ -124,7 +124,7 @@ class TestmonDeselect(object):
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         p = testdir.tmpdir.join('.coveragerc')
         p.write("[")
-        a = testdir.makepyfile(test_a="""
+        testdir.makepyfile(test_a="""
             def test_add():
                 pass
         """)
@@ -174,7 +174,7 @@ class TestmonDeselect(object):
 
     def test_easy(self, testdir, monkeypatch):
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
-        a = testdir.makepyfile(test_a="""
+        testdir.makepyfile(test_a="""
             def test_add():
                 assert add(1, 2) == 3
 
@@ -224,7 +224,7 @@ class TestmonDeselect(object):
                 def test_twob(self):
                     print("2")
         """)
-        module2 = Module(cs2.source_code)
+        Module(cs2.source_code)
 
         test_a = testdir.makepyfile(test_a=cs1.source_code)
         result = testdir.runpytest("--testmon", "test_a.py::TestA::test_one",)
@@ -259,7 +259,7 @@ class TestmonDeselect(object):
         ])
 
     def test_nonfunc_class_2(self, testdir):
-        config = testdir.parseconfigure()
+        testdir.parseconfigure()
         cs2 = CodeSample("""\
             class TestA(object):
                 def test_one(self):
@@ -287,7 +287,7 @@ class TestmonDeselect(object):
                 return a - b
         """)
 
-        b = testdir.makepyfile(b="""
+        testdir.makepyfile(b="""
             def divide(a, b):
                 return a // b
 
@@ -295,7 +295,7 @@ class TestmonDeselect(object):
                 return a * b
         """)
 
-        test_a = testdir.makepyfile(test_a="""
+        testdir.makepyfile(test_a="""
             from a import add, subtract
             import time
 
@@ -306,7 +306,7 @@ class TestmonDeselect(object):
                 assert subtract(1, 2) == -1
                     """)
 
-        test_a = testdir.makepyfile(test_b="""
+        testdir.makepyfile(test_b="""
             import unittest
 
             from b import multiply, divide
@@ -319,7 +319,7 @@ class TestmonDeselect(object):
                     self.assertEqual(divide(1, 2), 0)
         """)
 
-        test_ab = testdir.makepyfile(test_ab="""
+        testdir.makepyfile(test_ab="""
             from a import add
             from b import multiply
             def test_add_and_multiply():
