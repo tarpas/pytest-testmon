@@ -26,18 +26,14 @@ def test_run_variant_empty(testdir):
     assert eval_variant(config.getini('run_variant_expression')) == ''
 
 
-def test_run_variant_env(testdir):
-    test_v_before = os.environ.get('TEST_V')
-    os.environ['TEST_V'] = 'JUST_A_TEST'
+def test_run_variant_env(testdir, monkeypatch):
+    monkeypatch.setenv('TEST_V', 'JUST_A_TEST')
     testdir.makeini("""
                     [pytest]
                     run_variant_expression=os.environ.get('TEST_V')
                     """)
     config = testdir.parseconfigure()
     assert eval_variant(config.getini('run_variant_expression')) == 'JUST_A_TEST'
-    del os.environ['TEST_V']
-    if test_v_before is not None:
-        os.environ['TEST_V']
 
 def test_run_variant_nonsense(testdir):
     testdir.makeini("""
