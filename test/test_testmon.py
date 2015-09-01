@@ -47,6 +47,16 @@ def test_run_variant_nonsense(testdir):
     config = testdir.parseconfigure()
     assert 'NameError' in eval_variant(config.getini('run_variant_expression'))
 
+def test_run_variant_complex(testdir, monkeypatch):
+    "Test that ``os`` is available in list comprehensions."
+    monkeypatch.setenv('TEST_V', 'JUST_A_TEST')
+    testdir.makeini("""
+                    [pytest]
+                    run_variant_expression="_".join([x + ":" + os.environ[x] for x in os.environ if x == 'TEST_V'])
+                    """)
+    config = testdir.parseconfigure()
+    assert eval_variant(config.getini('run_variant_expression')) == 'TEST_V:JUST_A_TEST'
+
 def track_it(testdir, func):
     testmon = Testmon(project_dirs=[testdir.tmpdir.strpath],
                       testmon_labels=set())
