@@ -109,11 +109,11 @@ def eval_variant(run_variant, **kwargs):
     if not run_variant:
         return ''
 
-    eval_locals = {'os': os, 'sys': sys}
-    eval_locals.update(kwargs)
+    eval_globals = {'os': os, 'sys': sys}
+    eval_globals.update(kwargs)
 
     try:
-        return eval(run_variant, {}, eval_locals)
+        return eval(run_variant, eval_globals)
     except Exception as e:
         return repr(e)
 
