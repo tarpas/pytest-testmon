@@ -113,7 +113,7 @@ def eval_variant(run_variant, **kwargs):
     eval_globals.update(kwargs)
 
     try:
-        return eval(run_variant, eval_globals)
+        return str(eval(run_variant, eval_globals))
     except Exception as e:
         return repr(e)
 
