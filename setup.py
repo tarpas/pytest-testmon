@@ -16,7 +16,7 @@ setup(
             'testmon = testmon.pytest_testmon',
         ]
     },
-    install_requires=['pytest>=2.7.0,<2.9', 'coverage>=3.7.1,<4.0', 'coverage_pth'],
+    install_requires=['pytest>=2.7.0,<2.9', 'coverage>=3.7.1,<4.0'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
