@@ -49,6 +49,18 @@ Add testmon to the pytest.ini
     run_variant_expression = os.environ.get('DJANGO_SETTINGS_MODULE') + ':python' + str(sys.version_info[:2])
     addopts = --testmon # you can make --testmon a default if you want
 
+Configuring subprocess tracking
+=================================
+If your test suite uses subprocesses testmon supports this. You just have to configure python+coverage
+so that the coverage hook is executed with every python process started. You can do this by installing
+coverage_pth
+
+::
+
+     pip install coverage_pth 
+     
+If there is any problem you can still configure your python `manually <http://nedbatchelder.com/code/coverage/subprocess.html>`_.
+
 
 Troubleshooting - usual problems
 ================================
