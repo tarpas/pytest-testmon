@@ -290,7 +290,8 @@ class TestCoverageSubprocess(CoverageTest):
             """)
             os.environ['COVERAGE_PROCESS_START']='.testmoncoveragerc'
             self.run_command('python {}'.format(path1))
-            assert os.path.exists('.testmoncoverage')
+            assert os.path.exists('.testmoncoverage'), (
+                os.getcwd(), os.listdir(os.getcwd()))
 
 
 class TestCoverageAssumptions(CoverageTest):
