@@ -155,10 +155,16 @@ class TestmonDeselect(object):
                 except KeyError:
                     pass
 
+    class FakeItemFromTestmon(object):
+        def __init__(self, config):
+            self.config = config
+
     def pytest_ignore_collect(self, path, config):
         strpath = path.strpath
         if strpath in self.testmon_data.unaffected_paths:
-            config.hook.pytest_deselected(items=['1'] * self.testmon_data.unaffected_paths[strpath])
+            config.hook.pytest_deselected(
+                items=([self.FakeItemFromTestmon(config)] *
+                     self.testmon_data.unaffected_paths[strpath]))
             return True
 
     def pytest_internalerror(self, excrepr, excinfo):
