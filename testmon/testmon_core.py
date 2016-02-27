@@ -4,6 +4,7 @@ try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
+import hashlib
 import json
 import os
 from collections import defaultdict
@@ -118,7 +119,10 @@ def eval_variant(run_variant, **kwargs):
     if not run_variant:
         return ''
 
-    eval_globals = {'os': os, 'sys': sys}
+    def md5(s):
+        return hashlib.md5(s.encode()).hexdigest()
+
+    eval_globals = {'os': os, 'sys': sys, 'hashlib': hashlib, 'md5': md5}
     eval_globals.update(kwargs)
 
     try:

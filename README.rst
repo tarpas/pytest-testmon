@@ -45,9 +45,14 @@ Add testmon to the pytest.ini
 ::
 
     [pytest]
-    #if you want to separate different environments running the same sources
+    # If you want to separate different environments running the same sources.
     run_variant_expression = os.environ.get('DJANGO_SETTINGS_MODULE') + ':python' + str(sys.version_info[:2])
     addopts = --testmon # you can make --testmon a default if you want
+
+
+More complex `run_variant_expression` can be written: the `os`, `sys` and
+`hashlib` modules are available, and there is a helper function `md5(s)` that
+will return `hashlib.md5(s.encode()).hexdigest()`.
 
 Configuring subprocess tracking
 =================================
