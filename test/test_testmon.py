@@ -139,7 +139,7 @@ class TestmonDeselect(object):
             def test_add():
                 pass
         """)
-        testdir.inprocess_run(["--testmon", ])
+        testdir.inline_run(["--testmon", ])
 
     def test_not_running_after_failure(self, testdir, monkeypatch):
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
@@ -151,7 +151,7 @@ class TestmonDeselect(object):
         reprec = testdir.inline_run( "--testmon", "-v")
         res = reprec.countoutcomes()
         assert tuple(res) == (1, 0, 0), res
-        del sys.modules['test_a']
+        sys.modules.pop('test_a', None)
 
         tf = testdir.makepyfile(test_a="""
             def test_add():
@@ -161,7 +161,7 @@ class TestmonDeselect(object):
         reprec = testdir.inline_run( "--testmon", "-v")
         res = reprec.countoutcomes()
         assert tuple(res) == (0, 0, 1), res
-        del sys.modules['test_a']
+        sys.modules.pop('test_a', None)
 
         tf = testdir.makepyfile(test_a="""
             def test_add():
@@ -171,7 +171,7 @@ class TestmonDeselect(object):
         reprec = testdir.inline_run( "--testmon", "-v")
         res = reprec.countoutcomes()
         assert tuple(res) == (0, 0, 1), res
-        del sys.modules['test_a']
+        sys.modules.pop('test_a', None)
 
         tf = testdir.makepyfile(test_a="""
             def test_add():
@@ -181,7 +181,7 @@ class TestmonDeselect(object):
         reprec = testdir.inline_run( "--testmon", "-v")
         res = reprec.countoutcomes()
         assert tuple(res) == (1, 0, 0), res
-
+        sys.modules.pop('test_a', None)
 
     def test_easy(self, testdir, monkeypatch):
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)

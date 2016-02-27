@@ -1,10 +1,8 @@
-import sys
 import os
+from test.coveragepy.coveragetest import CoverageTest
 
 import pytest
 from testmon.process_code import Block, Module, checksum_coverage
-import coverage
-from testmon.testmon_core import Testmon
 
 
 def parse(source_code, file_name='a.py'):
@@ -276,7 +274,6 @@ class TestModule(object):
         assert module1.blocks[1] == module2.blocks[1]
         assert module1.blocks[2] != module2.blocks[2]
 
-from test.coveragepy.coveragetest import CoverageTest
 
 class TestCoverageSubprocess(CoverageTest):
 
@@ -290,7 +287,8 @@ class TestCoverageSubprocess(CoverageTest):
             """)
             os.environ['COVERAGE_PROCESS_START']='.testmoncoveragerc'
             self.run_command('python {}'.format(path1))
-            assert os.path.exists('.testmoncoverage')
+            assert os.path.exists('.testmoncoverage'), (
+                os.getcwd(), os.listdir(os.getcwd()))
 
 
 class TestCoverageAssumptions(CoverageTest):
