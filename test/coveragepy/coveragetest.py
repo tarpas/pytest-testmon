@@ -4,9 +4,9 @@ import glob, imp, os, random, shlex, shutil, sys, tempfile, textwrap
 import atexit
 
 import coverage
-from coverage.backward import sorted, StringIO      # pylint: disable=W0622
+from coverage.backward import StringIO      # pylint: disable=W0622
 from coverage.backward import to_bytes
-from coverage.control import _TEST_NAME_FILE
+_TEST_NAME_FILE = "" #"/tmp/covtest.txt"
 from test.coveragepy.backtest import run_command
 from test.coveragepy.backunittest import TestCase
 
@@ -360,7 +360,7 @@ class CoverageTest(TestCase):
         analysis = cov._analyze(mod)
         statements = sorted(analysis.statements)
         if cov_data:
-            self.assertEqual(cov.data.lines[os.path.abspath(modname + ".py")], cov_data, msg)
+            self.assertEqual(cov.get_data().lines(os.path.abspath(modname + ".py")), cov_data, msg)
         if lines is not None:
             if type(lines[0]) == type(1):
                 # lines is just a list of numbers, it must match the statements

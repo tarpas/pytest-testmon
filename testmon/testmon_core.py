@@ -83,7 +83,6 @@ class Testmon(object):
                                      omit=_get_python_lib_paths(),
                                      data_file=getattr(self, 'sub_cov_file', None),
                                      config_file=False, )
-        self.cov.use_cache(False)
         self.cov._warn_no_data = False
 
     def track_dependencies(self, callable_to_track, testmon_data, rootdir, nodeid):
@@ -102,17 +101,18 @@ class Testmon(object):
 
     def stop_and_save(self, testmon_data, rootdir, nodeid):
         self.cov.stop()
-        self.cov.save()
+        #self.cov.save()
         if hasattr(self, 'sub_cov_file'):
             self.cov.combine()
 
-        testmon_data.set_dependencies(nodeid, self.cov.data, rootdir)
+        testmon_data.set_dependencies(nodeid, self.cov.get_data(), rootdir)
 
 
 
     def close(self):
         if hasattr(self, 'sub_cov_file'):
             os.remove(self.sub_cov_file + "_rc")
+        del os.environ['COVERAGE_PROCESS_START']
 
 
 def eval_variant(run_variant, **kwargs):
@@ -237,9 +237,10 @@ class TestmonData(object):
 
     def set_dependencies(self, nodeid, coverage_data, rootdir):
         result = {}
-        for filename, value in coverage_data.lines.items():
+        for filename in coverage_data.measured_files():
+            lines = coverage_data.lines(filename)
             if os.path.exists(filename):
-                result[filename] = checksum_coverage(self.parse_cache(filename).blocks, value.keys())
+                result[filename] = checksum_coverage(self.parse_cache(filename).blocks, lines)
         if not result:
             filename = os.path.join(rootdir, nodeid).split("::",1)[0]
             result[filename] = checksum_coverage(self.parse_cache(filename).blocks,[1])

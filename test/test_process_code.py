@@ -134,7 +134,7 @@ code_samples = {
     
         assert add(1, 2) == 3
             """,
-                  {1: None, 2: None, 4: None}),
+                  [1, 2, 4]),
 
     2: CodeSample("""\
         def add(a, b):
@@ -145,19 +145,19 @@ code_samples = {
 
         assert add(1, 2) == 3
             """,
-                  {1: None, 2: None, 4: None, 7: None}),
+                  [1, 2, 4, 7]),
     '3': CodeSample("""\
         class A(object):
             def add(self, a, b):
                 return a + b
         """,
-                    {1: None, 2: None}),
+                    [1, 2]),
     '3b': CodeSample("""\
         class A(object):
             def add(self, a, b):
                 return a - b
         """,
-                     {1: None, 2: None}),
+                     [1, 2]),
     'classes': CodeSample("""\
         class A(object):
             def add(self, a, b):
@@ -165,7 +165,7 @@ code_samples = {
             def subtract(self, a, b):
                 return a - b
         """,
-                          {1: None, 2: None, 4: None}),
+                          [1, 2, 4]),
 
     'classes_b': CodeSample("""\
         class A(object):
@@ -174,7 +174,7 @@ code_samples = {
             def subtract(self, a, b):
                 return a - b - 1
         """,
-                            {1: None, 2: None, 4: None}),
+                            [1, 2, 4]),
     'classes_c': CodeSample("""\
         class A(object):
             def add1(self, a, b):
@@ -182,7 +182,7 @@ code_samples = {
             def subtract(self, a, b):
                 return a - b
         """,
-                            {1: None, 2: None, 4: None}),
+                            [1, 2, 4]),
 }
 
 
@@ -236,7 +236,7 @@ class TestModule(object):
         def checksum(code_sample):
             module = Module(code_sample.source_code, 'a.py')
             covdata = code_sample.expected_coverage
-            return checksum_coverage(module.blocks, covdata.keys())
+            return checksum_coverage(module.blocks, covdata)
 
         assert checksum(code_samples[1])[1] == checksum(code_samples[2])[1]
 
@@ -289,6 +289,7 @@ class TestCoverageSubprocess(CoverageTest):
             self.run_command('python {}'.format(path1))
             assert os.path.exists('.testmoncoverage'), (
                 os.getcwd(), os.listdir(os.getcwd()))
+            del os.environ['COVERAGE_PROCESS_START']
 
 
 class TestCoverageAssumptions(CoverageTest):
