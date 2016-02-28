@@ -101,7 +101,6 @@ class Testmon(object):
 
     def stop_and_save(self, testmon_data, rootdir, nodeid):
         self.cov.stop()
-        #self.cov.save()
         if hasattr(self, 'sub_cov_file'):
             self.cov.combine()
 
@@ -112,7 +111,7 @@ class Testmon(object):
     def close(self):
         if hasattr(self, 'sub_cov_file'):
             os.remove(self.sub_cov_file + "_rc")
-        del os.environ['COVERAGE_PROCESS_START']
+        os.environ.pop('COVERAGE_PROCESS_START', None)
 
 
 def eval_variant(run_variant, **kwargs):
