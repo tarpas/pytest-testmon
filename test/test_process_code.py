@@ -277,6 +277,31 @@ class TestModule(object):
 
 class TestCoverageSubprocess(CoverageTest):
 
+        def test_basic_run(self):
+            path1 = self.make_file("subprocesstest.py", """\
+            print("hello world")
+            """)
+            output = self.run_command('python {}'.format(path1))
+            assert output == "hello world\n"
+
+        def test_pass_environ(self):
+            path1 = self.make_file("subprocesstest.py", """\
+            import os
+            print(os.environ['TEST_NAME'])
+            """)
+            os.environ['TEST_NAME'] = 'TEST_VALUE'
+            output = self.run_command('python {}'.format(path1))
+            assert output == "{}\n".format('TEST_VALUE')
+                  
+        def test_coverage_expected_fail(self):
+            path1 = self.make_file("subprocesstest.py", """\
+            a=1
+            """)
+            os.environ['COVERAGE_PROCESS_START'] = 'nonexistent_file'
+            output = self.run_command('python {}'.format(path1))
+            del os.environ['COVERAGE_PROCESS_START']
+            assert "Couldn't read 'nonexistent_file' as a config file" in output
+
         def test_subprocess(self):
             path1 = self.make_file("subprocesstest.py", """\
             a=1
