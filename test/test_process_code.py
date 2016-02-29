@@ -283,12 +283,13 @@ class TestCoverageSubprocess(CoverageTest):
             """)
             self.make_file('.testmoncoveragerc', """\
                 [run]
-                data_file = .testmoncoverage
-            """)
-            os.environ['COVERAGE_PROCESS_START']='.testmoncoveragerc'
+
+                data_file = {}/.testmoncoverage
+            """.format(os.getcwd()))
+            os.environ['COVERAGE_PROCESS_START']='{}/.testmoncoveragerc'.format(os.getcwd())
             self.run_command('python {}'.format(path1))
-            assert os.path.exists('.testmoncoverage'), (
-                os.getcwd(), os.listdir(os.getcwd()))
+            subprocess_coverage_exists = os.path.exists('.testmoncoverage')
+            assert subprocess_coverage_exists, "Dir: {}".format(os.listdir(os.getcwd()))
             del os.environ['COVERAGE_PROCESS_START']
 
 
