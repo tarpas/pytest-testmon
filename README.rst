@@ -64,7 +64,7 @@ coverage_pth
 
      pip install coverage_pth 
      
-If there is any problem you can still configure your python `manually <http://nedbatchelder.com/code/coverage/subprocess.html>`_.
+If there is any problem you can still configure your python `manually <http://coverage.readthedocs.org/en/latest/subprocess.html>`_.
 
 
 Troubleshooting - usual problems
