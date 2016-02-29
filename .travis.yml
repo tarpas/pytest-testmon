@@ -14,6 +14,9 @@ env:
     - TOXENV=py27-pytestcurrent
     - TOXENV=py34-pytest27
     - TOXENV=py34-pytestcurrent
+    allow_failures:
+        - TOXENV=py35-pytest27
+        - TOXENV=py35-pytestcurrent
 
 install:
   - pip install tox
