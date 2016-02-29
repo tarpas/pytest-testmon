@@ -4,7 +4,9 @@ import sys
 import pytest
 from test.coveragepy import coveragetest
 from testmon.process_code import Module, checksum_coverage
-from testmon.testmon_core import Testmon, eval_variant, TestmonData
+from testmon.testmon_core import eval_variant
+from testmon.testmon_core import Testmon as CoreTestmon
+from testmon.testmon_core import TestmonData as CoreTestmonData
 from test.test_process_code import CodeSample
 
 pytest_plugins = "pytester",
@@ -65,9 +67,9 @@ def test_run_variant_complex(testdir, monkeypatch):
     assert eval_variant(config.getini('run_variant_expression')) == 'TEST_V:JUST_A_TEST'
 
 def track_it(testdir, func):
-    testmon = Testmon(project_dirs=[testdir.tmpdir.strpath],
+    testmon = CoreTestmon(project_dirs=[testdir.tmpdir.strpath],
                       testmon_labels=set())
-    testmon_data = TestmonData(testdir.tmpdir.strpath)
+    testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
     testmon.start()
     func()
     testmon.stop_and_save(testmon_data, testdir.tmpdir.strpath, 'testnode')
@@ -89,8 +91,9 @@ def test_subprocesss(testdir, monkeypatch):
                 checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
 
 @pytest.mark.xfail
-def test_subprocesss_recursive(testdir, monkeypatch):
+def test_subprocess_recursive(testdir, monkeypatch):
     monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
+    #os.environ['COVERAGE_TEST_TRACER']='py'
     a = testdir.makepyfile(test_a="""\
     def test_1():
         a=1
@@ -99,6 +102,7 @@ def test_subprocesss_recursive(testdir, monkeypatch):
         testdir.runpytest("test_a.py", "--testmon", "--capture=no")
 
     deps = track_it(testdir, func)
+    #os.environ.pop('COVERAGE_TEST_TRACER', None)
 
     assert {os.path.abspath(a.strpath):
                 checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps

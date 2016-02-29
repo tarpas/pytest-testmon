@@ -79,7 +79,7 @@ class Testmon(object):
                 subprocess_rc.write(rc_content)
             os.environ['COVERAGE_PROCESS_START'] = self.sub_cov_file + "_rc"
 
-        self.cov = coverage.coverage(include=includes,
+        self.cov = coverage.Coverage(include=includes,
                                      omit=_get_python_lib_paths(),
                                      data_file=getattr(self, 'sub_cov_file', None),
                                      config_file=False, )

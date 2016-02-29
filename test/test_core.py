@@ -1,37 +1,37 @@
 from testmon.process_code import Module
 from test.test_process_code import CodeSample
 from test.test_testmon import get_modules
-from testmon.testmon_core import TestmonData
+from testmon.testmon_core import TestmonData as CoreTestmonData
 from testmon.testmon_core import is_dependent, affected_nodeids
 
 pytest_plugins = "pytester",
 
 
 def test_write_data(testdir):
-    td = TestmonData(testdir.tmpdir.strpath, 'V1')
+    td = CoreTestmonData(testdir.tmpdir.strpath, 'V1')
     td._write_attribute('1', {})
 
 
 def test_write_read_data(testdir):
-    td = TestmonData(testdir.tmpdir.strpath, 'V1')
+    td = CoreTestmonData(testdir.tmpdir.strpath, 'V1')
     with td.connection:
         td._write_attribute('1', {'a': 1})
-    td2 = TestmonData(testdir.tmpdir.strpath, 'V1')
+    td2 = CoreTestmonData(testdir.tmpdir.strpath, 'V1')
     assert td2._fetch_attribute('1') == {'a': 1}
 
 
 def test_read_nonexistent(testdir):
-    td = TestmonData(testdir.tmpdir.strpath, 'V2')
+    td = CoreTestmonData(testdir.tmpdir.strpath, 'V2')
     assert td._fetch_attribute('1') == None
 
 
 def test_write_read_data2(testdir):
-    td = TestmonData(testdir.tmpdir.strpath, 'default')
+    td = CoreTestmonData(testdir.tmpdir.strpath, 'default')
     td.mtimes = {'a.py': 1.0}
     td.node_data = {'n1': {'a.py': [1]}}
     td.lastfailed = ['n1']
     td.write_data()
-    td2 = TestmonData(testdir.tmpdir.strpath, 'default')
+    td2 = CoreTestmonData(testdir.tmpdir.strpath, 'default')
     td2.read_data()
     assert td == td2
 
@@ -114,7 +114,7 @@ class TestDepGraph():
     def test_affected_list(self):
         changes = {'test_a.py': [102, 103]}
 
-        td = TestmonData('')
+        td = CoreTestmonData('')
         td.node_data = {'node1': {'test_a.py': [101, 102]},
                         'node2': {'test_a.py': [102, 103], 'test_b.py': [200, 201]}}
 
@@ -130,15 +130,15 @@ class TestDepGraph():
 
 
 def test_variants_separation(testdir):
-    testmon1_data = TestmonData(testdir.tmpdir.strpath, variant='1')
+    testmon1_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
     testmon1_data.node_data['node1'] = {'a.py': 1}
     testmon1_data.write_data()
 
-    testmon2_data = TestmonData(testdir.tmpdir.strpath, variant='2')
+    testmon2_data = CoreTestmonData(testdir.tmpdir.strpath, variant='2')
     testmon2_data.node_data['node1'] = {'a.py': 2}
     testmon2_data.write_data()
 
-    testmon_check_data = TestmonData(testdir.tmpdir.strpath, variant='1')
+    testmon_check_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
     testmon_check_data.read_fs()
     assert testmon1_data.node_data['node1'] == {'a.py': 1 }
 
