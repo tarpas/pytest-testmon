@@ -9,14 +9,18 @@ cache:
 python: 3.5
 
 env:
-  matrix:
-    - TOXENV=py27-pytest27
-    - TOXENV=py27-pytestcurrent
-    - TOXENV=py34-pytest27
-    - TOXENV=py34-pytestcurrent
-    allow_failures:
-        - TOXENV=py35-pytest27
-        - TOXENV=py35-pytestcurrent
+  - TOXENV=py27-pytest27
+  - TOXENV=py27-pytestcurrent
+  - TOXENV=py34-pytest27
+  - TOXENV=py34-pytestcurrent
+  - TOXENV=py35-pytest27
+  - TOXENV=py35-pytestcurrent
+
+matrix:
+  allow_failures:
+    - env: TOXENV=py35-pytest27
+    - env: TOXENV=py35-pytestcurrent
+
 
 install:
   - pip install tox
