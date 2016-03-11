@@ -10,7 +10,6 @@ setup(
     url='https://github.com/tarpas/pytest-testmon/',
     author_email='tibor.arpas@infinit.sk',
     author='Tibor Arpas, Jozef Knaperek, Martin Riesz',
-    data_files=([('', ['README.rst']), ]),
     entry_points={
         'pytest11': [
             'testmon = testmon.pytest_testmon',
