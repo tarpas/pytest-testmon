@@ -3,6 +3,7 @@ from setuptools import setup
 setup(
     name='pytest-testmon',
     description='take TDD to a new level with py.test and testmon',
+    long_description=''.join(open('README.rst').readlines()),
     version='0.8.1',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
@@ -10,7 +11,6 @@ setup(
     url='https://github.com/tarpas/pytest-testmon/',
     author_email='tibor.arpas@infinit.sk',
     author='Tibor Arpas, Jozef Knaperek, Martin Riesz',
-    data_files=([('', ['README.rst']), ]),
     entry_points={
         'pytest11': [
             'testmon = testmon.pytest_testmon',
