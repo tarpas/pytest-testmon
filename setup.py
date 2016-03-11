@@ -3,6 +3,7 @@ from setuptools import setup
 setup(
     name='pytest-testmon',
     description='take TDD to a new level with py.test and testmon',
+    long_description=''.join(open('README.rst').readlines()),
     version='0.8.1',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
