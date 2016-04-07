@@ -122,10 +122,14 @@ def eval_variant(run_variant, **kwargs):
     def md5(s):
         return hashlib.md5(s.encode()).hexdigest()
 
+    def cmd(s):
+        return subprocess.check_output(s).decode('utf-8').rstrip()
+
     eval_globals = {'os': os,
                     'subprocess': subprocess,
                     'sys': sys,
                     'hashlib': hashlib,
+                    'cmd': cmd,
                     'md5': md5}
     eval_globals.update(kwargs)
 
