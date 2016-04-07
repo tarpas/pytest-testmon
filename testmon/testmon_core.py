@@ -11,6 +11,7 @@ from collections import defaultdict
 import sys
 import textwrap
 import random
+import subprocess
 
 import coverage
 from testmon.process_code import checksum_coverage
@@ -121,7 +122,11 @@ def eval_variant(run_variant, **kwargs):
     def md5(s):
         return hashlib.md5(s.encode()).hexdigest()
 
-    eval_globals = {'os': os, 'sys': sys, 'hashlib': hashlib, 'md5': md5}
+    eval_globals = {'os': os,
+                    'subprocess': subprocess,
+                    'sys': sys,
+                    'hashlib': hashlib,
+                    'md5': md5}
     eval_globals.update(kwargs)
 
     try:
