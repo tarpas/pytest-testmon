@@ -184,7 +184,7 @@ class TestmonDeselect(object):
             self.testmon_data.write_data()
         self.testmon.close()
 
-    def pytest_terminal_summary(self, terminalreporter, exitstatus):
+    def pytest_terminal_summary(self, terminalreporter, exitstatus=None):
         if (not self.testmon_save and
                 terminalreporter.config.getvalue('verbose')):
             terminalreporter.line('testmon: not saving data')
