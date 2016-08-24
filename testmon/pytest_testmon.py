@@ -140,7 +140,9 @@ class TestmonDeselect(object):
             yield
 
         self.testmon.start()
-        yield
+        result = yield
+        if result.excinfo and issubclass(result.excinfo[0], KeyboardInterrupt):
+            self.testmon_save = False
         self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid)
 
     def pytest_runtest_logreport(self, report):
@@ -171,9 +173,18 @@ class TestmonDeselect(object):
         self.testmon_save = False
 
     def pytest_keyboard_interrupt(self, excinfo):
+        if excinfo.typename == 'Interrupted':  # --maxfail/-x
+            assert self.testmon_save
+            return
+        assert self.testmon_save == False
         self.testmon_save = False
 
     def pytest_sessionfinish(self, session):
         if self.testmon_save:
             self.testmon_data.write_data()
         self.testmon.close()
+
+    def pytest_terminal_summary(self, terminalreporter, exitstatus):
+        if (not self.testmon_save and
+                terminalreporter.config.getvalue('verbose')):
+            terminalreporter.line('testmon: not saving data')
