@@ -141,9 +141,12 @@ class TestmonDeselect(object):
 
         self.testmon.start()
         result = yield
+        # NOTE: pytest-watch also sends KeyboardInterrupt when changes are
+        # detected.  This should still save the collected data up until then.
         if result.excinfo and issubclass(result.excinfo[0], KeyboardInterrupt):
-            self.testmon_save = False
-        self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid)
+            self.testmon.stop()
+        else:
+            self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid)
 
     def pytest_runtest_logreport(self, report):
         if report.failed and "xfail" not in report.keywords:
@@ -170,13 +173,6 @@ class TestmonDeselect(object):
             return True
 
     def pytest_internalerror(self, excrepr, excinfo):
-        self.testmon_save = False
-
-    def pytest_keyboard_interrupt(self, excinfo):
-        if excinfo.typename == 'Interrupted':  # --maxfail/-x
-            assert self.testmon_save
-            return
-        assert self.testmon_save == False
         self.testmon_save = False
 
     def pytest_sessionfinish(self, session):
