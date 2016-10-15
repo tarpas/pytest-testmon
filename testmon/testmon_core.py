@@ -195,6 +195,33 @@ class TestmonData(object):
 
     def init_tables(self):
         self.connection.execute('CREATE TABLE alldata (dataid text primary key, data blob)')
+        self.connection.execute("""
+          CREATE TABLE node_execution_version (
+              nodeid TEXT PRIMARY KEY,
+              logreports TEXT)
+""")
+        self.connection.execute("""
+          CREATE TABLE file_version (
+              id INTEGER PRIMARY KEY,
+              name TEXT,
+              mtime LONG)
+        """)
+
+        self.connection.execute("""
+          CREATE TABLE node_checksum_dep (
+            id INTEGER PRIMARY KEY,
+            nodeid text,
+            file_version_id INTEGER,
+            FOREIGN KEY(nodeid) REFERENCES node_execution_version(nodeid) ON DELETE CASCADE,
+            FOREIGN KEY(file_version_id) REFERENCES file_version(id) ON DELETE CASCADE)
+    """)
+
+        self.connection.execute("""
+          CREATE TABLE checksum (
+              checksum INTEGER,
+              node_checksum_dep_id INTEGER,
+              FOREIGN KEY(node_checksum_dep_id) REFERENCES node_checksum_dep(id) ON DELETE CASCADE )
+        """)
 
     def read_data(self):
         self.mtimes, \
@@ -232,18 +259,39 @@ class TestmonData(object):
         for files in self.node_data.values():
             for module in files:
                 test_counts[module] += 1
+        #self.connection.execute("SELECT file_version_id, count(file_version_id) "
+        #                        "FROM node_checksum_dep n JOIN file_version f ON n.file_version_id=f.id"
+        #                        "GROUP BY ")
         return test_counts
 
     def set_dependencies(self, nodeid, coverage_data, rootdir):
         result = {}
-        for filename in coverage_data.measured_files():
-            lines = coverage_data.lines(filename)
-            if os.path.exists(filename):
-                result[filename] = checksum_coverage(self.parse_cache(filename).blocks, lines)
-        if not result:
-            filename = os.path.join(rootdir, nodeid).split("::",1)[0]
-            result[filename] = checksum_coverage(self.parse_cache(filename).blocks,[1])
-        self.node_data[nodeid] = result
+        with self.connection as con:
+            con.execute("DELETE FROM"
+                        "  file_version "
+                        "WHERE id in ("
+                        "    SELECT file_version_id "
+                        "    FROM  node_checksum_dep "
+                        "    WHERE nodeid = ?)", (nodeid,))
+            con.execute("DELETE FROM "
+                        "  node_execution_version WHERE nodeid=?", (nodeid,))
+            con.execute("INSERT INTO node_execution_version VALUES (?, ?)", (nodeid, ''))
+            for filename in coverage_data.measured_files():
+                fc = con.cursor()
+                fc.execute("INSERT INTO file_version VALUES (?, ?, ?)", (None, filename, 1) )
+                dc = con.cursor()
+                dc.execute("INSERT INTO node_checksum_dep VALUES (?, ?, ?)", (None, nodeid, fc.lastrowid))
+                lines = coverage_data.lines(filename)
+                if os.path.exists(filename):
+                    result[filename] = checksum_coverage(self.parse_cache(filename).blocks, lines)
+                    self.connection.executemany("INSERT INTO checksum VALUES (?, ?)", [(x, dc.lastrowid ) for x in result[filename]])
+
+            if not result:
+                filename = os.path.join(rootdir, nodeid).split("::",1)[0]
+                result[filename] = checksum_coverage(self.parse_cache(filename).blocks,[1])
+                self.connection.executemany("INSERT INTO checksum VALUES (?, ?)",
+                                            [(x, dc.lastrowid) for x in result[filename]])
+            self.node_data[nodeid] = result
 
     def parse_cache(self, module, new_mtime=None):
         if module not in self.modules_cache:

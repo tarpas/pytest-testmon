@@ -1,5 +1,4 @@
-import pytest
+import pydevd;
 
-@pytest.mark.skipif(True, reason="Because")
 def test_1():
     pass

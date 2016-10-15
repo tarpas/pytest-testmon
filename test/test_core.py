@@ -3,6 +3,11 @@ from test.test_process_code import CodeSample
 from test.test_testmon import get_modules
 from testmon.testmon_core import TestmonData as CoreTestmonData
 from testmon.testmon_core import is_dependent, affected_nodeids
+import json
+import pickle
+import pytest
+
+from _pytest import runner
 
 pytest_plugins = "pytester",
 
@@ -141,4 +146,58 @@ def test_variants_separation(testdir):
     testmon_check_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
     testmon_check_data.read_fs()
     assert testmon1_data.node_data['node1'] == {'a.py': 1 }
+
+
+global_reports = []
+
+def serialize_report(rep):
+    import py
+    d = rep.__dict__.copy()
+    if hasattr(rep.longrepr, 'toterminal'):
+        d['longrepr'] = str(rep.longrepr)
+    else:
+        d['longrepr'] = rep.longrepr
+    for name in d:
+        if isinstance(d[name], py.path.local):
+            d[name] = str(d[name])
+        elif name == "result":
+            d[name] = None  # for now
+    return d
+
+
+
+def test_serialize(testdir):
+
+
+    class PlugWrite:
+
+        def pytest_runtest_logreport(self, report):
+            global global_reports
+            global_reports.append(report)
+
+    class PlugRereport:
+
+        def pytest_runtest_protocol(self, item, nextitem):
+            hook = getattr(item.ihook, 'pytest_runtest_logreport')
+            for g in global_reports:
+                hook(report=g)
+            return True
+
+
+    testdir.makepyfile("""
+    def test_a():
+        raise Exception('exception from test_a')
+    """)
+
+    testdir.runpytest_inprocess(plugins=[PlugWrite()])
+
+
+    testdir.makepyfile("""
+    def test_a():
+        pass
+    """)
+
+    result = testdir.runpytest_inprocess(plugins=[PlugRereport()])
+
+    print(result)
 
