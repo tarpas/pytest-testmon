@@ -1,7 +1,7 @@
 from testmon.process_code import Module
 from test.test_process_code import CodeSample
 from test.test_testmon import get_modules
-from testmon.testmon_core import TestmonData as CoreTestmonData
+from testmon.testmon_core import TestmonData as CoreTestmonData, flip_dictionary
 from testmon.testmon_core import is_dependent, affected_nodeids
 
 pytest_plugins = "pytester",
@@ -118,7 +118,7 @@ class TestDepGraph():
         td.node_data = {'node1': {'test_a.py': [101, 102]},
                         'node2': {'test_a.py': [102, 103], 'test_b.py': [200, 201]}}
 
-        assert set(td.modules_test_counts()) == set(['test_a.py', 'test_b.py'])
+        assert set(td.file_data()) == set(['test_a.py', 'test_b.py'])
 
         assert affected_nodeids(td.node_data, changes) == ['node1']
 
@@ -141,4 +141,11 @@ def test_variants_separation(testdir):
     testmon_check_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
     testmon_check_data.read_fs()
     assert testmon1_data.node_data['node1'] == {'a.py': 1 }
+
+
+def test_flipp():
+    node_data = {'X': {'a': [1, 2, 3], 'b': [3, 4, 5]}, 'Y': {'b': [3, 6, 7]}}
+    files = flip_dictionary(node_data)
+    assert files == {'a': {'X': [1, 2, 3]}, 'b': {'X': [3, 4, 5], 'Y': [3, 6, 7]}}
+
 

@@ -19,6 +19,7 @@ from testmon.process_code import Module
 if sys.version_info > (3,):
     buffer = memoryview
 
+
 def _get_python_lib_paths():
     res = [sys.prefix]
     for attr in ['exec_prefix', 'real_prefix', 'base_prefix']:
@@ -50,12 +51,19 @@ def affected_nodeids(nodes, changes):
     return affected
 
 
-class Testmon(object):
+def flip_dictionary(node_data):
+    files = defaultdict(lambda: {})
+    for nodeid, node_files in node_data.items():
+        for filename, checksums in node_files.items():
+            files[filename][nodeid] = checksums
+    return files
 
+
+class Testmon(object):
     def __init__(self, project_dirs, testmon_labels=set()):
         self.project_dirs = project_dirs
         self.testmon_labels = testmon_labels
-        self.setup_coverage(not('singleprocess' in testmon_labels))
+        self.setup_coverage(not ('singleprocess' in testmon_labels))
 
     def setup_coverage(self, subprocess):
 
@@ -94,7 +102,6 @@ class Testmon(object):
         finally:
             self.stop_and_save(testmon_data, rootdir, nodeid)
 
-
     def start(self):
         self.cov.erase()
         self.cov.start()
@@ -108,8 +115,6 @@ class Testmon(object):
             self.cov.combine()
 
         testmon_data.set_dependencies(nodeid, self.cov.get_data(), rootdir)
-
-
 
     def close(self):
         if hasattr(self, 'sub_cov_file'):
@@ -135,7 +140,7 @@ def eval_variant(run_variant, **kwargs):
 
 def get_variant_inifile(inifile):
     config = configparser.ConfigParser()
-    config.read(str(inifile),)
+    config.read(str(inifile), )
     if config.has_section('pytest') and config.has_option('pytest', 'run_variant_expression'):
         run_variant_expression = config.get('pytest', 'run_variant_expression')
     else:
@@ -145,7 +150,6 @@ def get_variant_inifile(inifile):
 
 
 class TestmonData(object):
-
     def __init__(self, rootdir, variant=None):
 
         self.variant = variant if variant else 'default'
@@ -192,12 +196,11 @@ class TestmonData(object):
         cursor = self.connection.execute("UPDATE alldata SET data=? WHERE dataid=?",
                                          [compressed_data_buffer, dataid])
         if not cursor.rowcount:
-
             cursor.execute("INSERT INTO alldata VALUES (?, ?)",
                            [dataid, compressed_data_buffer])
 
     def init_tables(self):
-        self.connection.execute('CREATE TABLE alldata (dataid text primary key, data blob)')
+        self.connection.execute('CREATE TABLE alldata (dataid TEXT PRIMARY KEY, data BLOB)')
 
     def read_data(self):
         self.mtimes, \
@@ -230,12 +233,8 @@ class TestmonData(object):
                                    for filename, module
                                    in self.modules_cache.items()})
 
-    def modules_test_counts(self):
-        test_counts = defaultdict(lambda: 0)
-        for files in self.node_data.values():
-            for module in files:
-                test_counts[module] += 1
-        return test_counts
+    def file_data(self):
+        return flip_dictionary(self.node_data)
 
     def set_dependencies(self, nodeid, coverage_data, rootdir):
         result = {}
@@ -244,8 +243,8 @@ class TestmonData(object):
             if os.path.exists(filename):
                 result[filename] = checksum_coverage(self.parse_cache(filename).blocks, lines)
         if not result:
-            filename = os.path.join(rootdir, nodeid).split("::",1)[0]
-            result[filename] = checksum_coverage(self.parse_cache(filename).blocks,[1])
+            filename = os.path.join(rootdir, nodeid).split("::", 1)[0]
+            result[filename] = checksum_coverage(self.parse_cache(filename).blocks, [1])
         self.node_data[nodeid] = result
 
     def parse_cache(self, module, new_mtime=None):
@@ -259,7 +258,7 @@ class TestmonData(object):
         self.read_data()
         self.old_mtimes = self.mtimes.copy()
         self.unchanged_paths = set()
-        for py_file in self.modules_test_counts():
+        for py_file in self.file_data():
             try:
                 new_mtime = os.path.getmtime(py_file)
                 if self.old_mtimes.get(py_file) != new_mtime:
@@ -283,11 +282,11 @@ class TestmonData(object):
 
         self.unaffected_paths = {path: all_paths[path] for path in all_paths if path not in affected_paths}
 
-## possible data structures
-## nodeid1 -> [filename -> [block_a, block_b]]
-## filename -> [block_a -> [nodeid1, ], block_b -> [nodeid1], block_c -> [] ]
+    ## possible data structures
+    ## nodeid1 -> [filename -> [block_a, block_b]]
+    ## filename -> [block_a -> [nodeid1, ], block_b -> [nodeid1], block_c -> [] ]
 
-    def collect_garbage(self, allnodeids): # TODO, this was naive a causing loss of data ..
+    def collect_garbage(self, allnodeids):  # TODO, this was naive a causing loss of data ..
         return
         for testmon_nodeid in list(self.node_data.keys()):
             if testmon_nodeid not in allnodeids:
