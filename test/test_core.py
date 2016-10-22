@@ -1,8 +1,8 @@
+from collections import namedtuple
+
 from testmon.process_code import Module
 from test.test_process_code import CodeSample
-from test.test_testmon import get_modules
-from testmon.testmon_core import TestmonData as CoreTestmonData, flip_dictionary
-from testmon.testmon_core import is_dependent, affected_nodeids
+from testmon.testmon_core import TestmonData as CoreTestmonData, flip_dictionary, unaffected
 
 pytest_plugins = "pytester",
 
@@ -67,11 +67,6 @@ class TestDepGraph():
         assert is_dependent({'a.py': [101, 102]}, changed_py_files) == False
         assert is_dependent({'a.py': [101], 'b.py': [107]}, changed_py_files) == True
 
-    def test_two_modules_combination3(self):
-        changed_py_files = {'b.py': get_modules([103, 104])}
-        assert is_dependent('test_1', changed_py_files) == False
-        assert is_dependent('test_both', changed_py_files) == False
-
     def test_classes_depggraph(self):
         module1 = Module(CodeSample("""\
             class TestA(object):
@@ -119,12 +114,27 @@ class TestDepGraph():
 
         assert set(td.file_data()) == set(['test_a.py', 'test_b.py'])
 
-        assert affected_nodeids(td.node_data, changes) == ['node1']
+        assert affected_nodeids(td.node_data, changes) == {'node1'}
 
     def test_affected_list2(self):
         changes = {'test_a.py': [102, 103]}
         dependencies = {'node1': {'test_a.py': [102, 103, 104]}, }
-        assert affected_nodeids(dependencies, changes) == ['node1']
+        assert affected_nodeids(dependencies, changes) == {'node1'}
+
+
+def get_modules(checksums):
+    return checksums
+
+
+def is_dependent(dependencies, changes):
+    result = affected_nodeids({'testnode': dependencies}, changes)
+    return result == {'testnode'}
+
+
+def affected_nodeids(dependencies, changes):
+    Block = namedtuple('Block', 'checksums')
+    unaffected_nodes, files = unaffected(dependencies, {key: Block(value) for key, value in changes.items()})
+    return dependencies.keys() - unaffected_nodes
 
 
 def test_variants_separation(testdir):

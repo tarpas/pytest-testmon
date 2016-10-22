@@ -113,12 +113,12 @@ class TestmonDeselect(object):
     def pytest_report_header(self, config):
         changed_files = ",".join([os.path.relpath(path, config.rootdir.strpath)
                                   for path
-                                  in self.testmon_data.modules_cache])
+                                  in self.testmon_data.changed_files])
         if changed_files == '' or len(changed_files) > 100:
-            changed_files = len(self.testmon_data.modules_cache)
+            changed_files = len(self.testmon_data.changed_files)
         active_message = "testmon={}, changed files: {}, skipping collection of {} items".format(
             config.getoption('testmon'),
-            changed_files, sum(self.testmon_data.unaffected_paths.values()))
+            changed_files, len(self.testmon_data.unaffected_nodeids))
         if self.testmon_data.variant:
             return active_message + ", run variant: {}".format(self.testmon_data.variant)
         else:
@@ -128,7 +128,7 @@ class TestmonDeselect(object):
         selected, deselected = [], []
         self.testmon_data.collect_garbage(allnodeids=[item.nodeid for item in items])
         for item in items:
-            if item.nodeid in self.lastfailed or self.testmon_data.test_should_run(item.nodeid):
+            if item.nodeid in self.testmon_data.lastfailed or self.testmon_data.test_should_run(item.nodeid):
                 selected.append(item)
             else:
                 deselected.append(item)
@@ -152,13 +152,13 @@ class TestmonDeselect(object):
 
     def pytest_runtest_logreport(self, report):
         if report.failed and "xfail" not in report.keywords:
-            if report.nodeid not in self.lastfailed:
-                self.lastfailed.append(report.nodeid)
+            if report.nodeid not in self.testmon_data.lastfailed:
+                self.testmon_data.lastfailed.append(report.nodeid)
         elif not report.failed:
             if report.when == "call":
                 try:
-                    if report.nodeid in self.lastfailed:
-                        self.lastfailed.remove(report.nodeid)
+                    if report.nodeid in self.testmon_data.lastfailed:
+                        self.testmon_data.lastfailed.remove(report.nodeid)
                 except KeyError:
                     pass
 
@@ -168,10 +168,11 @@ class TestmonDeselect(object):
 
     def pytest_ignore_collect(self, path, config):
         strpath = path.strpath
-        if strpath in self.testmon_data.unaffected_paths:
-            config.hook.pytest_deselected(
-                items=([self.FakeItemFromTestmon(config)] *
-                       self.testmon_data.unaffected_paths[strpath]))
+        if strpath in self.testmon_data.unaffected_files:
+            if os.path.split(strpath)[1].startswith('test_'):
+                config.hook.pytest_deselected(
+                    items=([self.FakeItemFromTestmon(config)] *
+                           len(self.testmon_data.file_data()[strpath])))
             return True
 
     def pytest_internalerror(self, excrepr, excinfo):
