@@ -280,21 +280,23 @@ class TestmonData(object):
                         "  node_execution_version WHERE nodeid=?", (nodeid,))
             con.execute("INSERT INTO node_execution_version VALUES (?, ?)", (nodeid, ''))
             for filename in coverage_data.measured_files():
-                fc = con.cursor()
-                fc.execute("INSERT INTO file_version VALUES (?, ?, ?)", (None, filename, 1) )
-                dc = con.cursor()
-                dc.execute("INSERT INTO node_checksum_dep VALUES (?, ?, ?)", (None, nodeid, fc.lastrowid))
                 lines = coverage_data.lines(filename)
                 if os.path.exists(filename):
                     result[filename] = checksum_coverage(self.parse_cache(filename).blocks, lines)
-                    self.connection.executemany("INSERT INTO checksum VALUES (?, ?)", [(x, dc.lastrowid ) for x in result[filename]])
+                    self.write_db(con, filename, nodeid, result)
 
             if not result:
                 filename = os.path.join(rootdir, nodeid).split("::",1)[0]
                 result[filename] = checksum_coverage(self.parse_cache(filename).blocks,[1])
-                self.connection.executemany("INSERT INTO checksum VALUES (?, ?)",
-                                            [(x, dc.lastrowid) for x in result[filename]])
+                self.write_db(con, filename, nodeid, result)
             self.node_data[nodeid] = result
+
+    def write_db(self, con, filename, nodeid, result):
+        fc = con.cursor()
+        fc.execute("INSERT INTO file_version VALUES (?, ?, ?)", (None, filename, 1))
+        dc = con.cursor()
+        dc.execute("INSERT INTO node_checksum_dep VALUES (?, ?, ?)", (None, nodeid, fc.lastrowid))
+        con.executemany("INSERT INTO checksum VALUES (?, ?)", [(x, dc.lastrowid) for x in result[filename]])
 
     def parse_cache(self, module, new_mtime=None):
         if module not in self.modules_cache:
