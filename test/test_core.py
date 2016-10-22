@@ -26,14 +26,13 @@ def test_read_nonexistent(testdir):
 
 
 def test_write_read_data2(testdir):
+    original = ({'a.py': 1.0}, {'n1': {'a.py': [1]}}, ['n1'])
     td = CoreTestmonData(testdir.tmpdir.strpath, 'default')
-    td.mtimes = {'a.py': 1.0}
-    td.node_data = {'n1': {'a.py': [1]}}
-    td.lastfailed = ['n1']
+    td.mtimes, td.node_data, td.lastfailed = original
     td.write_data()
     td2 = CoreTestmonData(testdir.tmpdir.strpath, 'default')
     td2.read_data()
-    assert td == td2
+    assert original == (td2.mtimes, td2.node_data, td2.lastfailed)
 
 
 class TestDepGraph():
@@ -60,7 +59,7 @@ class TestDepGraph():
 
     def test_two_modules_combination(self):
         changed_py_files = {'b.py': get_modules([])}
-        assert is_dependent( {'a.py': [101, 102]}, changed_py_files) == False
+        assert is_dependent({'a.py': [101, 102]}, changed_py_files) == False
         assert is_dependent({'a.py': [105, 106], 'b.py': [107, 108]}, changed_py_files) == True
 
     def test_two_modules_combination2(self):
@@ -106,10 +105,10 @@ class TestDepGraph():
                                      bs2[1].checksum)
         assert (bs1[1].name) != (bs2[1].name)
 
-
-        assert is_dependent({'test_s.py': [bs1[0].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
-        assert is_dependent({'test_s.py': [bs1[1].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
-
+        assert is_dependent({'test_s.py': [bs1[0].checksum, bs1[2].checksum]},
+                            {'test_s.py': [b.checksum for b in bs2]}) == True
+        assert is_dependent({'test_s.py': [bs1[1].checksum, bs1[2].checksum]},
+                            {'test_s.py': [b.checksum for b in bs2]}) == True
 
     def test_affected_list(self):
         changes = {'test_a.py': [102, 103]}
@@ -122,10 +121,9 @@ class TestDepGraph():
 
         assert affected_nodeids(td.node_data, changes) == ['node1']
 
-
     def test_affected_list2(self):
         changes = {'test_a.py': [102, 103]}
-        dependencies = {'node1': {'test_a.py': [102, 103, 104]},}
+        dependencies = {'node1': {'test_a.py': [102, 103, 104]}, }
         assert affected_nodeids(dependencies, changes) == ['node1']
 
 
@@ -140,12 +138,10 @@ def test_variants_separation(testdir):
 
     testmon_check_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
     testmon_check_data.read_fs()
-    assert testmon1_data.node_data['node1'] == {'a.py': 1 }
+    assert testmon1_data.node_data['node1'] == {'a.py': 1}
 
 
 def test_flipp():
     node_data = {'X': {'a': [1, 2, 3], 'b': [3, 4, 5]}, 'Y': {'b': [3, 6, 7]}}
     files = flip_dictionary(node_data)
     assert files == {'a': {'X': [1, 2, 3]}, 'b': {'X': [3, 4, 5], 'Y': [3, 6, 7]}}
-
-

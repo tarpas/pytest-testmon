@@ -160,13 +160,6 @@ class TestmonData(object):
         self.modules_cache = {}
         self.lastfailed = []
 
-    def __eq__(self, other):
-        return (self.mtimes, \
-                self.node_data, \
-                self.lastfailed == other.mtimes, \
-                other.node_data, \
-                other.lastfailed)
-
     def init_connection(self):
         self.datafile = os.path.join(self.rootdir, '.testmondata')
         self.connection = None
