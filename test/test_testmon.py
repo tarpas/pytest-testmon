@@ -355,6 +355,35 @@ class TestmonDeselect(object):
             "*5 deselected*",
         ])
 
+    def test_new2(self, testdir, monkeypatch):
+        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
+        a = testdir.makepyfile(a="""
+            def add(a, b):
+                return a + b
+        """)
+
+        testdir.makepyfile(test_a="""
+            from a import add
+
+            def test_add():
+                assert add(1, 2) == 3
+                    """)
+
+        result = testdir.runpytest("--testmon", )
+        result.stdout.fnmatch_lines([
+            "*1 passed*",
+        ])
+
+        a = testdir.makepyfile(a="""
+            def add(a, b):
+                return a + b + 0
+        """)
+        a.setmtime(1424880935)
+        result = testdir.runpytest("--testmon", )
+        result.stdout.fnmatch_lines([
+            "*passed*",
+        ])
+
 
 def get_modules(hashes):
     return hashes

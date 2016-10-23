@@ -6,6 +6,8 @@ from testmon.testmon_core import TestmonData as CoreTestmonData, flip_dictionary
 
 pytest_plugins = "pytester",
 
+Block = namedtuple('Block', 'checksums')
+
 
 def test_write_data(testdir):
     td = CoreTestmonData(testdir.tmpdir.strpath, 'V1')
@@ -122,6 +124,23 @@ class TestDepGraph():
         assert affected_nodeids(dependencies, changes) == {'node1'}
 
 
+class TestUnaffected():
+    def tes_nothing_changed(self):
+        changed = {'a.py': [101, 102, 103]}
+        dependencies = {'node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]}}
+        assert unaffected(dependencies, blockify(changed))[0] == dependencies
+
+    def test_simple_change(self):
+        changed = {'a.py': [101, 102, 151]}
+        dependencies = {'node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]},
+                        'node2': {'test_b.py': [301, 302], 'a.py': [151]}}
+
+        nodes, files = unaffected(dependencies, blockify(changed))
+
+        assert nodes.keys() == {'node2'}
+        assert set(files) == {'test_b.py'}
+
+
 def get_modules(checksums):
     return checksums
 
@@ -132,9 +151,13 @@ def is_dependent(dependencies, changes):
 
 
 def affected_nodeids(dependencies, changes):
-    Block = namedtuple('Block', 'checksums')
-    unaffected_nodes, files = unaffected(dependencies, {key: Block(value) for key, value in changes.items()})
+    unaffected_nodes, files = unaffected(dependencies, blockify(changes))
     return dependencies.keys() - unaffected_nodes
+
+
+def blockify(changes):
+    block_changes = {key: Block(value) for key, value in changes.items()}
+    return block_changes
 
 
 def test_variants_separation(testdir):

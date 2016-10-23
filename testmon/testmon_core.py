@@ -39,12 +39,12 @@ def flip_dictionary(node_data):
 def unaffected(node_data, changed_files):
     file_data = flip_dictionary(node_data)
     unaffected_nodes = dict(node_data)
-    unaffected_files = dict(file_data)
+    unaffected_files = set(file_data)
     for file in set(changed_files) & set(file_data):
         for nodeid, checksums in file_data[file].items():
             if set(checksums) - set(changed_files[file].checksums):
-                del unaffected_files[file]
-                del unaffected_nodes[nodeid]
+                affected = set(unaffected_nodes.pop(nodeid, []))
+                unaffected_files = unaffected_files - affected
     return unaffected_nodes, unaffected_files
 
 
