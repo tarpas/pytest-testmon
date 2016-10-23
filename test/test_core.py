@@ -137,7 +137,7 @@ class TestUnaffected():
 
         nodes, files = unaffected(dependencies, blockify(changed))
 
-        assert nodes.keys() == {'node2'}
+        assert set(nodes) == {'node2'}
         assert set(files) == {'test_b.py'}
 
 
@@ -152,7 +152,7 @@ def is_dependent(dependencies, changes):
 
 def affected_nodeids(dependencies, changes):
     unaffected_nodes, files = unaffected(dependencies, blockify(changes))
-    return dependencies.keys() - unaffected_nodes
+    return set(dependencies) - set(unaffected_nodes)
 
 
 def blockify(changes):
