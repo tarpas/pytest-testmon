@@ -122,9 +122,6 @@ class CodeSample():
         self.expected_coverage = expected_coverage or {}
         self.possible_lines = possible_lines or []
 
-    def line_count(self):
-        return len(self.source_code.splitlines())
-
 
 code_samples = {
     1: CodeSample("""\

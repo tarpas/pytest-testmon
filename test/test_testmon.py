@@ -39,6 +39,15 @@ def test_run_variant_empty(testdir):
     assert eval_variant(config.getini('run_variant_expression')) == ''
 
 
+def test_run_variant_md5(testdir, monkeypatch):
+    testdir.makeini("""
+                    [pytest]
+                    run_variant_expression=md5('TEST')
+                    """)
+    config = testdir.parseconfigure()
+    assert eval_variant(config.getini('run_variant_expression')) == '033bd94b1168d7e4f0d644c3c95e35bf'
+
+
 def test_run_variant_env(testdir, monkeypatch):
     monkeypatch.setenv('TEST_V', 'JUST_A_TEST')
     testdir.makeini("""
@@ -48,6 +57,7 @@ def test_run_variant_env(testdir, monkeypatch):
     config = testdir.parseconfigure()
     assert eval_variant(config.getini('run_variant_expression')) == 'JUST_A_TEST'
 
+
 def test_run_variant_nonsense(testdir):
     testdir.makeini("""
                     [pytest]
@@ -55,6 +65,7 @@ def test_run_variant_nonsense(testdir):
                     """)
     config = testdir.parseconfigure()
     assert 'NameError' in eval_variant(config.getini('run_variant_expression'))
+
 
 def test_run_variant_complex(testdir, monkeypatch):
     "Test that ``os`` is available in list comprehensions."
@@ -66,9 +77,10 @@ def test_run_variant_complex(testdir, monkeypatch):
     config = testdir.parseconfigure()
     assert eval_variant(config.getini('run_variant_expression')) == 'TEST_V:JUST_A_TEST'
 
+
 def track_it(testdir, func):
     testmon = CoreTestmon(project_dirs=[testdir.tmpdir.strpath],
-                      testmon_labels=set())
+                          testmon_labels=set())
     testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
     testmon.start()
     func()
@@ -82,6 +94,7 @@ def test_subprocesss(testdir, monkeypatch):
     def test_1():
         a=1
     """)
+
     def func():
         testdir.runpytest("test_a.py")
 
@@ -90,19 +103,21 @@ def test_subprocesss(testdir, monkeypatch):
     assert {os.path.abspath(a.strpath):
                 checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
 
+
 @pytest.mark.xfail
 def test_subprocess_recursive(testdir, monkeypatch):
     monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
-    #os.environ['COVERAGE_TEST_TRACER']='py'
+    # os.environ['COVERAGE_TEST_TRACER']='py'
     a = testdir.makepyfile(test_a="""\
     def test_1():
         a=1
     """)
+
     def func():
         testdir.runpytest("test_a.py", "--testmon", "--capture=no")
 
     deps = track_it(testdir, func)
-    #os.environ.pop('COVERAGE_TEST_TRACER', None)
+    # os.environ.pop('COVERAGE_TEST_TRACER', None)
 
     assert {os.path.abspath(a.strpath):
                 checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
@@ -127,14 +142,14 @@ def test_run_dissapearing(testdir):
     def f():
         coveragetest.import_local_file('a')
 
-    deps=track_it(testdir, f)
+    deps = track_it(testdir, f)
     assert a.strpath in deps
     assert len(deps) == 1
 
     del sys.modules['a']
 
-class TestmonDeselect(object):
 
+class TestmonDeselect(object):
     def test_dont_readcoveragerc(self, testdir, monkeypatch):
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         p = testdir.tmpdir.join('.coveragerc')
@@ -151,8 +166,8 @@ class TestmonDeselect(object):
         tf = testdir.makepyfile(test_a="""
             def test_add():
                 pass
-        """,)
-        reprec = testdir.inline_run( "--testmon", "-v")
+        """, )
+        reprec = testdir.inline_run("--testmon", "-v")
         res = reprec.countoutcomes()
         assert tuple(res) == (1, 0, 0), res
         sys.modules.pop('test_a', None)
@@ -160,9 +175,9 @@ class TestmonDeselect(object):
         tf = testdir.makepyfile(test_a="""
             def test_add():
                 1/0
-        """,)
+        """, )
         tf.setmtime(1424880936)
-        reprec = testdir.inline_run( "--testmon", "-v")
+        reprec = testdir.inline_run("--testmon", "-v")
         res = reprec.countoutcomes()
         assert tuple(res) == (0, 0, 1), res
         sys.modules.pop('test_a', None)
@@ -170,9 +185,9 @@ class TestmonDeselect(object):
         tf = testdir.makepyfile(test_a="""
             def test_add():
                 blas
-        """,)
+        """, )
         tf.setmtime(1424880937)
-        reprec = testdir.inline_run( "--testmon", "-v")
+        reprec = testdir.inline_run("--testmon", "-v")
         res = reprec.countoutcomes()
         assert tuple(res) == (0, 0, 1), res
         sys.modules.pop('test_a', None)
@@ -180,9 +195,9 @@ class TestmonDeselect(object):
         tf = testdir.makepyfile(test_a="""
             def test_add():
                 pass
-        """,)
+        """, )
         tf.setmtime(1424880938)
-        reprec = testdir.inline_run( "--testmon", "-v")
+        reprec = testdir.inline_run("--testmon", "-v")
         res = reprec.countoutcomes()
         assert tuple(res) == (1, 0, 0), res
         sys.modules.pop('test_a', None)
@@ -242,14 +257,14 @@ class TestmonDeselect(object):
         Module(cs2.source_code)
 
         test_a = testdir.makepyfile(test_a=cs1.source_code)
-        result = testdir.runpytest("--testmon", "test_a.py::TestA::test_one",)
+        result = testdir.runpytest("--testmon", "test_a.py::TestA::test_one", )
         result.stdout.fnmatch_lines([
             "*1 passed*",
         ])
 
         testdir.makepyfile(test_a=cs2.source_code)
         test_a.setmtime(1424880935)
-        result = testdir.runpytest("-v", "--collectonly", "--testmon", "--capture=no",)
+        result = testdir.runpytest("-v", "--collectonly", "--testmon", "--capture=no", )
         result.stdout.fnmatch_lines([
             "*test_one*",
         ])
@@ -285,11 +300,10 @@ class TestmonDeselect(object):
         """)
         testdir.makepyfile(test_a=cs2.source_code)
 
-        result = testdir.runpytest("-vv", "--collectonly", "--testmon",)
+        result = testdir.runpytest("-vv", "--collectonly", "--testmon", )
         result.stdout.fnmatch_lines([
             "*test_one*",
         ])
-
 
     def test_new(self, testdir, monkeypatch):
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
@@ -341,7 +355,7 @@ class TestmonDeselect(object):
                 assert add(2, 3) == 5
                 assert multiply(2, 3) == 6
         """)
-        result = testdir.runpytest("--testmon",)
+        result = testdir.runpytest("--testmon", )
         result.stdout.fnmatch_lines([
             "*5 passed*",
         ])

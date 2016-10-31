@@ -126,7 +126,6 @@ class TestmonDeselect(object):
 
     def pytest_collection_modifyitems(self, session, config, items):
         selected, deselected = [], []
-        self.testmon_data.collect_garbage(allnodeids=[item.nodeid for item in items])
         for item in items:
             if item.nodeid in self.testmon_data.lastfailed or self.testmon_data.test_should_run(item.nodeid):
                 selected.append(item)

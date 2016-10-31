@@ -112,6 +112,18 @@ class Testmon(object):
         os.environ.pop('COVERAGE_PROCESS_START', None)
 
 
+class ExtTestmon(Testmon):
+
+    def track_dependencies(self, callable_to_track, testmon_data, rootdir, nodeid):
+        pass
+
+
+class ExtExtTestmon(ExtTestmon):
+
+    def track_dependencies(self, callable_to_track, testmon_data, rootdir, nodeid):
+        pass
+
+
 def eval_variant(run_variant, **kwargs):
     if not run_variant:
         return ''
@@ -217,9 +229,6 @@ class TestmonData(object):
                                   for (p, checksum)
                                   in self.node_data[key].items()])
 
-    def __repr__(self):
-        return "\n".join((self.repr_per_node(nodeid) for nodeid in self.node_data))
-
     def test_should_run(self, nodeid):
         if nodeid in self.unaffected_nodeids:
             return False
@@ -262,15 +271,6 @@ class TestmonData(object):
     def compute_unaffected(self):
         self.unaffected_nodeids, self.unaffected_files = unaffected(self.node_data, self.changed_files)
 
-    ## possible data structures
-    ## nodeid1 -> [filename -> [block_a, block_b]]
-    ## filename -> [block_a -> [nodeid1, ], block_b -> [nodeid1], block_c -> [] ]
-
-    def collect_garbage(self, allnodeids):  # TODO, this was naive a causing loss of data ..
-        return
-        for testmon_nodeid in list(self.node_data.keys()):
-            if testmon_nodeid not in allnodeids:
-                del self.node_data[testmon_nodeid]
-        for lastfailed_nodeid in self.lastfailed:
-            if lastfailed_nodeid not in allnodeids:
-                self.lastfailed.remove(lastfailed_nodeid)
+        # possible data structures
+        # nodeid1 -> [filename -> [block_a, block_b]]
+        # filename -> [block_a -> [nodeid1, ], block_b -> [nodeid1], block_c -> [] ]

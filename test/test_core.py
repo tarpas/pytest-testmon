@@ -125,7 +125,7 @@ class TestDepGraph():
 
 
 class TestUnaffected():
-    def tes_nothing_changed(self):
+    def test_nothing_changed(self):
         changed = {'a.py': [101, 102, 103]}
         dependencies = {'node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]}}
         assert unaffected(dependencies, blockify(changed))[0] == dependencies
@@ -174,7 +174,8 @@ def test_variants_separation(testdir):
     assert testmon1_data.node_data['node1'] == {'a.py': 1}
 
 
-def test_flipp():
+def test_flip():
     node_data = {'X': {'a': [1, 2, 3], 'b': [3, 4, 5]}, 'Y': {'b': [3, 6, 7]}}
     files = flip_dictionary(node_data)
     assert files == {'a': {'X': [1, 2, 3]}, 'b': {'X': [3, 4, 5], 'Y': [3, 6, 7]}}
+
