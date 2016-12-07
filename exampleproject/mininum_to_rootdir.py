@@ -19,7 +19,7 @@ testmon = Testmon([str(rootdir)], variant=variant )
 testmon.read_fs()
 
 
-node_files = testmon.modules_test_counts().keys()
+node_files = testmon.file_data().keys()
 
 changed_files = []
 for node_file in node_files:

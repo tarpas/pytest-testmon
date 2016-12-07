@@ -1,15 +1,19 @@
+from collections import namedtuple
+
 from testmon.process_code import Module
 from test.test_process_code import CodeSample
-from test.test_testmon import get_modules
-from testmon.testmon_core import TestmonData as CoreTestmonData
-from testmon.testmon_core import is_dependent, affected_nodeids
+from testmon.testmon_core import TestmonData as CoreTestmonData, flip_dictionary, unaffected
+
 import json
 import pickle
 import pytest
 
 from _pytest import runner
 
+
 pytest_plugins = "pytester",
+
+Block = namedtuple('Block', 'checksums')
 
 
 def test_write_data(testdir):
@@ -31,14 +35,13 @@ def test_read_nonexistent(testdir):
 
 
 def test_write_read_data2(testdir):
+    original = ({'a.py': 1.0}, {'n1': {'a.py': [1]}}, ['n1'])
     td = CoreTestmonData(testdir.tmpdir.strpath, 'default')
-    td.mtimes = {'a.py': 1.0}
-    td.node_data = {'n1': {'a.py': [1]}}
-    td.lastfailed = ['n1']
+    td.mtimes, td.node_data, td.lastfailed = original
     td.write_data()
     td2 = CoreTestmonData(testdir.tmpdir.strpath, 'default')
     td2.read_data()
-    assert td == td2
+    assert original == (td2.mtimes, td2.node_data, td2.lastfailed)
 
 
 class TestDepGraph():
@@ -65,18 +68,13 @@ class TestDepGraph():
 
     def test_two_modules_combination(self):
         changed_py_files = {'b.py': get_modules([])}
-        assert is_dependent( {'a.py': [101, 102]}, changed_py_files) == False
+        assert is_dependent({'a.py': [101, 102]}, changed_py_files) == False
         assert is_dependent({'a.py': [105, 106], 'b.py': [107, 108]}, changed_py_files) == True
 
     def test_two_modules_combination2(self):
         changed_py_files = {'b.py': get_modules([103, 104])}
         assert is_dependent({'a.py': [101, 102]}, changed_py_files) == False
         assert is_dependent({'a.py': [101], 'b.py': [107]}, changed_py_files) == True
-
-    def test_two_modules_combination3(self):
-        changed_py_files = {'b.py': get_modules([103, 104])}
-        assert is_dependent('test_1', changed_py_files) == False
-        assert is_dependent('test_both', changed_py_files) == False
 
     def test_classes_depggraph(self):
         module1 = Module(CodeSample("""\
@@ -111,10 +109,10 @@ class TestDepGraph():
                                      bs2[1].checksum)
         assert (bs1[1].name) != (bs2[1].name)
 
-
-        assert is_dependent({'test_s.py': [bs1[0].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
-        assert is_dependent({'test_s.py': [bs1[1].checksum, bs1[2].checksum]}, {'test_s.py': [b.checksum for b in bs2]}) == True
-
+        assert is_dependent({'test_s.py': [bs1[0].checksum, bs1[2].checksum]},
+                            {'test_s.py': [b.checksum for b in bs2]}) == True
+        assert is_dependent({'test_s.py': [bs1[1].checksum, bs1[2].checksum]},
+                            {'test_s.py': [b.checksum for b in bs2]}) == True
 
     def test_affected_list(self):
         changes = {'test_a.py': [102, 103]}
@@ -123,15 +121,50 @@ class TestDepGraph():
         td.node_data = {'node1': {'test_a.py': [101, 102]},
                         'node2': {'test_a.py': [102, 103], 'test_b.py': [200, 201]}}
 
-        assert set(td.modules_test_counts()) == set(['test_a.py', 'test_b.py'])
+        assert set(td.file_data()) == set(['test_a.py', 'test_b.py'])
 
-        assert affected_nodeids(td.node_data, changes) == ['node1']
-
+        assert affected_nodeids(td.node_data, changes) == {'node1'}
 
     def test_affected_list2(self):
         changes = {'test_a.py': [102, 103]}
-        dependencies = {'node1': {'test_a.py': [102, 103, 104]},}
-        assert affected_nodeids(dependencies, changes) == ['node1']
+        dependencies = {'node1': {'test_a.py': [102, 103, 104]}, }
+        assert affected_nodeids(dependencies, changes) == {'node1'}
+
+
+class TestUnaffected():
+    def test_nothing_changed(self):
+        changed = {'a.py': [101, 102, 103]}
+        dependencies = {'node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]}}
+        assert unaffected(dependencies, blockify(changed))[0] == dependencies
+
+    def test_simple_change(self):
+        changed = {'a.py': [101, 102, 151]}
+        dependencies = {'node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]},
+                        'node2': {'test_b.py': [301, 302], 'a.py': [151]}}
+
+        nodes, files = unaffected(dependencies, blockify(changed))
+
+        assert set(nodes) == {'node2'}
+        assert set(files) == {'test_b.py'}
+
+
+def get_modules(checksums):
+    return checksums
+
+
+def is_dependent(dependencies, changes):
+    result = affected_nodeids({'testnode': dependencies}, changes)
+    return result == {'testnode'}
+
+
+def affected_nodeids(dependencies, changes):
+    unaffected_nodes, files = unaffected(dependencies, blockify(changes))
+    return set(dependencies) - set(unaffected_nodes)
+
+
+def blockify(changes):
+    block_changes = {key: Block(value) for key, value in changes.items()}
+    return block_changes
 
 
 def test_variants_separation(testdir):
@@ -145,8 +178,13 @@ def test_variants_separation(testdir):
 
     testmon_check_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
     testmon_check_data.read_fs()
-    assert testmon1_data.node_data['node1'] == {'a.py': 1 }
+    assert testmon1_data.node_data['node1'] == {'a.py': 1}
 
+
+def test_flip():
+    node_data = {'X': {'a': [1, 2, 3], 'b': [3, 4, 5]}, 'Y': {'b': [3, 6, 7]}}
+    files = flip_dictionary(node_data)
+    assert files == {'a': {'X': [1, 2, 3]}, 'b': {'X': [3, 4, 5], 'Y': [3, 6, 7]}}
 
 global_reports = []
 
