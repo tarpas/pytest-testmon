@@ -4,12 +4,6 @@ from testmon.process_code import Module
 from test.test_process_code import CodeSample
 from testmon.testmon_core import TestmonData as CoreTestmonData, flip_dictionary, unaffected
 
-import json
-import pickle
-import pytest
-
-from _pytest import runner
-
 pytest_plugins = "pytester",
 
 Block = namedtuple('Block', 'checksums')
