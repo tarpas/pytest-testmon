@@ -276,13 +276,13 @@ class TestmonData(object):
             for filename in nodedata:
                 self.write_db(con, filename, nodeid, nodedata[filename])
 
-    def parse_file(self, file, new_mtime=None):
-        assert file[0] != '/'
-        if file not in self.changed_files:
-            self.changed_files[file] = Module(file_name=os.path.join(self.rootdir, file))
-            self.changed_mtimes[file] = new_mtime if new_mtime else os.path.getmtime(os.path.join(self.rootdir, file))
+    def parse_file(self, filename, new_mtime=None):
+        assert filename[0] != '/'
+        if filename not in self.changed_files:
+            self.changed_files[filename] = Module(file_name=filename, rootdir=self.rootdir)
+            self.changed_mtimes[filename] = new_mtime if new_mtime else os.path.getmtime(os.path.join(self.rootdir, filename))
 
-        return self.changed_files[file]
+        return self.changed_files[filename]
 
     def write_db(self, con, filename, nodeid, checksums):
         dc = con.cursor()
