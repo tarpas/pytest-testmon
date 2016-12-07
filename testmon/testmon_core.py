@@ -19,6 +19,7 @@ from testmon.process_code import Module
 if sys.version_info > (3,):
     buffer = memoryview
 
+
 def _get_python_lib_paths():
     res = [sys.prefix]
     for attr in ['exec_prefix', 'real_prefix', 'base_prefix']:
@@ -51,11 +52,10 @@ def affected_nodeids(nodes, changes):
 
 
 class Testmon(object):
-
     def __init__(self, project_dirs, testmon_labels=set()):
         self.project_dirs = project_dirs
         self.testmon_labels = testmon_labels
-        self.setup_coverage(not('singleprocess' in testmon_labels))
+        self.setup_coverage(not ('singleprocess' in testmon_labels))
 
     def setup_coverage(self, subprocess):
 
@@ -94,7 +94,6 @@ class Testmon(object):
         finally:
             self.stop_and_save(testmon_data, rootdir, nodeid)
 
-
     def start(self):
         self.cov.erase()
         self.cov.start()
@@ -108,8 +107,6 @@ class Testmon(object):
             self.cov.combine()
 
         testmon_data.set_dependencies(nodeid, self.cov.get_data(), rootdir)
-
-
 
     def close(self):
         if hasattr(self, 'sub_cov_file'):
@@ -135,7 +132,7 @@ def eval_variant(run_variant, **kwargs):
 
 def get_variant_inifile(inifile):
     config = configparser.ConfigParser()
-    config.read(str(inifile),)
+    config.read(str(inifile), )
     if config.has_section('pytest') and config.has_option('pytest', 'run_variant_expression'):
         run_variant_expression = config.get('pytest', 'run_variant_expression')
     else:
@@ -145,7 +142,6 @@ def get_variant_inifile(inifile):
 
 
 class TestmonData(object):
-
     def __init__(self, rootdir, variant=None):
 
         self.variant = variant if variant else 'default'
@@ -173,6 +169,7 @@ class TestmonData(object):
         else:
             self.newfile = True
         self.connection = sqlite3.connect(self.datafile)
+        self.connection.execute("PRAGMA recursive_triggers = TRUE ")
         if getattr(self, 'newfile', False):
             self.init_tables()
 
@@ -192,39 +189,33 @@ class TestmonData(object):
         cursor = self.connection.execute("UPDATE alldata SET data=? WHERE dataid=?",
                                          [compressed_data_buffer, dataid])
         if not cursor.rowcount:
-
             cursor.execute("INSERT INTO alldata VALUES (?, ?)",
                            [dataid, compressed_data_buffer])
 
     def init_tables(self):
-        self.connection.execute('CREATE TABLE alldata (dataid text primary key, data blob)')
+        self.connection.execute('CREATE TABLE alldata (dataid TEXT PRIMARY KEY, data BLOB)')
         self.connection.execute("""
-          CREATE TABLE node_execution_version (
-              nodeid TEXT PRIMARY KEY,
-              logreports TEXT)
+          CREATE TABLE node (
+              variant TEXT,
+              name TEXT,
+              result TEXT,
+              PRIMARY KEY (variant, name))
 """)
         self.connection.execute("""
-          CREATE TABLE file_version (
-              id INTEGER PRIMARY KEY,
-              name TEXT,
+          CREATE TABLE file (
+              name TEXT PRIMARY KEY,
               mtime LONG)
         """)
 
         self.connection.execute("""
-          CREATE TABLE node_checksum_dep (
-            id INTEGER PRIMARY KEY,
-            nodeid text,
-            file_version_id INTEGER,
-            FOREIGN KEY(nodeid) REFERENCES node_execution_version(nodeid) ON DELETE CASCADE,
-            FOREIGN KEY(file_version_id) REFERENCES file_version(id) ON DELETE CASCADE)
+          CREATE TABLE node_file (
+            node_variant TEXT,
+            node_name TEXT,
+            file_name TEXT,
+            checksums TEXT,
+            FOREIGN KEY(node_variant, node_name) REFERENCES node(variant, name) ON DELETE CASCADE,
+            FOREIGN KEY(file_name) REFERENCES file(name) ON DELETE CASCADE)
     """)
-
-        self.connection.execute("""
-          CREATE TABLE checksum (
-              checksum INTEGER,
-              node_checksum_dep_id INTEGER,
-              FOREIGN KEY(node_checksum_dep_id) REFERENCES node_checksum_dep(id) ON DELETE CASCADE )
-        """)
 
     def read_data(self):
         self.mtimes, \
@@ -262,7 +253,7 @@ class TestmonData(object):
         for files in self.node_data.values():
             for module in files:
                 test_counts[module] += 1
-        #self.connection.execute("SELECT file_version_id, count(file_version_id) "
+        # self.connection.execute("SELECT file_version_id, count(file_version_id) "
         #                        "FROM node_checksum_dep n JOIN file_version f ON n.file_version_id=f.id"
         #                        "GROUP BY ")
         return test_counts
@@ -270,33 +261,27 @@ class TestmonData(object):
     def set_dependencies(self, nodeid, coverage_data, rootdir):
         result = {}
         with self.connection as con:
-            con.execute("DELETE FROM"
-                        "  file_version "
-                        "WHERE id in ("
-                        "    SELECT file_version_id "
-                        "    FROM  node_checksum_dep "
-                        "    WHERE nodeid = ?)", (nodeid,))
-            con.execute("DELETE FROM "
-                        "  node_execution_version WHERE nodeid=?", (nodeid,))
-            con.execute("INSERT INTO node_execution_version VALUES (?, ?)", (nodeid, ''))
+            con.execute("INSERT OR REPLACE INTO "
+                        "node "
+                        "VALUES (?, ?, ?)", (self.variant, nodeid, ''))
             for filename in coverage_data.measured_files():
                 lines = coverage_data.lines(filename)
                 if os.path.exists(filename):
                     result[filename] = checksum_coverage(self.parse_cache(filename).blocks, lines)
-                    self.write_db(con, filename, nodeid, result)
+                    self.write_db(con, filename, nodeid, result[filename])
 
             if not result:
-                filename = os.path.join(rootdir, nodeid).split("::",1)[0]
-                result[filename] = checksum_coverage(self.parse_cache(filename).blocks,[1])
-                self.write_db(con, filename, nodeid, result)
+                filename = os.path.join(rootdir, nodeid).split("::", 1)[0]
+                result[filename] = checksum_coverage(self.parse_cache(filename).blocks, [1])
+                self.write_db(con, filename, nodeid, result[filename])
             self.node_data[nodeid] = result
 
-    def write_db(self, con, filename, nodeid, result):
+    def write_db(self, con, filename, nodeid, checksums):
         fc = con.cursor()
-        fc.execute("INSERT INTO file_version VALUES (?, ?, ?)", (None, filename, 1))
+        fc.execute("INSERT OR REPLACE INTO file VALUES (?, ?)", (filename, self.mtimes[filename]))
         dc = con.cursor()
-        dc.execute("INSERT INTO node_checksum_dep VALUES (?, ?, ?)", (None, nodeid, fc.lastrowid))
-        con.executemany("INSERT INTO checksum VALUES (?, ?)", [(x, dc.lastrowid) for x in result[filename]])
+        dc.execute("INSERT INTO node_file VALUES (?, ?, ?, ?)", (self.variant, nodeid, filename, json.dumps(checksums)))
+        #import pydevd; pydevd.settrace()
 
     def parse_cache(self, module, new_mtime=None):
         if module not in self.modules_cache:
@@ -333,11 +318,11 @@ class TestmonData(object):
 
         self.unaffected_paths = {path: all_paths[path] for path in all_paths if path not in affected_paths}
 
-## possible data structures
-## nodeid1 -> [filename -> [block_a, block_b]]
-## filename -> [block_a -> [nodeid1, ], block_b -> [nodeid1], block_c -> [] ]
+    ## possible data structures
+    ## nodeid1 -> [filename -> [block_a, block_b]]
+    ## filename -> [block_a -> [nodeid1, ], block_b -> [nodeid1], block_c -> [] ]
 
-    def collect_garbage(self, allnodeids): # TODO, this was naive a causing loss of data ..
+    def collect_garbage(self, allnodeids):  # TODO, this was naive a causing loss of data ..
         return
         for testmon_nodeid in list(self.node_data.keys()):
             if testmon_nodeid not in allnodeids:
