@@ -100,7 +100,7 @@ def test_subprocesss(testdir, monkeypatch):
 
     deps = track_it(testdir, func)
 
-    assert {os.path.abspath(a.strpath):
+    assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath):
                 checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
 
 
@@ -143,7 +143,7 @@ def test_run_dissapearing(testdir):
         coveragetest.import_local_file('a')
 
     deps = track_it(testdir, f)
-    assert a.strpath in deps
+    assert os.path.relpath(a.strpath, testdir.tmpdir.strpath) in deps
     assert len(deps) == 1
 
     del sys.modules['a']

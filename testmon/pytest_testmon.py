@@ -111,9 +111,7 @@ class TestmonDeselect(object):
         self.lastfailed = self.testmon_data.lastfailed
 
     def pytest_report_header(self, config):
-        changed_files = ",".join([os.path.relpath(path, config.rootdir.strpath)
-                                  for path
-                                  in self.testmon_data.changed_files])
+        changed_files = ",".join(self.testmon_data.changed_files)
         if changed_files == '' or len(changed_files) > 100:
             changed_files = len(self.testmon_data.changed_files)
         active_message = "testmon={}, changed files: {}, skipping collection of {} items".format(
@@ -166,7 +164,7 @@ class TestmonDeselect(object):
             self.config = config
 
     def pytest_ignore_collect(self, path, config):
-        strpath = path.strpath
+        strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
         if strpath in self.testmon_data.unaffected_files:
             if os.path.split(strpath)[1].startswith('test_'):
                 config.hook.pytest_deselected(

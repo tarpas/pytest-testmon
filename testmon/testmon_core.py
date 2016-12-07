@@ -256,14 +256,15 @@ class TestmonData(object):
     def get_nodedata(self, nodeid, coverage_data, rootdir):
         result = {}
         for filename in coverage_data.measured_files():
+            relfilename = os.path.relpath(filename, rootdir)
             lines = coverage_data.lines(filename)
             if os.path.exists(filename):
-                result[filename] = checksum_coverage(self.parse_file(filename).blocks, lines)
+                result[relfilename] = checksum_coverage(self.parse_file(relfilename).blocks, lines)
         if not result: # when testmon kicks-in the test module is already imported. If the test function is skipped
                        # coverage_data is empty. However, we need to write down, that we depend on the
                        # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)
-            filename = os.path.join(rootdir, nodeid).split("::", 1)[0]
-            result[filename] = checksum_coverage(self.parse_file(filename).blocks, [1])
+            relfilename = os.path.relpath(os.path.join(rootdir, nodeid).split("::", 1)[0], self.rootdir)
+            result[relfilename] = checksum_coverage(self.parse_file(relfilename).blocks, [1])
         return result
 
     def set_dependencies(self, nodeid, nodedata):
@@ -276,9 +277,10 @@ class TestmonData(object):
                 self.write_db(con, filename, nodeid, nodedata[filename])
 
     def parse_file(self, file, new_mtime=None):
+        assert file[0] != '/'
         if file not in self.changed_files:
-            self.changed_files[file] = Module(file_name=file)
-            self.changed_mtimes[file] = new_mtime if new_mtime else os.path.getmtime(file)
+            self.changed_files[file] = Module(file_name=os.path.join(self.rootdir, file))
+            self.changed_mtimes[file] = new_mtime if new_mtime else os.path.getmtime(os.path.join(self.rootdir, file))
 
         return self.changed_files[file]
 
