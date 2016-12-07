@@ -165,6 +165,8 @@ class TestmonDeselect(object):
 
     def pytest_ignore_collect(self, path, config):
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
+        if strpath in [nodeid.split("::")[0] for nodeid in self.testmon_data.lastfailed]:
+            return False
         if strpath in self.testmon_data.unaffected_files:
             if os.path.split(strpath)[1].startswith('test_'):
                 config.hook.pytest_deselected(

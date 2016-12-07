@@ -175,7 +175,7 @@ class TestmonData(object):
                                          [self.variant + ':' + attribute])
         result = cursor.fetchone()
         if result:
-            return json.loads(zlib.decompress(result[0]).decode('utf-8)'))
+            return json.loads(result[0].decode('utf-8)')) #zlib.decompress(result[0]).decode('utf-8)'))
         else:
             return default
 
@@ -189,7 +189,7 @@ class TestmonData(object):
     def _write_attribute(self, attribute, data):
         dataid = self.variant + ':' + attribute
         json_data = json.dumps(data).encode('utf-8')
-        compressed_data_buffer = buffer(zlib.compress(json_data))
+        compressed_data_buffer = buffer(json_data) #zlib.compress(json_data))
         cursor = self.connection.execute("UPDATE alldata SET data=? WHERE dataid=?",
                                          [compressed_data_buffer, dataid])
         if not cursor.rowcount:
@@ -197,7 +197,7 @@ class TestmonData(object):
                            [dataid, compressed_data_buffer])
 
     def init_tables(self):
-        self.connection.execute('CREATE TABLE alldata (dataid TEXT PRIMARY KEY, data BLOB)')
+        self.connection.execute('CREATE TABLE alldata (dataid TEXT PRIMARY KEY, data TEXT)')
         self.connection.execute("""
           CREATE TABLE node (
               variant TEXT,
@@ -226,7 +226,6 @@ class TestmonData(object):
     def write_data(self):
         with self.connection:
             self.mtimes.update(self.changed_mtimes)
-            self.node_data.update(self.changed_node_data)
             self.reports.update(self.changed_reports)
             self._write_attribute('mtimes', self.mtimes)
             #self._write_attribute('node_data', self.node_data)
