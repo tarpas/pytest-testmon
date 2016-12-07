@@ -10,7 +10,6 @@ import pytest
 
 from _pytest import runner
 
-
 pytest_plugins = "pytester",
 
 Block = namedtuple('Block', 'checksums')
@@ -35,13 +34,16 @@ def test_read_nonexistent(testdir):
 
 
 def test_write_read_data2(testdir):
-    original = ({'a.py': 1.0}, {'n1': {'a.py': [1]}}, ['n1'])
+    n1_node_data = {'a.py': [1]}
+    original = ({'a.py': 1.0}, ['n1'])
     td = CoreTestmonData(testdir.tmpdir.strpath, 'default')
-    td.mtimes, td.node_data, td.lastfailed = original
+    td.mtimes, td.lastfailed = original
     td.write_data()
+    td.set_dependencies('n1', n1_node_data, )
     td2 = CoreTestmonData(testdir.tmpdir.strpath, 'default')
     td2.read_data()
-    assert original == (td2.mtimes, td2.node_data, td2.lastfailed)
+    assert td2.node_data['n1'] == n1_node_data
+    assert original == (td2.mtimes, td2.lastfailed)
 
 
 class TestDepGraph():
@@ -186,7 +188,9 @@ def test_flip():
     files = flip_dictionary(node_data)
     assert files == {'a': {'X': [1, 2, 3]}, 'b': {'X': [3, 4, 5], 'Y': [3, 6, 7]}}
 
+
 global_reports = []
+
 
 def serialize_report(rep):
     import py
@@ -203,24 +207,18 @@ def serialize_report(rep):
     return d
 
 
-
 def test_serialize(testdir):
-
-
     class PlugWrite:
-
         def pytest_runtest_logreport(self, report):
             global global_reports
             global_reports.append(report)
 
     class PlugRereport:
-
         def pytest_runtest_protocol(self, item, nextitem):
             hook = getattr(item.ihook, 'pytest_runtest_logreport')
             for g in global_reports:
                 hook(report=g)
             return True
-
 
     testdir.makepyfile("""
     def test_a():
@@ -228,7 +226,6 @@ def test_serialize(testdir):
     """)
 
     testdir.runpytest_inprocess(plugins=[PlugWrite()])
-
 
     testdir.makepyfile("""
     def test_a():
@@ -238,4 +235,3 @@ def test_serialize(testdir):
     result = testdir.runpytest_inprocess(plugins=[PlugRereport()])
 
     print(result)
-

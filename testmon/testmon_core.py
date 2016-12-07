@@ -104,24 +104,12 @@ class Testmon(object):
         if hasattr(self, 'sub_cov_file'):
             self.cov.combine()
 
-        testmon_data.set_dependencies(nodeid, self.cov.get_data(), rootdir)
+        testmon_data.set_dependencies(nodeid, testmon_data.get_nodedata(nodeid, self.cov.get_data(), rootdir))
 
     def close(self):
         if hasattr(self, 'sub_cov_file'):
             os.remove(self.sub_cov_file + "_rc")
         os.environ.pop('COVERAGE_PROCESS_START', None)
-
-
-class ExtTestmon(Testmon):
-
-    def track_dependencies(self, callable_to_track, testmon_data, rootdir, nodeid):
-        pass
-
-
-class ExtExtTestmon(ExtTestmon):
-
-    def track_dependencies(self, callable_to_track, testmon_data, rootdir, nodeid):
-        pass
 
 
 def eval_variant(run_variant, **kwargs):
@@ -191,6 +179,13 @@ class TestmonData(object):
         else:
             return default
 
+    def _fetch_node_data(self):
+        result = defaultdict(lambda: {})
+        for row in self.connection.execute("SELECT node_name, file_name, checksums FROM node_file WHERE node_variant=?",
+                                           (self.variant,)):
+            result[row[0]][row[1]] = json.loads(row[2])
+        return result
+
     def _write_attribute(self, attribute, data):
         dataid = self.variant + ':' + attribute
         json_data = json.dumps(data).encode('utf-8')
@@ -211,19 +206,12 @@ class TestmonData(object):
               PRIMARY KEY (variant, name))
 """)
         self.connection.execute("""
-          CREATE TABLE file (
-              name TEXT PRIMARY KEY,
-              mtime LONG)
-        """)
-
-        self.connection.execute("""
           CREATE TABLE node_file (
             node_variant TEXT,
             node_name TEXT,
             file_name TEXT,
             checksums TEXT,
-            FOREIGN KEY(node_variant, node_name) REFERENCES node(variant, name) ON DELETE CASCADE,
-            FOREIGN KEY(file_name) REFERENCES file(name) ON DELETE CASCADE)
+            FOREIGN KEY(node_variant, node_name) REFERENCES node(variant, name) ON DELETE CASCADE)
     """)
 
     def read_data(self):
@@ -231,7 +219,7 @@ class TestmonData(object):
         self.node_data, \
         self.reports, \
         self.lastfailed = self._fetch_attribute('mtimes', default={}), \
-                          self._fetch_attribute('node_data', default={}), \
+                          self._fetch_node_data(), \
                           self._fetch_attribute('reports', default={}), \
                           self._fetch_attribute('lastfailed', default=[])
 
@@ -241,7 +229,7 @@ class TestmonData(object):
             self.node_data.update(self.changed_node_data)
             self.reports.update(self.changed_reports)
             self._write_attribute('mtimes', self.mtimes)
-            self._write_attribute('node_data', self.node_data)
+            #self._write_attribute('node_data', self.node_data)
             self._write_attribute('lastfailed', self.lastfailed)
             self._write_attribute('reports', self.reports)
 
@@ -264,23 +252,28 @@ class TestmonData(object):
     #                        "FROM node_checksum_dep n JOIN file_version f ON n.file_version_id=f.id"
     #                        "GROUP BY ")
 
-    def set_dependencies(self, nodeid, coverage_data, rootdir):
+
+    def get_nodedata(self, nodeid, coverage_data, rootdir):
         result = {}
+        for filename in coverage_data.measured_files():
+            lines = coverage_data.lines(filename)
+            if os.path.exists(filename):
+                result[filename] = checksum_coverage(self.parse_file(filename).blocks, lines)
+        if not result: # when testmon kicks-in the test module is already imported. If the test function is skipped
+                       # coverage_data is empty. However, we need to write down, that we depend on the
+                       # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)
+            filename = os.path.join(rootdir, nodeid).split("::", 1)[0]
+            result[filename] = checksum_coverage(self.parse_file(filename).blocks, [1])
+        return result
+
+    def set_dependencies(self, nodeid, nodedata):
         with self.connection as con:
             con.execute("INSERT OR REPLACE INTO "
                         "node "
                         "VALUES (?, ?, ?)", (self.variant, nodeid, ''))
 
-        for filename in coverage_data.measured_files():
-            lines = coverage_data.lines(filename)
-            if os.path.exists(filename):
-                result[filename] = checksum_coverage(self.parse_file(filename).blocks, lines)
-                self.write_db(con, filename, nodeid, result[filename])
-        if not result:
-            filename = os.path.join(rootdir, nodeid).split("::", 1)[0]
-            result[filename] = checksum_coverage(self.parse_file(filename).blocks, [1])
-            self.write_db(con, filename, nodeid, result[filename])
-        self.changed_node_data[nodeid] = result
+            for filename in nodedata:
+                self.write_db(con, filename, nodeid, nodedata[filename])
 
     def parse_file(self, file, new_mtime=None):
         if file not in self.changed_files:
@@ -290,14 +283,10 @@ class TestmonData(object):
         return self.changed_files[file]
 
     def write_db(self, con, filename, nodeid, checksums):
-        fc = con.cursor()
-        fc.execute("INSERT OR REPLACE INTO file VALUES (?, ?)", (filename, self.mtimes[filename]))
         dc = con.cursor()
         dc.execute("INSERT INTO node_file VALUES (?, ?, ?, ?)",
                    (self.variant, nodeid, filename, json.dumps(checksums)))
-        # import pydevd; pydevd.settrace()
 
-        return self.modules_cache[module]
 
     def read_fs(self):
         self.read_data()
