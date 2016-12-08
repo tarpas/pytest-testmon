@@ -175,7 +175,7 @@ class TestmonData(object):
                                          [self.variant + ':' + attribute])
         result = cursor.fetchone()
         if result:
-            return json.loads(result[0]) #zlib.decompress(result[0]).decode('utf-8)'))
+            return json.loads(result[0])  # zlib.decompress(result[0]).decode('utf-8)'))
         else:
             return default
 
@@ -189,7 +189,7 @@ class TestmonData(object):
     def _write_attribute(self, attribute, data):
         dataid = self.variant + ':' + attribute
         json_data = json.dumps(data)
-        compressed_data_buffer = json_data #buffer(zlib.compress(json_data.encode('utf-8')))
+        compressed_data_buffer = json_data  # buffer(zlib.compress(json_data.encode('utf-8')))
         cursor = self.connection.execute("UPDATE alldata SET data=? WHERE dataid=?",
                                          [compressed_data_buffer, dataid])
         if not cursor.rowcount:
@@ -228,7 +228,6 @@ class TestmonData(object):
             self.mtimes.update(self.changed_mtimes)
             self.reports.update(self.changed_reports)
             self._write_attribute('mtimes', self.mtimes)
-            #self._write_attribute('node_data', self.node_data)
             self._write_attribute('lastfailed', self.lastfailed)
             self._write_attribute('reports', self.reports)
 
@@ -247,11 +246,6 @@ class TestmonData(object):
     def file_data(self):
         return flip_dictionary(self.node_data)
 
-    # self.connection.execute("SELECT file_version_id, count(file_version_id) "
-    #                        "FROM node_checksum_dep n JOIN file_version f ON n.file_version_id=f.id"
-    #                        "GROUP BY ")
-
-
     def get_nodedata(self, nodeid, coverage_data, rootdir):
         result = {}
         for filename in coverage_data.measured_files():
@@ -259,9 +253,9 @@ class TestmonData(object):
             lines = coverage_data.lines(filename)
             if os.path.exists(filename):
                 result[relfilename] = checksum_coverage(self.parse_file(relfilename).blocks, lines)
-        if not result: # when testmon kicks-in the test module is already imported. If the test function is skipped
-                       # coverage_data is empty. However, we need to write down, that we depend on the
-                       # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)
+        if not result:  # when testmon kicks-in the test module is already imported. If the test function is skipped
+            # coverage_data is empty. However, we need to write down, that we depend on the
+            # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)
             relfilename = os.path.relpath(os.path.join(rootdir, nodeid).split("::", 1)[0], self.rootdir)
             result[relfilename] = checksum_coverage(self.parse_file(relfilename).blocks, [1])
         return result
@@ -271,23 +265,17 @@ class TestmonData(object):
             con.execute("INSERT OR REPLACE INTO "
                         "node "
                         "VALUES (?, ?, ?)", (self.variant, nodeid, ''))
-
-            for filename in nodedata:
-                self.write_db(con, filename, nodeid, nodedata[filename])
+            con.executemany("INSERT INTO node_file VALUES (?, ?, ?, ?)",
+                            [(self.variant, nodeid, filename, json.dumps(nodedata[filename])) for filename in nodedata])
 
     def parse_file(self, filename, new_mtime=None):
         assert filename[0] != '/'
         if filename not in self.changed_files:
             self.changed_files[filename] = Module(file_name=filename, rootdir=self.rootdir)
-            self.changed_mtimes[filename] = new_mtime if new_mtime else os.path.getmtime(os.path.join(self.rootdir, filename))
+            self.changed_mtimes[filename] = new_mtime if new_mtime else os.path.getmtime(
+                os.path.join(self.rootdir, filename))
 
         return self.changed_files[filename]
-
-    def write_db(self, con, filename, nodeid, checksums):
-        dc = con.cursor()
-        dc.execute("INSERT INTO node_file VALUES (?, ?, ?, ?)",
-                   (self.variant, nodeid, filename, json.dumps(checksums)))
-
 
     def read_fs(self):
         self.read_data()
