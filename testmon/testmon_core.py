@@ -175,7 +175,7 @@ class TestmonData(object):
                                          [self.variant + ':' + attribute])
         result = cursor.fetchone()
         if result:
-            return json.loads(result[0].decode('utf-8)')) #zlib.decompress(result[0]).decode('utf-8)'))
+            return json.loads(result[0]) #zlib.decompress(result[0]).decode('utf-8)'))
         else:
             return default
 
@@ -188,8 +188,8 @@ class TestmonData(object):
 
     def _write_attribute(self, attribute, data):
         dataid = self.variant + ':' + attribute
-        json_data = json.dumps(data).encode('utf-8')
-        compressed_data_buffer = buffer(json_data) #zlib.compress(json_data))
+        json_data = json.dumps(data)
+        compressed_data_buffer = json_data #buffer(zlib.compress(json_data.encode('utf-8')))
         cursor = self.connection.execute("UPDATE alldata SET data=? WHERE dataid=?",
                                          [compressed_data_buffer, dataid])
         if not cursor.rowcount:
