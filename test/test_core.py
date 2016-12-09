@@ -1,10 +1,12 @@
+from collections import namedtuple
+
 from testmon.process_code import Module
 from test.test_process_code import CodeSample
-from test.test_testmon import get_modules
-from testmon.testmon_core import TestmonData as CoreTestmonData, flip_dictionary
-from testmon.testmon_core import is_dependent, affected_nodeids
+from testmon.testmon_core import TestmonData as CoreTestmonData, flip_dictionary, unaffected
 
 pytest_plugins = "pytester",
+
+Block = namedtuple('Block', 'checksums')
 
 
 def test_write_data(testdir):
@@ -26,13 +28,16 @@ def test_read_nonexistent(testdir):
 
 
 def test_write_read_data2(testdir):
-    original = ({'a.py': 1.0}, {'n1': {'a.py': [1]}}, ['n1'])
+    n1_node_data = {'a.py': [1]}
+    original = ({'a.py': 1.0}, ['n1'])
     td = CoreTestmonData(testdir.tmpdir.strpath, 'default')
-    td.mtimes, td.node_data, td.lastfailed = original
+    td.mtimes, td.lastfailed = original
     td.write_data()
+    td.set_dependencies('n1', n1_node_data, )
     td2 = CoreTestmonData(testdir.tmpdir.strpath, 'default')
     td2.read_data()
-    assert original == (td2.mtimes, td2.node_data, td2.lastfailed)
+    assert td2.node_data['n1'] == n1_node_data
+    assert original == (td2.mtimes, td2.lastfailed)
 
 
 class TestDepGraph():
@@ -66,11 +71,6 @@ class TestDepGraph():
         changed_py_files = {'b.py': get_modules([103, 104])}
         assert is_dependent({'a.py': [101, 102]}, changed_py_files) == False
         assert is_dependent({'a.py': [101], 'b.py': [107]}, changed_py_files) == True
-
-    def test_two_modules_combination3(self):
-        changed_py_files = {'b.py': get_modules([103, 104])}
-        assert is_dependent('test_1', changed_py_files) == False
-        assert is_dependent('test_both', changed_py_files) == False
 
     def test_classes_depggraph(self):
         module1 = Module(CodeSample("""\
@@ -119,12 +119,48 @@ class TestDepGraph():
 
         assert set(td.file_data()) == set(['test_a.py', 'test_b.py'])
 
-        assert affected_nodeids(td.node_data, changes) == ['node1']
+        assert affected_nodeids(td.node_data, changes) == {'node1'}
 
     def test_affected_list2(self):
         changes = {'test_a.py': [102, 103]}
         dependencies = {'node1': {'test_a.py': [102, 103, 104]}, }
-        assert affected_nodeids(dependencies, changes) == ['node1']
+        assert affected_nodeids(dependencies, changes) == {'node1'}
+
+
+class TestUnaffected():
+    def test_nothing_changed(self):
+        changed = {'a.py': [101, 102, 103]}
+        dependencies = {'node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]}}
+        assert unaffected(dependencies, blockify(changed))[0] == dependencies
+
+    def test_simple_change(self):
+        changed = {'a.py': [101, 102, 151]}
+        dependencies = {'node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]},
+                        'node2': {'test_b.py': [301, 302], 'a.py': [151]}}
+
+        nodes, files = unaffected(dependencies, blockify(changed))
+
+        assert set(nodes) == {'node2'}
+        assert set(files) == {'test_b.py'}
+
+
+def get_modules(checksums):
+    return checksums
+
+
+def is_dependent(dependencies, changes):
+    result = affected_nodeids({'testnode': dependencies}, changes)
+    return result == {'testnode'}
+
+
+def affected_nodeids(dependencies, changes):
+    unaffected_nodes, files = unaffected(dependencies, blockify(changes))
+    return set(dependencies) - set(unaffected_nodes)
+
+
+def blockify(changes):
+    block_changes = {key: Block(value) for key, value in changes.items()}
+    return block_changes
 
 
 def test_variants_separation(testdir):
@@ -141,7 +177,55 @@ def test_variants_separation(testdir):
     assert testmon1_data.node_data['node1'] == {'a.py': 1}
 
 
-def test_flipp():
+def test_flip():
     node_data = {'X': {'a': [1, 2, 3], 'b': [3, 4, 5]}, 'Y': {'b': [3, 6, 7]}}
     files = flip_dictionary(node_data)
     assert files == {'a': {'X': [1, 2, 3]}, 'b': {'X': [3, 4, 5], 'Y': [3, 6, 7]}}
+
+
+global_reports = []
+
+
+def serialize_report(rep):
+    import py
+    d = rep.__dict__.copy()
+    if hasattr(rep.longrepr, 'toterminal'):
+        d['longrepr'] = str(rep.longrepr)
+    else:
+        d['longrepr'] = rep.longrepr
+    for name in d:
+        if isinstance(d[name], py.path.local):
+            d[name] = str(d[name])
+        elif name == "result":
+            d[name] = None  # for now
+    return d
+
+
+def test_serialize(testdir):
+    class PlugWrite:
+        def pytest_runtest_logreport(self, report):
+            global global_reports
+            global_reports.append(report)
+
+    class PlugRereport:
+        def pytest_runtest_protocol(self, item, nextitem):
+            hook = getattr(item.ihook, 'pytest_runtest_logreport')
+            for g in global_reports:
+                hook(report=g)
+            return True
+
+    testdir.makepyfile("""
+    def test_a():
+        raise Exception('exception from test_a')
+    """)
+
+    testdir.runpytest_inprocess(plugins=[PlugWrite()])
+
+    testdir.makepyfile("""
+    def test_a():
+        pass
+    """)
+
+    result = testdir.runpytest_inprocess(plugins=[PlugRereport()])
+
+    print(result)

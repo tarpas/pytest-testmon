@@ -1,4 +1,5 @@
 import os
+import sys
 import pytest
 from test.coveragepy.coveragetest import CoverageTest
 
@@ -8,7 +9,7 @@ class TestCoverageSubprocess(CoverageTest):
             path1 = self.make_file("subprocesstest.py", """\
             print("hello world")
             """)
-            output = self.run_command('python {}'.format(path1))
+            output = self.run_command('{} {}'.format(sys.executable, path1))
             assert output == "hello world\n"
 
         def test_pass_environ(self):
@@ -17,7 +18,7 @@ class TestCoverageSubprocess(CoverageTest):
             print(os.environ['TEST_NAME'])
             """)
             os.environ['TEST_NAME'] = 'TEST_VALUE'
-            output = self.run_command('python {}'.format(path1))
+            output = self.run_command('{} {}'.format(sys.executable, path1))
             assert output == "{}\n".format('TEST_VALUE')
 
         @pytest.mark.xfail

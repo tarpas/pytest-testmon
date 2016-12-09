@@ -15,7 +15,7 @@ class TestA(unittest.TestCase):
 
     def test_subtract(self):
         """test subtracting"""
-        self.assertEqual(subtract(1, 2), -1)
+        self.assertEqual(subtract(1 , 2), -1)
 
     @pytest.mark.xfail(True, reason="Division by zero not implemented yet.")
     def test_always_fail(self):

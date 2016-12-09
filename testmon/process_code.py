@@ -1,6 +1,7 @@
 import ast
 import textwrap
 import zlib
+import os
 
 
 class Block():
@@ -39,11 +40,11 @@ class Block():
 
 
 class Module(object):
-    def __init__(self, source_code=None, file_name='<unknown>'):
+    def __init__(self, source_code=None, file_name='<unknown>', rootdir=''):
         self.blocks = []
         self.counter = 0
         if source_code is None:
-            with open(file_name) as f:
+            with open(os.path.join(rootdir, file_name)) as f:
                 source_code = f.read()
         else:
             source_code = textwrap.dedent(source_code)
