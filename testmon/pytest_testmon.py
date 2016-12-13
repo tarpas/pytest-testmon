@@ -79,7 +79,8 @@ def init_testmon_data(config):
 
 
 def pytest_cmdline_main(config):
-    init_testmon_data(config)
+    if config.option.by_test_count or config.option.testmon:
+        init_testmon_data(config)
     if config.option.by_test_count:
         from _pytest.main import wrap_session
 
