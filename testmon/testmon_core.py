@@ -18,6 +18,9 @@ import hashlib
 
 if sys.version_info > (3,):
     buffer = memoryview
+    encode = lambda x: bytes(x, 'utf_8')
+else:
+    encode = lambda x: x
 
 
 def _get_python_lib_paths():
@@ -139,12 +142,6 @@ def get_variant_inifile(inifile):
     return eval_variant(run_variant_expression)
 
 
-if sys.version_info.major == 2:
-    encode = lambda x: x
-else:
-    encode = lambda x: bytes(x, 'utf_8')
-
-
 def read_file_with_checksum(absfilename):
     afile = open(absfilename)
     hasher = hashlib.sha1()
@@ -155,9 +152,6 @@ def read_file_with_checksum(absfilename):
 
 def parse_file(filename, rootdir, source_code):
     return Module(source_code=source_code, file_name=filename, rootdir=rootdir)
-
-
-DISAPPEARED_FILE = -2
 
 
 class SourceTree():
@@ -189,8 +183,9 @@ class SourceTree():
 
     def get_file(self, filename):
         if filename not in self.changed_files:
-            self.mtimes[filename] = os.path.getmtime(os.path.join(self.rootdir, filename))
             code, checksum = read_file_with_checksum(os.path.join(self.rootdir, filename))
+            self.mtimes[filename] = os.path.getmtime(os.path.join(self.rootdir, filename))
+            self.checksums[filename] = checksum
             self.changed_files[filename] = parse_file(filename=filename, rootdir=self.rootdir, source_code=code)
         return self.changed_files[filename]
 
@@ -223,7 +218,7 @@ class TestmonData(object):
             self.init_tables()
 
     def _fetch_attribute(self, attribute, default=None):
-        cursor = self.connection.execute("SELECT data FROM alldata WHERE dataid=?",
+        cursor = self.connection.execute("SELECT data FROM metadata WHERE dataid=?",
                                          [self.variant + ':' + attribute])
         result = cursor.fetchone()
         if result:
@@ -242,14 +237,14 @@ class TestmonData(object):
         dataid = self.variant + ':' + attribute
         json_data = json.dumps(data)
         compressed_data_buffer = json_data  # buffer(zlib.compress(json_data.encode('utf-8')))
-        cursor = self.connection.execute("UPDATE alldata SET data=? WHERE dataid=?",
+        cursor = self.connection.execute("UPDATE metadata SET data=? WHERE dataid=?",
                                          [compressed_data_buffer, dataid])
         if not cursor.rowcount:
-            cursor.execute("INSERT INTO alldata VALUES (?, ?)",
+            cursor.execute("INSERT INTO metadata VALUES (?, ?)",
                            [dataid, compressed_data_buffer])
 
     def init_tables(self):
-        self.connection.execute('CREATE TABLE alldata (dataid TEXT PRIMARY KEY, data TEXT)')
+        self.connection.execute('CREATE TABLE metadata (dataid TEXT PRIMARY KEY, data TEXT)')
         self.connection.execute("""
           CREATE TABLE node (
               variant TEXT,

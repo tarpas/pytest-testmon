@@ -229,7 +229,6 @@ def test_serialize(testdir):
 
     print(result)
 
-
 class TestSourceTree():
     @pytest.fixture
     def a_py(self, testdir):
@@ -245,6 +244,10 @@ class TestSourceTree():
         fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'a.py': a_py.mtime()}, checksums={'a.py': checksum})
         changed_files = fs_data.get_changed_files()
         assert changed_files == {}
+
+    def test_basic_checksum(self, testdir, a_py):
+        code, checksum = read_file_with_checksum('a.py')
+        fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'a.py': a_py.mtime()}, checksums={'a.py': checksum})
 
         a_py.setmtime(1424880936)
         changed_files = fs_data.get_changed_files()
