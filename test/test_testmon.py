@@ -399,6 +399,20 @@ class TestmonDeselect(object):
             "*passed*",
         ])
 
+    def test_zero_lines_touched(self, testdir):
+        testdir.makepyfile(test_c="""
+            import unittest
+
+            class TestA(unittest.TestCase):
+                @unittest.skip('')
+                def test_add(self):
+                    pass
+        """)
+        result = testdir.runpytest("--testmon", )
+        result.stdout.fnmatch_lines([
+            "*1 skipped*",
+        ])
+
 
 def get_modules(hashes):
     return hashes
