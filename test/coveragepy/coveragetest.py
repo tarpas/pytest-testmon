@@ -360,7 +360,7 @@ class CoverageTest(TestCase):
         analysis = cov._analyze(mod)
         statements = sorted(analysis.statements)
         if cov_data:
-            self.assertEqual(cov.get_data().lines(os.path.abspath(modname + ".py")), cov_data, msg)
+            self.assertEqual(sorted(cov.get_data().lines(os.path.abspath(modname + ".py"))), cov_data, msg)
         if lines is not None:
             if type(lines[0]) == type(1):
                 # lines is just a list of numbers, it must match the statements
