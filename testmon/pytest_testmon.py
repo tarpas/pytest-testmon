@@ -67,21 +67,23 @@ def testmon_options(config):
     return result
 
 
-def init_testmon_data(config):
+def init_testmon_data(config, read_source=True):
     if not hasattr(config, 'testmon_data'):
         variant = eval_variant(config.getini('run_variant_expression'))
         config.project_dirs = config.getoption('project_directory') or [config.rootdir.strpath]
         testmon_data = TestmonData(config.project_dirs[0],
                                    variant=variant)
-        affected = testmon_data.read_fs()
+        testmon_data.read_data()
+        if read_source:
+            testmon_data.read_source()
         config.testmon_data = testmon_data
-        return affected
 
 
 def pytest_cmdline_main(config):
-    if config.option.by_test_count or config.option.testmon:
+    if config.option.testmon:
         init_testmon_data(config)
-    if config.option.by_test_count:
+    elif config.option.by_test_count:
+        init_testmon_data(config, read_source=False)
         from _pytest.main import wrap_session
 
         return wrap_session(config, by_test_count)
@@ -112,9 +114,9 @@ class TestmonDeselect(object):
         self.lastfailed = self.testmon_data.lastfailed
 
     def pytest_report_header(self, config):
-        changed_files = ",".join(self.testmon_data.changed_files)
+        changed_files = ",".join(self.testmon_data.source_tree.changed_files)
         if changed_files == '' or len(changed_files) > 100:
-            changed_files = len(self.testmon_data.changed_files)
+            changed_files = len(self.testmon_data.source_tree.changed_files)
         active_message = "testmon={}, changed files: {}, skipping collection of {} items".format(
             config.getoption('testmon'),
             changed_files, len(self.testmon_data.unaffected_nodeids))

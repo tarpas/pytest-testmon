@@ -50,7 +50,7 @@ class Module(object):
             source_code = textwrap.dedent(source_code)
         lines = source_code.splitlines()
         try:
-            tree = ast.parse("\n".join(lines), file_name)
+            tree = ast.parse(source_code, file_name)
             self.dump_and_block(tree, len(lines), name=file_name)
         except SyntaxError:
             pass

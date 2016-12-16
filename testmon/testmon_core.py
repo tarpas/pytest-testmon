@@ -4,7 +4,6 @@ try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
-import hashlib
 import json
 import os
 from collections import defaultdict
@@ -15,6 +14,7 @@ import random
 import coverage
 from testmon.process_code import checksum_coverage
 from testmon.process_code import Module
+import hashlib
 
 if sys.version_info > (3,):
     buffer = memoryview
@@ -139,22 +139,74 @@ def get_variant_inifile(inifile):
     return eval_variant(run_variant_expression)
 
 
+if sys.version_info.major == 2:
+    encode = lambda x: x
+else:
+    encode = lambda x: bytes(x, 'utf_8')
+
+
+def read_file_with_checksum(absfilename):
+    afile = open(absfilename)
+    hasher = hashlib.sha1()
+    source = afile.read()
+    hasher.update(encode(source))
+    return source, hasher.hexdigest()
+
+
+def parse_file(filename, rootdir, source_code):
+    return Module(source_code=source_code, file_name=filename, rootdir=rootdir)
+
+
+DISAPPEARED_FILE = -2
+
+
+class SourceTree():
+    def __init__(self, rootdir, mtimes, checksums):
+        self.rootdir = rootdir
+        self.mtimes = mtimes
+        self.checksums = checksums
+        self.changed_files = {}
+
+    def get_changed_files(self):
+
+        for filename in self.mtimes:
+            try:
+                absfilename = os.path.join(self.rootdir, filename)
+                fs_mtime = os.path.getmtime(absfilename)
+                if self.mtimes[filename] != fs_mtime:
+                    self.mtimes[filename] = fs_mtime
+                    code, fs_checksum = read_file_with_checksum(absfilename)
+                    if self.checksums.get(filename) != fs_checksum:
+                        self.checksums[filename] = fs_checksum
+                        self.changed_files[filename] = parse_file(filename=filename, rootdir=self.rootdir,
+                                                                  source_code=code)
+
+            except OSError:
+                pass
+                # self.changed_files[filename] = DISAPPEARED_FILE
+
+        return self.changed_files
+
+    def get_file(self, filename):
+        if filename not in self.changed_files:
+            self.mtimes[filename] = os.path.getmtime(os.path.join(self.rootdir, filename))
+            code, checksum = read_file_with_checksum(os.path.join(self.rootdir, filename))
+            self.changed_files[filename] = parse_file(filename=filename, rootdir=self.rootdir, source_code=code)
+        return self.changed_files[filename]
+
+
 class TestmonData(object):
     def __init__(self, rootdir, variant=None):
 
         self.variant = variant if variant else 'default'
         self.rootdir = rootdir
         self.init_connection()
-        self.mtimes = {}
         self.node_data = {}
         self.reports = {}
 
         self.lastfailed = []
 
-        self.changed_files = {}
-        self.changed_node_data = {}
         self.changed_reports = {}
-        self.changed_mtimes = {}
 
     def init_connection(self):
         self.datafile = os.path.join(self.rootdir, '.testmondata')
@@ -215,21 +267,21 @@ class TestmonData(object):
     """)
 
     def read_data(self):
-        self.mtimes, \
         self.node_data, \
         self.reports, \
-        self.lastfailed = self._fetch_attribute('mtimes', default={}), \
-                          self._fetch_node_data(), \
+        self.lastfailed = self._fetch_node_data(), \
                           self._fetch_attribute('reports', default={}), \
-                          self._fetch_attribute('lastfailed', default=[])
+                          self._fetch_attribute('lastfailed', default=[]),
 
     def write_data(self):
         with self.connection:
-            self.mtimes.update(self.changed_mtimes)
             self.reports.update(self.changed_reports)
-            self._write_attribute('mtimes', self.mtimes)
             self._write_attribute('lastfailed', self.lastfailed)
             self._write_attribute('reports', self.reports)
+
+            if hasattr(self, 'source_tree'):
+                self._write_attribute('mtimes', self.source_tree.mtimes)
+                self._write_attribute('file_checksums', self.source_tree.checksums)
 
     def repr_per_node(self, key):
         return "{}: {}\n".format(key,
@@ -252,12 +304,12 @@ class TestmonData(object):
             relfilename = os.path.relpath(filename, rootdir)
             lines = coverage_data.lines(filename)
             if os.path.exists(filename):
-                result[relfilename] = checksum_coverage(self.parse_file(relfilename).blocks, lines)
+                result[relfilename] = checksum_coverage(self.source_tree.get_file(relfilename).blocks, lines)
         if not result:  # when testmon kicks-in the test module is already imported. If the test function is skipped
             # coverage_data is empty. However, we need to write down, that we depend on the
             # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)
             relfilename = os.path.relpath(os.path.join(rootdir, nodeid).split("::", 1)[0], self.rootdir)
-            result[relfilename] = checksum_coverage(self.parse_file(relfilename).blocks, [1])
+            result[relfilename] = checksum_coverage(self.source_tree.get_file(relfilename).blocks, [1])
         return result
 
     def set_dependencies(self, nodeid, nodedata):
@@ -268,29 +320,15 @@ class TestmonData(object):
             con.executemany("INSERT INTO node_file VALUES (?, ?, ?, ?)",
                             [(self.variant, nodeid, filename, json.dumps(nodedata[filename])) for filename in nodedata])
 
-    def parse_file(self, filename, new_mtime=None):
-        assert filename[0] != '/'
-        if filename not in self.changed_files:
-            self.changed_files[filename] = Module(file_name=filename, rootdir=self.rootdir)
-            self.changed_mtimes[filename] = new_mtime if new_mtime else os.path.getmtime(
-                os.path.join(self.rootdir, filename))
+    def read_source(self):
+        mtimes = self._fetch_attribute('mtimes', default={})
+        checksums = self._fetch_attribute('file_checksums', default={})
 
-        return self.changed_files[filename]
+        self.source_tree = SourceTree(rootdir=self.rootdir, mtimes=mtimes, checksums=checksums)
+        self.compute_unaffected(self.source_tree.get_changed_files())
 
-    def read_fs(self):
-        self.read_data()
-        for py_file in self.file_data():
-            try:
-                new_mtime = os.path.getmtime(py_file)
-                if self.mtimes.get(py_file) != new_mtime:
-                    self.parse_file(py_file, new_mtime)
-            except OSError:
-                self.mtimes[py_file] = [-2]
-
-        self.compute_unaffected()
-
-    def compute_unaffected(self):
-        self.unaffected_nodeids, self.unaffected_files = unaffected(self.node_data, self.changed_files)
+    def compute_unaffected(self, changed_files):
+        self.unaffected_nodeids, self.unaffected_files = unaffected(self.node_data, changed_files)
 
         # possible data structures
         # nodeid1 -> [filename -> [block_a, block_b]]

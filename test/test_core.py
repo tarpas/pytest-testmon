@@ -1,8 +1,10 @@
+import pytest
 from collections import namedtuple
 
 from testmon.process_code import Module
 from test.test_process_code import CodeSample
-from testmon.testmon_core import TestmonData as CoreTestmonData, flip_dictionary, unaffected
+from testmon.testmon_core import TestmonData as CoreTestmonData, SourceTree, flip_dictionary, unaffected, \
+    read_file_with_checksum
 
 pytest_plugins = "pytester",
 
@@ -29,15 +31,13 @@ def test_read_nonexistent(testdir):
 
 def test_write_read_data2(testdir):
     n1_node_data = {'a.py': [1]}
-    original = ({'a.py': 1.0}, ['n1'])
     td = CoreTestmonData(testdir.tmpdir.strpath, 'default')
-    td.mtimes, td.lastfailed = original
+    td.lastfailed = ['n1']
     td.write_data()
     td.set_dependencies('n1', n1_node_data, )
     td2 = CoreTestmonData(testdir.tmpdir.strpath, 'default')
     td2.read_data()
     assert td2.node_data['n1'] == n1_node_data
-    assert original == (td2.mtimes, td2.lastfailed)
 
 
 class TestDepGraph():
@@ -173,7 +173,6 @@ def test_variants_separation(testdir):
     testmon2_data.write_data()
 
     testmon_check_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
-    testmon_check_data.read_fs()
     assert testmon1_data.node_data['node1'] == {'a.py': 1}
 
 
@@ -229,3 +228,50 @@ def test_serialize(testdir):
     result = testdir.runpytest_inprocess(plugins=[PlugRereport()])
 
     print(result)
+
+
+class TestSourceTree():
+    @pytest.fixture
+    def a_py(self, testdir):
+        return testdir.makepyfile(a="""
+        def test_a():
+            return 0
+        """)
+
+    def test_basic(self, testdir, a_py):
+        code, checksum = read_file_with_checksum('a.py')
+        assert checksum == 'ea4739bb5b0069cafb92af3874891898617ef590'
+
+        fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'a.py': a_py.mtime()}, checksums={'a.py': checksum})
+        changed_files = fs_data.get_changed_files()
+        assert changed_files == {}
+
+        a_py.setmtime(1424880936)
+        changed_files = fs_data.get_changed_files()
+        assert changed_files == {}
+        assert fs_data.mtimes['a.py'] == 1424880936
+
+        testdir.makepyfile(a="""
+        def test_a():
+            return 0 # comment
+        """)
+        fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'a.py': -100}, checksums={'a.py': checksum})
+        changed_files = fs_data.get_changed_files()
+        assert 'a.py' in changed_files
+        assert [type(c) for c in changed_files['a.py'].checksums] == [int, int]
+        assert fs_data.checksums['a.py'] == 'ec1fd361d4d73353c3f65cb10b86fcea4e0d0e42'
+
+    def test_get_file(self, testdir, a_py):
+        fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'a.py': -100}, checksums={'a.py': -200})
+        fs_data.get_file('a.py')
+        fs_data.mtimes['a.py'] = a_py.mtime
+        fs_data.checksums['a.py'] = 'ec1fd361d4d73353c3f65cb10b86fcea4e0d0e42'
+
+    def test_disappeared(self, testdir, a_py):
+        fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'b.py': -100}, checksums={'b.py': -200})
+        fs_data.get_changed_files()
+        pytest.raises((OSError, IOError), fs_data.get_file, 'c.py')
+
+
+
+        # parse_fs_changes(stored_version={'a.py': [a_py.mtime, hash(a_py.read_mtime)]})
