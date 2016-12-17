@@ -132,6 +132,7 @@ class TestmonDeselect(object):
     def __init__(self, config, testmon_data):
         self.testmon_data = testmon_data
         self.testmon = Testmon(config.project_dirs, testmon_labels=testmon_options(config))
+        self.collection_ignored = set()
         self.testmon_save = True
         self.config = config
 
@@ -155,16 +156,15 @@ class TestmonDeselect(object):
 
     def pytest_collection_modifyitems(self, session, config, items):
         selected, deselected = [], []
-        for filename in self.testmon_data.unaffected_files:
-            if os.path.split(filename)[1].startswith("test_a"):
-                for nodeid in self.testmon_data.file_data()[filename]:
-                    self.report_if_failed(nodeid)
         for item in items:
+            assert item.nodeid not in self.collection_ignored
             if self.testmon_data.test_should_run(item.nodeid):
                 selected.append(item)
             else:
                 self.report_if_failed(item.nodeid)
                 deselected.append(item)
+        for nodeid in self.collection_ignored:
+                self.report_if_failed(nodeid)
         items[:] = selected
         if deselected:
             config.hook.pytest_deselected(items=deselected)
@@ -197,6 +197,8 @@ class TestmonDeselect(object):
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
         if strpath in self.testmon_data.unaffected_files:
             if os.path.split(strpath)[1].startswith('test_'):
+                for nodeid in self.testmon_data.file_data()[strpath]:
+                    self.collection_ignored.add(nodeid)
                 config.hook.pytest_deselected(
                     items=([self.FakeItemFromTestmon(config)] *
                            len(self.testmon_data.file_data()[strpath])))

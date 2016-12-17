@@ -1,28 +1,30 @@
-import time
 import unittest
 
 import pytest
 
 from ..a import add, subtract
+from ..b import multiply, divide
 from ..d import always_fail
 
 
-class TestA(unittest.TestCase):
-    @unittest.skip('')
-    def test_add(self):
-        """test adding"""
-        self.assertEqual(add(1, 2), 3)
+def test_add():
+    assert add(1, 2) == 3
 
-    def test_subtract(self):
-        """test subtracting"""
-        self.assertEqual(subtract(1 , 2), -1)
+def test_subtract():
+    assert subtract(1 , 2) == -1
 
-    @pytest.mark.xfail(True, reason="Division by zero not implemented yet.")
-    def test_always_fail(self):
-        pass
-        always_fail()
+def test_add_and_multiply():
+    assert add(multiply(2, 1), 1) == 3
 
-    #@pytest.mark.skipif(True, reason="Not available on this platform")
-    def test_skip_always_fail(self):
-        return
-        always_fail()
+def test_error1():
+    pass
+    raise Exception('error1')
+
+
+@pytest.mark.xfail(True, reason="Division by zero not implemented yet.")
+def test_always_fail(self):
+    always_fail()
+
+def test_skip_always_fail():
+    return
+    always_fail()
