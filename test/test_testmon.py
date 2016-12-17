@@ -86,7 +86,7 @@ def track_it(testdir, func):
     testmon.start()
     func()
     testmon.stop_and_save(testmon_data, testdir.tmpdir.strpath, 'testnode')
-    return testmon_data._fetch_node_data()['testnode']
+    return testmon_data._fetch_node_data()[0]['testnode']
 
 
 def test_subprocesss(testdir, monkeypatch):

@@ -102,12 +102,12 @@ class Testmon(object):
     def stop(self):
         self.cov.stop()
 
-    def stop_and_save(self, testmon_data, rootdir, nodeid):
+    def stop_and_save(self, testmon_data, rootdir, nodeid, result=[]):
         self.stop()
         if hasattr(self, 'sub_cov_file'):
             self.cov.combine()
 
-        testmon_data.set_dependencies(nodeid, testmon_data.get_nodedata(nodeid, self.cov.get_data(), rootdir))
+        testmon_data.set_dependencies(nodeid, testmon_data.get_nodedata(nodeid, self.cov.get_data(), rootdir), result)
 
     def close(self):
         if hasattr(self, 'sub_cov_file'):
@@ -199,10 +199,6 @@ class TestmonData(object):
         self.node_data = {}
         self.reports = {}
 
-        self.lastfailed = []
-
-        self.changed_reports = {}
-
     def init_connection(self):
         self.datafile = os.path.join(self.rootdir, '.testmondata')
         self.connection = None
@@ -227,11 +223,22 @@ class TestmonData(object):
             return default
 
     def _fetch_node_data(self):
-        result = defaultdict(lambda: {})
-        for row in self.connection.execute("SELECT node_name, file_name, checksums FROM node_file WHERE node_variant=?",
+        dependencies = defaultdict(lambda: {})
+        for row in self.connection.execute("""SELECT
+                                                node_name,
+                                                file_name,
+                                                checksums
+                                              FROM node_file WHERE node_variant=?""",
                                            (self.variant,)):
-            result[row[0]][row[1]] = json.loads(row[2])
-        return result
+            dependencies[row[0]][row[1]] = json.loads(row[2])
+
+        fail_reports = defaultdict(lambda: {})
+
+        for row in self.connection.execute('SELECT name, result FROM node WHERE variant=? AND failed=1',
+                                           (self.variant,)):
+            fail_reports[row[0]] = json.loads(row[1])
+
+        return dependencies, fail_reports
 
     def _write_attribute(self, attribute, data):
         dataid = self.variant + ':' + attribute
@@ -250,6 +257,7 @@ class TestmonData(object):
               variant TEXT,
               name TEXT,
               result TEXT,
+              failed BIT,
               PRIMARY KEY (variant, name))
 """)
         self.connection.execute("""
@@ -262,18 +270,10 @@ class TestmonData(object):
     """)
 
     def read_data(self):
-        self.node_data, \
-        self.reports, \
-        self.lastfailed = self._fetch_node_data(), \
-                          self._fetch_attribute('reports', default={}), \
-                          self._fetch_attribute('lastfailed', default=[]),
+        self.node_data, self.fail_reports = self._fetch_node_data()
 
     def write_data(self):
         with self.connection:
-            self.reports.update(self.changed_reports)
-            self._write_attribute('lastfailed', self.lastfailed)
-            self._write_attribute('reports', self.reports)
-
             if hasattr(self, 'source_tree'):
                 self._write_attribute('mtimes', self.source_tree.mtimes)
                 self._write_attribute('file_checksums', self.source_tree.checksums)
@@ -307,11 +307,13 @@ class TestmonData(object):
             result[relfilename] = checksum_coverage(self.source_tree.get_file(relfilename).blocks, [1])
         return result
 
-    def set_dependencies(self, nodeid, nodedata):
+    def set_dependencies(self, nodeid, nodedata, result=[]):
         with self.connection as con:
+            outcome = bool([True for r in result if r.get('outcome') == u'failed'])
             con.execute("INSERT OR REPLACE INTO "
                         "node "
-                        "VALUES (?, ?, ?)", (self.variant, nodeid, ''))
+                        "VALUES (?, ?, ?, ?)",
+                        (self.variant, nodeid, json.dumps(result) if outcome else '', outcome))
             con.executemany("INSERT INTO node_file VALUES (?, ?, ?, ?)",
                             [(self.variant, nodeid, filename, json.dumps(nodedata[filename])) for filename in nodedata])
 

@@ -185,21 +185,6 @@ def test_flip():
 global_reports = []
 
 
-def serialize_report(rep):
-    import py
-    d = rep.__dict__.copy()
-    if hasattr(rep.longrepr, 'toterminal'):
-        d['longrepr'] = str(rep.longrepr)
-    else:
-        d['longrepr'] = rep.longrepr
-    for name in d:
-        if isinstance(d[name], py.path.local):
-            d[name] = str(d[name])
-        elif name == "result":
-            d[name] = None  # for now
-    return d
-
-
 def test_serialize(testdir):
     class PlugWrite:
         def pytest_runtest_logreport(self, report):

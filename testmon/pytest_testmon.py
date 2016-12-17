@@ -6,6 +6,29 @@ import os
 import pytest
 
 from testmon.testmon_core import Testmon, eval_variant, TestmonData
+from _pytest import runner
+
+
+def unserialize_report(name, reportdict):
+    if name == "testreport":
+        return runner.TestReport(**reportdict)
+    elif name == "collectreport":
+        return runner.CollectReport(**reportdict)
+
+
+def serialize_report(rep):
+    import py
+    d = rep.__dict__.copy()
+    if hasattr(rep.longrepr, 'toterminal'):
+        d['longrepr'] = str(rep.longrepr)
+    else:
+        d['longrepr'] = rep.longrepr
+    for name in d:
+        if isinstance(d[name], py.path.local):
+            d[name] = str(d[name])
+        elif name == "result":
+            d[name] = None  # for now
+    return d
 
 
 def pytest_addoption(parser):
@@ -111,7 +134,6 @@ class TestmonDeselect(object):
         self.testmon = Testmon(config.project_dirs, testmon_labels=testmon_options(config))
         self.testmon_save = True
         self.config = config
-        self.lastfailed = self.testmon_data.lastfailed
 
     def pytest_report_header(self, config):
         changed_files = ",".join(self.testmon_data.source_tree.changed_files)
@@ -125,12 +147,23 @@ class TestmonDeselect(object):
         else:
             return active_message + "."
 
+    def report_if_failed(self, nodeid):
+        if nodeid in self.testmon_data.fail_reports:
+            for report in self.testmon_data.fail_reports[nodeid]:
+                test_report = unserialize_report('testreport', report)
+                self.config.hook.pytest_runtest_logreport(report=test_report)
+
     def pytest_collection_modifyitems(self, session, config, items):
         selected, deselected = [], []
+        for filename in self.testmon_data.unaffected_files:
+            if os.path.split(filename)[1].startswith("test_a"):
+                for nodeid in self.testmon_data.file_data()[filename]:
+                    self.report_if_failed(nodeid)
         for item in items:
-            if item.nodeid in self.testmon_data.lastfailed or self.testmon_data.test_should_run(item.nodeid):
+            if self.testmon_data.test_should_run(item.nodeid):
                 selected.append(item)
             else:
+                self.report_if_failed(item.nodeid)
                 deselected.append(item)
         items[:] = selected
         if deselected:
@@ -143,24 +176,18 @@ class TestmonDeselect(object):
 
         self.testmon.start()
         result = yield
-        # NOTE: pytest-watch also sends KeyboardInterrupt when changes are
-        # detected.  This should still save the collected data up until then.
+        # NOTE: pytest-watch also sends KeyboardInterrupt when changes are detected.
         if result.excinfo and issubclass(result.excinfo[0], KeyboardInterrupt):
             self.testmon.stop()
         else:
-            self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid)
+            self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
+                                       self.testmon_data.reports[item.nodeid])
+            del self.testmon_data.reports[item.nodeid]
 
     def pytest_runtest_logreport(self, report):
-        if report.failed and "xfail" not in report.keywords:
-            if report.nodeid not in self.testmon_data.lastfailed:
-                self.testmon_data.lastfailed.append(report.nodeid)
-        elif not report.failed:
-            if report.when == "call":
-                try:
-                    if report.nodeid in self.testmon_data.lastfailed:
-                        self.testmon_data.lastfailed.remove(report.nodeid)
-                except KeyError:
-                    pass
+        if not report.nodeid in self.testmon_data.reports:
+            self.testmon_data.reports[report.nodeid] = []
+        self.testmon_data.reports[report.nodeid].append(serialize_report(report))
 
     class FakeItemFromTestmon(object):
         def __init__(self, config):
@@ -168,8 +195,6 @@ class TestmonDeselect(object):
 
     def pytest_ignore_collect(self, path, config):
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
-        if strpath in [nodeid.split("::")[0] for nodeid in self.testmon_data.lastfailed]:
-            return False
         if strpath in self.testmon_data.unaffected_files:
             if os.path.split(strpath)[1].startswith('test_'):
                 config.hook.pytest_deselected(
