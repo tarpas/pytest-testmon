@@ -175,18 +175,12 @@ class TestmonDeselect(object):
             yield
 
         self.testmon.start()
-        result = yield
-        # NOTE: pytest-watch also sends KeyboardInterrupt when changes are detected.
-        if result.excinfo and issubclass(result.excinfo[0], KeyboardInterrupt):
-            self.testmon.stop()
-        else:
-            self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
-                                       self.testmon_data.reports[item.nodeid])
-            del self.testmon_data.reports[item.nodeid]
+        yield
+        self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
+                                   self.testmon_data.reports[item.nodeid])
+        del self.testmon_data.reports[item.nodeid]
 
     def pytest_runtest_logreport(self, report):
-        if not report.nodeid in self.testmon_data.reports:
-            self.testmon_data.reports[report.nodeid] = []
         self.testmon_data.reports[report.nodeid].append(serialize_report(report))
 
     class FakeItemFromTestmon(object):
@@ -207,12 +201,10 @@ class TestmonDeselect(object):
     def pytest_internalerror(self, excrepr, excinfo):
         self.testmon_save = False
 
+    def pytest_keyboard_interrupt(self, excinfo):
+        self.testmon_save = False
+
     def pytest_sessionfinish(self, session):
         if self.testmon_save:
             self.testmon_data.write_data()
         self.testmon.close()
-
-    def pytest_terminal_summary(self, terminalreporter, exitstatus=None):
-        if (not self.testmon_save and
-                terminalreporter.config.getvalue('verbose')):
-            terminalreporter.line('testmon: not saving data')

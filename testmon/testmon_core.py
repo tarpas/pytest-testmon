@@ -99,11 +99,8 @@ class Testmon(object):
         self.cov.erase()
         self.cov.start()
 
-    def stop(self):
-        self.cov.stop()
-
     def stop_and_save(self, testmon_data, rootdir, nodeid, result=[]):
-        self.stop()
+        self.cov.stop()
         if hasattr(self, 'sub_cov_file'):
             self.cov.combine()
 
@@ -197,7 +194,7 @@ class TestmonData(object):
         self.rootdir = rootdir
         self.init_connection()
         self.node_data = {}
-        self.reports = {}
+        self.reports = defaultdict(lambda: [])
 
     def init_connection(self):
         self.datafile = os.path.join(self.rootdir, '.testmondata')
