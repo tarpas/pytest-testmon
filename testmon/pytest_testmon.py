@@ -155,6 +155,11 @@ class TestmonDeselect(object):
                 self.config.hook.pytest_runtest_logreport(report=test_report)
 
     def pytest_collection_modifyitems(self, session, config, items):
+        removed_nodeids = set(self.testmon_data.node_data) - self.collection_ignored - set(
+            [item.nodeid for item in items])
+        if removed_nodeids:
+            self.testmon_data.collect_garbage(removed_nodeids)
+
         selected, deselected = [], []
         for item in items:
             assert item.nodeid not in self.collection_ignored
@@ -164,7 +169,7 @@ class TestmonDeselect(object):
                 self.report_if_failed(item.nodeid)
                 deselected.append(item)
         for nodeid in self.collection_ignored:
-                self.report_if_failed(nodeid)
+            self.report_if_failed(nodeid)
         items[:] = selected
         if deselected:
             config.hook.pytest_deselected(items=deselected)

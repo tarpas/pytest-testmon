@@ -16,7 +16,8 @@ def test_subtract():
 def test_add_and_multiply():
     assert add(multiply(2, 1), 1) == 3
 
-def test_error1():
+def test_error3():
+    pass
     pass
     raise Exception('error1')
 

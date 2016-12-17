@@ -275,6 +275,12 @@ class TestmonData(object):
                 self._write_attribute('mtimes', self.source_tree.mtimes)
                 self._write_attribute('file_checksums', self.source_tree.checksums)
 
+    def collect_garbage(self, removed_nodeids):
+        for removed_nodeid in removed_nodeids:
+            self.node_data.pop(removed_nodeid, None)
+        self.connection.executemany('DELETE FROM node WHERE variant=? AND name=?',
+                                    [(self.variant, removed_nodeid) for removed_nodeid in removed_nodeids])
+
     def repr_per_node(self, key):
         return "{}: {}\n".format(key,
                                  [(os.path.relpath(p), checksum)
