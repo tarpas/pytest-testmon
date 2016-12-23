@@ -140,9 +140,9 @@ def get_variant_inifile(inifile):
 
 
 def read_file_with_checksum(absfilename):
-    afile = open(absfilename)
     hasher = hashlib.sha1()
-    source = afile.read()
+    with open(absfilename) as afile:
+        source = afile.read()
     hasher.update(encode(source))
     return source, hasher.hexdigest()
 
