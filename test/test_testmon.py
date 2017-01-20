@@ -234,6 +234,32 @@ class TestmonDeselect(object):
             "*test_a.py::test_add PASSED*",
         ])
 
+    def test_interrupted(self, testdir, monkeypatch):
+        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
+        testdir.makepyfile(test_a="""
+             def test_1():
+                 1
+
+             def test_2():
+                 2
+         """)
+        testdir.runpytest("--testmon")
+
+        tf = testdir.makepyfile(test_a="""
+             def test_1():
+                 raise KeyboardInterrupt
+
+             def test_2():
+                 3
+         """)
+        os.utime('.testmondata', (1800000000, 1800000000))
+        tf.setmtime(1800000000)
+        try:
+            testdir.runpytest("--testmon", )
+        except:
+            pass
+        assert 1800000000 == os.path.getmtime('.testmondata') # interrupted run shouldn't save .testmondata
+
     def test_nonfunc_class(self, testdir, monkeypatch):
         """"
         """
