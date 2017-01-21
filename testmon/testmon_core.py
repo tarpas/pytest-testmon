@@ -99,8 +99,11 @@ class Testmon(object):
         self.cov.erase()
         self.cov.start()
 
-    def stop_and_save(self, testmon_data, rootdir, nodeid, result=[]):
+    def stop(self):
         self.cov.stop()
+
+    def stop_and_save(self, testmon_data, rootdir, nodeid, result=[]):
+        self.stop()
         if hasattr(self, 'sub_cov_file'):
             self.cov.combine()
 
