@@ -439,6 +439,25 @@ class TestmonDeselect(object):
             "*1 skipped*",
         ])
 
+    def test_changed_data_version(self, testdir, monkeypatch):
+        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
+        testdir.makepyfile(test_pass="""
+            def test_pass():
+                pass
+        """)
+        result = testdir.runpytest("--testmon")
+        assert result.ret == 0
+
+        # Now change the data version and check py.test then refuses to run
+        from testmon.testmon_core import TestmonData
+        monkeypatch.setattr(TestmonData, 'DATA_VERSION', TestmonData.DATA_VERSION + 1)
+
+        result = testdir.runpytest("--testmon")
+        assert result.ret != 0
+        result.stderr.fnmatch_lines([
+            "*The stored data file *.testmondata is not compatible with this version of testmon.*",
+        ])
+
 
 def get_modules(hashes):
     return hashes

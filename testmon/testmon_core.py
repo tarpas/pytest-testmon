@@ -1,20 +1,22 @@
-import zlib
-
+from collections import defaultdict
 try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
+import hashlib
 import json
 import os
-from collections import defaultdict
+import random
+import sqlite3
 import sys
 import textwrap
-import random
+import zlib
 
 import coverage
+
 from testmon.process_code import checksum_coverage
 from testmon.process_code import Module
-import hashlib
+
 
 if sys.version_info > (3,):
     buffer = memoryview
@@ -191,6 +193,11 @@ class SourceTree():
 
 
 class TestmonData(object):
+
+    # If you change the SQLlite schema, you should bump this number
+    DATA_VERSION = 1
+    _DATA_VERSION_KEY = '__data_version'
+
     def __init__(self, rootdir, variant=None):
 
         self.variant = variant if variant else 'default'
@@ -202,16 +209,32 @@ class TestmonData(object):
     def init_connection(self):
         self.datafile = os.path.join(self.rootdir, '.testmondata')
         self.connection = None
-        import sqlite3
 
-        if os.path.exists(self.datafile):
-            self.newfile = False
-        else:
-            self.newfile = True
+        new_db = not os.path.exists(self.datafile)
+
         self.connection = sqlite3.connect(self.datafile)
         self.connection.execute("PRAGMA recursive_triggers = TRUE ")
-        if getattr(self, 'newfile', False):
+
+        if new_db:
             self.init_tables()
+
+        self._check_data_version()
+
+    def _check_data_version(self):
+        stored_data_version = self._fetch_attribute(self._DATA_VERSION_KEY)
+
+        if not stored_data_version:
+            self._write_attribute(self._DATA_VERSION_KEY, str(self.DATA_VERSION))
+            return
+
+        if int(stored_data_version) == self.DATA_VERSION:
+            return
+
+        msg = (
+            "The stored data file {} is not compatible with this version of testmon."
+            " You must delete the stored data to continue."
+        ).format(self.datafile)
+        raise Exception(msg)
 
     def _fetch_attribute(self, attribute, default=None):
         cursor = self.connection.execute("SELECT data FROM metadata WHERE dataid=?",
