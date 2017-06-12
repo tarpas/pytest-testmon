@@ -220,6 +220,10 @@ class TestmonData(object):
 
         self._check_data_version()
 
+    def close_connection(self):
+        if self.connection:
+            self.connection.close()
+
     def _check_data_version(self):
         stored_data_version = self._fetch_attribute(self._DATA_VERSION_KEY)
 

@@ -103,9 +103,7 @@ def init_testmon_data(config, read_source=True):
 
 
 def pytest_cmdline_main(config):
-    if config.option.testmon:
-        init_testmon_data(config)
-    elif config.option.by_test_count:
+    if config.option.by_test_count:
         init_testmon_data(config, read_source=False)
         from _pytest.main import wrap_session
 
@@ -118,8 +116,14 @@ def is_active(config):
 
 def pytest_configure(config):
     if is_active(config):
+        init_testmon_data(config)
         config.pluginmanager.register(TestmonDeselect(config, config.testmon_data),
                                       "TestmonDeselect")
+
+
+def pytest_unconfigure(config):
+    if hasattr(config, 'testmon_data'):
+        config.testmon_data.close_connection()
 
 
 def by_test_count(config, session):
