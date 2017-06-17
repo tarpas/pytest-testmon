@@ -21,7 +21,6 @@ class TestCoverageSubprocess(CoverageTest):
         output = self.run_command('{} {}'.format(sys.executable, path1))
         assert output == "{}\n".format('TEST_VALUE')
 
-    @pytest.mark.xfail
     def test_coverage_expected_fail(self):
         path1 = self.make_file("subprocesstest.py", """\
         a=1
@@ -31,7 +30,6 @@ class TestCoverageSubprocess(CoverageTest):
         del os.environ['COVERAGE_PROCESS_START']
         assert "Couldn't read 'nonexistent_file' as a config file" in output
 
-    @pytest.mark.xfail
     def test_subprocess(self):
         path1 = self.make_file("subprocesstest.py", """\
         a=1
