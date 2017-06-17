@@ -89,7 +89,7 @@ def track_it(testdir, func):
     return testmon_data._fetch_node_data()[0]['testnode']
 
 
-def test_subprocesss(testdir, monkeypatch):
+def test_track_pytest_equal(testdir, monkeypatch):
     monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
     a = testdir.makepyfile(test_a="""\
     def test_1():
@@ -106,7 +106,7 @@ def test_subprocesss(testdir, monkeypatch):
 
 
 @pytest.mark.xfail
-def test_subprocess_recursive(testdir, monkeypatch):
+def test_testmon_recursive(testdir, monkeypatch):
     monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
     # os.environ['COVERAGE_TEST_TRACER']='py'
     a = testdir.makepyfile(test_a="""\
