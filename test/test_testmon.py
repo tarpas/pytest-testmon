@@ -90,7 +90,6 @@ def track_it(testdir, func):
 
 
 def test_track_pytest_equal(testdir, monkeypatch):
-    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
     a = testdir.makepyfile(test_a="""\
     def test_1():
         a=1
@@ -107,8 +106,6 @@ def test_track_pytest_equal(testdir, monkeypatch):
 
 @pytest.mark.xfail
 def test_testmon_recursive(testdir, monkeypatch):
-    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
-    # os.environ['COVERAGE_TEST_TRACER']='py'
     a = testdir.makepyfile(test_a="""\
     def test_1():
         a=1
@@ -147,7 +144,6 @@ def test_run_dissapearing(testdir):
 
 class TestmonDeselect(object):
     def test_dont_readcoveragerc(self, testdir, monkeypatch):
-        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         p = testdir.tmpdir.join('.coveragerc')
         p.write("[")
         testdir.makepyfile(test_a="""
@@ -157,8 +153,6 @@ class TestmonDeselect(object):
         testdir.inline_run(["--testmon", ])
 
     def test_not_running_after_failure(self, testdir, monkeypatch):
-        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
-        pass
         tf = testdir.makepyfile(test_a="""
             def test_add():
                 pass
@@ -199,7 +193,6 @@ class TestmonDeselect(object):
         sys.modules.pop('test_a', None)
 
     def test_easy(self, testdir, monkeypatch):
-        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         testdir.makepyfile(test_a="""
             def test_add():
                 assert add(1, 2) == 3
@@ -213,7 +206,6 @@ class TestmonDeselect(object):
         ])
 
     def test_interrupted(self, testdir, monkeypatch):
-        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         testdir.makepyfile(test_a="""
              def test_1():
                  1
@@ -241,7 +233,6 @@ class TestmonDeselect(object):
     def test_nonfunc_class(self, testdir, monkeypatch):
         """"
         """
-        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         cs1 = CodeSample("""\
             class TestA(object):
                 def test_one(self):
@@ -277,7 +268,6 @@ class TestmonDeselect(object):
     def test_strange_argparse_handling(self, testdir, monkeypatch):
         """"
         """
-        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         cs1 = CodeSample("""\
             class TestA(object):
                 def test_one(self):
@@ -311,7 +301,6 @@ class TestmonDeselect(object):
         ])
 
     def test_new(self, testdir, monkeypatch):
-        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         a = testdir.makepyfile(a="""
             def add(a, b):
                 a = a
@@ -375,7 +364,6 @@ class TestmonDeselect(object):
         ])
 
     def test_new2(self, testdir, monkeypatch):
-        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         a = testdir.makepyfile(a="""
             def add(a, b):
                 return a + b
@@ -418,7 +406,6 @@ class TestmonDeselect(object):
         ])
 
     def test_changed_data_version(self, testdir, monkeypatch):
-        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         testdir.makepyfile(test_pass="""
             def test_pass():
                 pass
