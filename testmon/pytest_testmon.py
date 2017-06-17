@@ -42,6 +42,13 @@ def pytest_addoption(parser):
     )
 
     group.addoption(
+        '--tlf',
+        action='store_true',
+        dest='tlf',
+        help="Re-execute last failures regardless of source change status",
+    )
+
+    group.addoption(
         '--by-test-count',
         action='store_true',
         dest='by_test_count',
@@ -98,7 +105,7 @@ def init_testmon_data(config, read_source=True):
                                    variant=variant)
         testmon_data.read_data()
         if read_source:
-            testmon_data.read_source()
+            testmon_data.read_source(tlf=config.getoption('tlf'))
         config.testmon_data = testmon_data
 
 
