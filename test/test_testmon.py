@@ -11,71 +11,71 @@ from test.test_process_code import CodeSample
 
 pytest_plugins = "pytester",
 
-
-def test_run_variant_header(testdir):
-    testdir.makeini("""
-                    [pytest]
-                    run_variant_expression='1'
-                    """)
-    result = testdir.runpytest("-v", "--testmon")
-    result.stdout.fnmatch_lines([
-        "*testmon=True, *, run variant: 1*",
-    ])
-
-
-def test_run_variant_header_nonstr(testdir):
-    testdir.makeini("""
-                    [pytest]
-                    run_variant_expression=int(1)
-                    """)
-    result = testdir.runpytest("-v", "--testmon")
-    result.stdout.fnmatch_lines([
-        "*testmon=True, *, run variant: 1*",
-    ])
+class TestVariant:
+    def test_run_variant_header(self, testdir):
+        testdir.makeini("""
+                        [pytest]
+                        run_variant_expression='1'
+                        """)
+        result = testdir.runpytest("-v", "--testmon")
+        result.stdout.fnmatch_lines([
+            "*testmon=True, *, run variant: 1*",
+        ])
 
 
-def test_run_variant_empty(testdir):
-    config = testdir.parseconfigure()
-    assert eval_variant(config.getini('run_variant_expression')) == ''
+    def test_run_variant_header_nonstr(self, testdir):
+        testdir.makeini("""
+                        [pytest]
+                        run_variant_expression=int(1)
+                        """)
+        result = testdir.runpytest("-v", "--testmon")
+        result.stdout.fnmatch_lines([
+            "*testmon=True, *, run variant: 1*",
+        ])
 
 
-def test_run_variant_md5(testdir, monkeypatch):
-    testdir.makeini("""
-                    [pytest]
-                    run_variant_expression=md5('TEST')
-                    """)
-    config = testdir.parseconfigure()
-    assert eval_variant(config.getini('run_variant_expression')) == '033bd94b1168d7e4f0d644c3c95e35bf'
+    def test_run_variant_empty(self, testdir):
+        config = testdir.parseconfigure()
+        assert eval_variant(config.getini('run_variant_expression')) == ''
 
 
-def test_run_variant_env(testdir, monkeypatch):
-    monkeypatch.setenv('TEST_V', 'JUST_A_TEST')
-    testdir.makeini("""
-                    [pytest]
-                    run_variant_expression=os.environ.get('TEST_V')
-                    """)
-    config = testdir.parseconfigure()
-    assert eval_variant(config.getini('run_variant_expression')) == 'JUST_A_TEST'
+    def test_run_variant_md5(self, testdir, monkeypatch):
+        testdir.makeini("""
+                        [pytest]
+                        run_variant_expression=md5('TEST')
+                        """)
+        config = testdir.parseconfigure()
+        assert eval_variant(config.getini('run_variant_expression')) == '033bd94b1168d7e4f0d644c3c95e35bf'
 
 
-def test_run_variant_nonsense(testdir):
-    testdir.makeini("""
-                    [pytest]
-                    run_variant_expression=nonsense
-                    """)
-    config = testdir.parseconfigure()
-    assert 'NameError' in eval_variant(config.getini('run_variant_expression'))
+    def test_run_variant_env(self, testdir, monkeypatch):
+        monkeypatch.setenv('TEST_V', 'JUST_A_TEST')
+        testdir.makeini("""
+                        [pytest]
+                        run_variant_expression=os.environ.get('TEST_V')
+                        """)
+        config = testdir.parseconfigure()
+        assert eval_variant(config.getini('run_variant_expression')) == 'JUST_A_TEST'
 
 
-def test_run_variant_complex(testdir, monkeypatch):
-    "Test that ``os`` is available in list comprehensions."
-    monkeypatch.setenv('TEST_V', 'JUST_A_TEST')
-    testdir.makeini("""
-                    [pytest]
-                    run_variant_expression="_".join([x + ":" + os.environ[x] for x in os.environ if x == 'TEST_V'])
-                    """)
-    config = testdir.parseconfigure()
-    assert eval_variant(config.getini('run_variant_expression')) == 'TEST_V:JUST_A_TEST'
+    def test_run_variant_nonsense(self, testdir):
+        testdir.makeini("""
+                        [pytest]
+                        run_variant_expression=nonsense
+                        """)
+        config = testdir.parseconfigure()
+        assert 'NameError' in eval_variant(config.getini('run_variant_expression'))
+
+
+    def test_run_variant_complex(self, testdir, monkeypatch):
+        "Test that ``os`` is available in list comprehensions."
+        monkeypatch.setenv('TEST_V', 'JUST_A_TEST')
+        testdir.makeini("""
+                        [pytest]
+                        run_variant_expression="_".join([x + ":" + os.environ[x] for x in os.environ if x == 'TEST_V'])
+                        """)
+        config = testdir.parseconfigure()
+        assert eval_variant(config.getini('run_variant_expression')) == 'TEST_V:JUST_A_TEST'
 
 
 def track_it(testdir, func):
@@ -125,19 +125,14 @@ def test_subprocess_recursive(testdir, monkeypatch):
 
 
 def test_run_dissapearing(testdir):
-    testdir.makeini("""
-                [pytest]
-                run_variants=1
-                """)
-
     a = testdir.makepyfile(a="""\
-    import sys
-    import os
-    with open('b.py', 'w') as f:
-        f.write("print('printing from b.py')")
-    sys.path.append('.')
-    import b
-    os.remove('b.py')
+        import sys
+        import os
+        with open('b.py', 'w') as f:
+            f.write("print('printing from b.py')")
+        sys.path.append('.')
+        import b
+        os.remove('b.py')
     """)
 
     def f():
@@ -217,23 +212,6 @@ class TestmonDeselect(object):
             "*test_a.py::test_add PASSED*",
         ])
 
-    def test_easy_by_block(self, testdir, monkeypatch):
-        monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
-        test_a = """
-            def test_add():
-                assert add(1, 2) == 3
-
-            def add(a, b):
-                return a + b
-        """
-        testdir.makepyfile(test_a=test_a)
-        Module(source_code=test_a, file_name='test_a')
-        result = testdir.runpytest("--testmon", "--tb=long", "-v")
-
-        result.stdout.fnmatch_lines([
-            "*test_a.py::test_add PASSED*",
-        ])
-
     def test_interrupted(self, testdir, monkeypatch):
         monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", 1)
         testdir.makepyfile(test_a="""
@@ -291,7 +269,7 @@ class TestmonDeselect(object):
 
         testdir.makepyfile(test_a=cs2.source_code)
         test_a.setmtime(1424880935)
-        result = testdir.runpytest("-v", "--collectonly", "--testmon", "--capture=no", )
+        result = testdir.runpytest("-v", "--collectonly", "--testmon")
         result.stdout.fnmatch_lines([
             "*test_one*",
         ])
