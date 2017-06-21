@@ -143,7 +143,7 @@ def test_run_dissapearing(testdir):
 
 
 class TestmonDeselect(object):
-    def test_dont_readcoveragerc(self, testdir, monkeypatch):
+    def test_dont_readcoveragerc(self, testdir):
         p = testdir.tmpdir.join('.coveragerc')
         p.write("[")
         testdir.makepyfile(test_a="""
@@ -152,7 +152,7 @@ class TestmonDeselect(object):
         """)
         testdir.inline_run(["--testmon", ])
 
-    def test_not_running_after_failure(self, testdir, monkeypatch):
+    def test_not_running_after_failure(self, testdir):
         tf = testdir.makepyfile(test_a="""
             def test_add():
                 pass
@@ -192,7 +192,7 @@ class TestmonDeselect(object):
         assert tuple(res) == (1, 0, 0), res
         sys.modules.pop('test_a', None)
 
-    def test_easy(self, testdir, monkeypatch):
+    def test_easy(self, testdir):
         testdir.makepyfile(test_a="""
             def test_add():
                 assert add(1, 2) == 3
@@ -205,7 +205,7 @@ class TestmonDeselect(object):
             "*test_a.py::test_add PASSED*",
         ])
 
-    def test_interrupted(self, testdir, monkeypatch):
+    def test_interrupted(self, testdir):
         testdir.makepyfile(test_a="""
              def test_1():
                  1
@@ -265,7 +265,7 @@ class TestmonDeselect(object):
             "*test_one*",
         ])
 
-    def test_strange_argparse_handling(self, testdir, monkeypatch):
+    def test_strange_argparse_handling(self, testdir):
         """"
         """
         cs1 = CodeSample("""\
@@ -300,7 +300,7 @@ class TestmonDeselect(object):
             "*test_one*",
         ])
 
-    def test_new(self, testdir, monkeypatch):
+    def test_new(self, testdir):
         a = testdir.makepyfile(a="""
             def add(a, b):
                 a = a
@@ -363,7 +363,7 @@ class TestmonDeselect(object):
             "*5 deselected*",
         ])
 
-    def test_new2(self, testdir, monkeypatch):
+    def test_new2(self, testdir):
         a = testdir.makepyfile(a="""
             def add(a, b):
                 return a + b
