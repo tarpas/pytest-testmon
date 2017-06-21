@@ -41,10 +41,14 @@ def flip_dictionary(node_data):
     return files
 
 
-def unaffected(node_data, changed_files):
+def unaffected(node_data, changed_files, fail_reports=[]):
     file_data = flip_dictionary(node_data)
     unaffected_nodes = dict(node_data)
     unaffected_files = set(file_data)
+    for fail_report in fail_reports:
+        affected =  set(unaffected_nodes.pop(fail_report, []))
+        unaffected_files = unaffected_files - affected
+
     for file in set(changed_files) & set(file_data):
         for nodeid, checksums in file_data[file].items():
             if set(checksums) - set(changed_files[file].checksums):
@@ -350,15 +354,17 @@ class TestmonData(object):
             con.executemany("INSERT INTO node_file VALUES (?, ?, ?, ?)",
                             [(self.variant, nodeid, filename, json.dumps(nodedata[filename])) for filename in nodedata])
 
-    def read_source(self):
+    def read_source(self, tlf=None):
         mtimes = self._fetch_attribute('mtimes', default={})
         checksums = self._fetch_attribute('file_checksums', default={})
 
         self.source_tree = SourceTree(rootdir=self.rootdir, mtimes=mtimes, checksums=checksums)
-        self.compute_unaffected(self.source_tree.get_changed_files())
+        self.compute_unaffected(self.source_tree.get_changed_files(), tlf)
 
-    def compute_unaffected(self, changed_files):
-        self.unaffected_nodeids, self.unaffected_files = unaffected(self.node_data, changed_files)
+    def compute_unaffected(self, changed_files, tlf):
+        self.unaffected_nodeids, self.unaffected_files = unaffected(self.node_data,
+                                                                    changed_files,
+                                                                    self.fail_reports if tlf else [])
 
         # possible data structures
         # nodeid1 -> [filename -> [block_a, block_b]]

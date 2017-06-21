@@ -192,6 +192,24 @@ class TestmonDeselect(object):
         assert tuple(res) == (1, 0, 0), res
         sys.modules.pop('test_a', None)
 
+    def test_tlf(self, testdir):
+        testdir.makepyfile(test_a="""
+            def test_add():
+                1/0
+        """, )
+        testdir.inline_run("--testmon", "-v")
+
+        result = testdir.runpytest("--testmon", "-v")
+        result.stdout.fnmatch_lines([
+            "*1 failed, 1 deselected*",
+        ])
+
+        result = testdir.runpytest("--testmon", "-v", "--tlf")
+        result.stdout.fnmatch_lines([
+            "*1 failed in*",
+        ])
+
+
     def test_easy(self, testdir):
         testdir.makepyfile(test_a="""
             def test_add():
