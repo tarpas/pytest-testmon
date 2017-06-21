@@ -193,18 +193,17 @@ class TestmonDeselect(object):
         sys.modules.pop('test_a', None)
 
     def test_tlf(self, testdir):
-        tf = testdir.makepyfile(test_a="""
+        testdir.makepyfile(test_a="""
             def test_add():
                 1/0
         """, )
         testdir.inline_run("--testmon", "-v")
-        sys.modules.pop('test_a', None)
 
         result = testdir.runpytest("--testmon", "-v")
         result.stdout.fnmatch_lines([
             "*1 failed, 1 deselected*",
         ])
-        tf.setmtime(1424880936)
+
         result = testdir.runpytest("--testmon", "-v", "--tlf")
         result.stdout.fnmatch_lines([
             "*1 failed in*",
