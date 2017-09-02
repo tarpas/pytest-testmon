@@ -229,7 +229,7 @@ class TestmonData(object):
     def _check_data_version(self):
         stored_data_version = self._fetch_attribute('__data_version', default=None, variant='default')
 
-        if stored_data_version and int(stored_data_version) == self.DATA_VERSION:
+        if stored_data_version is None or int(stored_data_version) == self.DATA_VERSION:
             return
 
         msg = (
