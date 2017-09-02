@@ -436,9 +436,32 @@ class TestmonDeselect(object):
         monkeypatch.setattr(TestmonData, 'DATA_VERSION', TestmonData.DATA_VERSION + 1)
 
         result = testdir.runpytest("--testmon")
+        monkeypatch.setattr(TestmonData, 'DATA_VERSION', TestmonData.DATA_VERSION - 1)
         assert result.ret != 0
         result.stderr.fnmatch_lines([
-            "*The stored data file *.testmondata is not compatible with this version of testmon.*",
+            "*The stored data file *.testmondata version (1) is not compatible with current version (2).*",
+        ])
+
+class Test_xdist(object):
+
+    def test_xdist_4(self, testdir):
+        pytest.importorskip("xdist")
+        testdir.makepyfile(test_a="""\
+            import pytest
+            @pytest.mark.parametrize("a", [
+                                    ("test0", ),
+                                    ("test1", ),
+                                    ("test2", ),
+                                    ("test3", )
+    ])
+            def test_1(a):
+                print(a)
+            """)
+
+        result = testdir.runpytest("test_a.py", "--testmon", "-n 4", "-v")
+        result.stdout.fnmatch_lines([
+            "*testmon=True, *",
+            "*PASSED test_a.py::test_1[a0*"
         ])
 
 
