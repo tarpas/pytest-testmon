@@ -436,9 +436,10 @@ class TestmonDeselect(object):
         monkeypatch.setattr(TestmonData, 'DATA_VERSION', TestmonData.DATA_VERSION + 1)
 
         result = testdir.runpytest("--testmon")
+        monkeypatch.setattr(TestmonData, 'DATA_VERSION', TestmonData.DATA_VERSION - 1)
         assert result.ret != 0
         result.stderr.fnmatch_lines([
-            "*The stored data file *.testmondata is not compatible with this version of testmon.*",
+            "*The stored data file *.testmondata version (1) is not compatible with current version (2).*",
         ])
 
 

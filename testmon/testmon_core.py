@@ -1,4 +1,5 @@
 from collections import defaultdict
+
 try:
     import configparser
 except ImportError:
@@ -16,7 +17,6 @@ import coverage
 
 from testmon.process_code import checksum_coverage
 from testmon.process_code import Module
-
 
 if sys.version_info > (3,):
     buffer = memoryview
@@ -46,7 +46,7 @@ def unaffected(node_data, changed_files, fail_reports=[]):
     unaffected_nodes = dict(node_data)
     unaffected_files = set(file_data)
     for fail_report in fail_reports:
-        affected =  set(unaffected_nodes.pop(fail_report, []))
+        affected = set(unaffected_nodes.pop(fail_report, []))
         unaffected_files = unaffected_files - affected
 
     for file in set(changed_files) & set(file_data):
@@ -197,10 +197,8 @@ class SourceTree():
 
 
 class TestmonData(object):
-
     # If you change the SQLlite schema, you should bump this number
     DATA_VERSION = 1
-    _DATA_VERSION_KEY = '__data_version'
 
     def __init__(self, rootdir, variant=None):
 
@@ -229,24 +227,20 @@ class TestmonData(object):
             self.connection.close()
 
     def _check_data_version(self):
-        stored_data_version = self._fetch_attribute(self._DATA_VERSION_KEY)
+        stored_data_version = self._fetch_attribute('__data_version', default=None, variant='default')
 
-        if not stored_data_version:
-            self._write_attribute(self._DATA_VERSION_KEY, str(self.DATA_VERSION))
-            return
-
-        if int(stored_data_version) == self.DATA_VERSION:
+        if stored_data_version and int(stored_data_version) == self.DATA_VERSION:
             return
 
         msg = (
-            "The stored data file {} is not compatible with this version of testmon."
+            "The stored data file {} version ({}) is not compatible with current version ({})."
             " You must delete the stored data to continue."
-        ).format(self.datafile)
+        ).format(self.datafile, stored_data_version, self.DATA_VERSION)
         raise Exception(msg)
 
-    def _fetch_attribute(self, attribute, default=None):
+    def _fetch_attribute(self, attribute, default=None, variant=None):
         cursor = self.connection.execute("SELECT data FROM metadata WHERE dataid=?",
-                                         [self.variant + ':' + attribute])
+                                         [(variant if variant else self.variant) + ':' + attribute])
         result = cursor.fetchone()
         if result:
             return json.loads(result[0])  # zlib.decompress(result[0]).decode('utf-8)'))
@@ -271,8 +265,8 @@ class TestmonData(object):
 
         return dependencies, fail_reports
 
-    def _write_attribute(self, attribute, data):
-        dataid = self.variant + ':' + attribute
+    def _write_attribute(self, attribute, data, variant=None):
+        dataid = (variant if variant else self.variant) + ':' + attribute
         json_data = json.dumps(data)
         compressed_data_buffer = json_data  # buffer(zlib.compress(json_data.encode('utf-8')))
         cursor = self.connection.execute("UPDATE metadata SET data=? WHERE dataid=?",
@@ -299,6 +293,7 @@ class TestmonData(object):
             checksums TEXT,
             FOREIGN KEY(node_variant, node_name) REFERENCES node(variant, name) ON DELETE CASCADE)
     """)
+        self._write_attribute('__data_version', str(self.DATA_VERSION), variant='default')
 
     def read_data(self):
         self.node_data, self.fail_reports = self._fetch_node_data()
