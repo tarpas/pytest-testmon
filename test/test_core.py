@@ -110,10 +110,10 @@ class TestDepGraph():
         assert is_dependent({'test_s.py': [bs1[1].checksum, bs1[2].checksum]},
                             {'test_s.py': [b.checksum for b in bs2]}) == True
 
-    def test_affected_list(self):
+    def test_affected_list(self, testdir):
         changes = {'test_a.py': [102, 103]}
 
-        td = CoreTestmonData('')
+        td = CoreTestmonData(testdir.tmpdir.strpath)
         td.node_data = {'node1': {'test_a.py': [101, 102]},
                         'node2': {'test_a.py': [102, 103], 'test_b.py': [200, 201]}}
 
