@@ -11,13 +11,6 @@ from testmon.testmon_core import Testmon, eval_variant, TestmonData
 from _pytest import runner
 
 
-def unserialize_report(name, reportdict):
-    if name == "testreport":
-        return runner.TestReport(**reportdict)
-    elif name == "collectreport":
-        return runner.CollectReport(**reportdict)
-
-
 def serialize_report(rep):
     import py
     d = rep.__dict__.copy()
@@ -169,7 +162,7 @@ class TestmonDeselect(object):
     def report_if_failed(self, nodeid):
         if nodeid in self.testmon_data.fail_reports:
             for report in self.testmon_data.fail_reports[nodeid]:
-                test_report = unserialize_report('testreport', report)
+                test_report = runner.TestReport(**report)
                 self.config.hook.pytest_runtest_logreport(report=test_report)
 
     def pytest_report_header(self, config):
