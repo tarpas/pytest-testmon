@@ -16,6 +16,7 @@ matrix:
       python: 2.7
     - env: TOXENV=py27-pytestfeatures
       python: 2.7
+
     - env: TOXENV=py34-pytest29
       python: 3.4
     - env: TOXENV=py35-pytest29
@@ -23,6 +24,8 @@ matrix:
     - env: TOXENV=py36-pytest31
       python: 3.6
     - env: TOXENV=py36-pytest32
+      python: 3.6
+    - env: TOXENV=py36-pytest33
       python: 3.6
     - env: TOXENV=py36-pytestmaster
       python: 3.6
