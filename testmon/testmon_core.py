@@ -207,6 +207,8 @@ class TestmonData(object):
         self.init_connection()
         self.node_data = {}
         self.reports = defaultdict(lambda: [])
+        # XXX: merge with self.node_data/fail_reports
+        self.node_dependencies = {}
 
     def init_connection(self):
         self.datafile = os.path.join(self.rootdir, '.testmondata')
@@ -299,10 +301,22 @@ class TestmonData(object):
         self.node_data, self.fail_reports = self._fetch_node_data()
 
     def write_data(self):
-        with self.connection:
-            if hasattr(self, 'source_tree'):
-                self._write_attribute('mtimes', self.source_tree.mtimes)
-                self._write_attribute('file_checksums', self.source_tree.checksums)
+        if not hasattr(self, 'source_tree'):
+            return
+
+        with self.connection as con:
+            self._write_attribute('mtimes', self.source_tree.mtimes)
+            self._write_attribute('file_checksums', self.source_tree.checksums)
+
+            for nodeid, data in self.node_dependencies.items():
+                nodedata, result, outcome = data
+                con.execute("INSERT OR REPLACE INTO "
+                            "node "
+                            "VALUES (?, ?, ?, ?)",
+                            (self.variant, nodeid, result, outcome))
+                con.executemany("INSERT INTO node_file VALUES (?, ?, ?, ?)",
+                                [(self.variant, nodeid, filename, json.dumps(nodedata[filename]))
+                                 for filename in nodedata])
 
     def collect_garbage(self, removed_nodeids):
         for removed_nodeid in removed_nodeids:
@@ -340,14 +354,9 @@ class TestmonData(object):
         return result
 
     def set_dependencies(self, nodeid, nodedata, result=[]):
-        with self.connection as con:
-            outcome = bool([True for r in result if r.get('outcome') == u'failed'])
-            con.execute("INSERT OR REPLACE INTO "
-                        "node "
-                        "VALUES (?, ?, ?, ?)",
-                        (self.variant, nodeid, json.dumps(result) if outcome else '', outcome))
-            con.executemany("INSERT INTO node_file VALUES (?, ?, ?, ?)",
-                            [(self.variant, nodeid, filename, json.dumps(nodedata[filename])) for filename in nodedata])
+        outcome = bool([True for r in result if r.get('outcome') == u'failed'])
+        result = json.dumps(result) if outcome else ''
+        self.node_dependencies[nodeid] = (nodedata, result, outcome)
 
     def read_source(self, tlf=None):
         mtimes = self._fetch_attribute('mtimes', default={})
