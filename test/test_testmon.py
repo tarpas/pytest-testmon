@@ -103,6 +103,11 @@ def test_track_pytest_equal(testdir, monkeypatch):
     assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath):
                 checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
 
+def test_detect_encoding():
+    from testmon import testmon_core
+    with open('test/print1250r.py', 'rb') as f:
+        testmon_core.detect_encoding(f.readline() + f.readline()) == 'cp1250'
+
 
 @pytest.mark.xfail
 def test_testmon_recursive(testdir, monkeypatch):
