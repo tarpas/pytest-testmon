@@ -150,8 +150,13 @@ def get_variant_inifile(inifile):
 
 def read_file_with_checksum(absfilename):
     hasher = hashlib.sha1()
-    with open(absfilename) as afile:
-        source = afile.read()
+    try:
+        with open(absfilename) as afile:
+            source = afile.read()
+    except UnicodeDecodeError:
+        raise Exception("""You are hitting https://github.com/tarpas/pytest-testmon/issues/14"""
+        """ when reading {}""".format(absfilename))
+
     hasher.update(encode(source))
     return source, hasher.hexdigest()
 

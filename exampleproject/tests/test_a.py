@@ -18,8 +18,6 @@ def test_add_and_multiply():
 
 def test_error3():
     pass
-    pass
-    raise Exception('error1')
 
 
 @pytest.mark.xfail(True, reason="Division by zero not implemented yet.")
