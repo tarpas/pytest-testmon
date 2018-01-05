@@ -1,7 +1,12 @@
 import ast
+import hashlib
 import textwrap
 import zlib
 import os
+
+import re
+
+coding_re = re.compile(b'coding[=:]\s*([-\w.]+)')
 
 
 class Block():
@@ -44,15 +49,14 @@ class Module(object):
         self.blocks = []
         self.counter = 0
         if source_code is None:
-            with open(os.path.join(rootdir, file_name)) as f:
-                source_code = f.read()
+            source_code, _ = read_file_with_checksum(os.path.join(rootdir, file_name))
         else:
             source_code = textwrap.dedent(source_code)
         lines = source_code.splitlines()
         try:
             tree = ast.parse(source_code, file_name)
             self.dump_and_block(tree, len(lines), name=file_name)
-        except SyntaxError:
+        except SyntaxError as e:
             pass
 
     def dump_and_block(self, node, end, name='unknown', into_block=False):
@@ -122,3 +126,27 @@ def checksum_coverage(blocks, lines):
             break
 
     return result
+
+
+def process_encoding(lines, afile):
+    line = afile.readline()
+    match = coding_re.search(line)
+    if match:
+        return match.group(1).decode('ascii')
+    else:
+        lines.append(line)
+        return None
+
+
+def read_file_with_checksum(absfilename):
+    hasher = hashlib.sha1()
+    with open(absfilename, 'rb') as afile:
+        lines = []
+        encoding = process_encoding(lines, afile)
+        if not encoding:
+            encoding = process_encoding(lines, afile)
+        if not encoding:
+            encoding = 'utf8'
+        source = b''.join(lines) + afile.read()
+    hasher.update(source)
+    return source.decode(encoding), hasher.hexdigest()
