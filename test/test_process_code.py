@@ -43,6 +43,14 @@ def test_read_file_with_checksum():
     assert u'š' in read_file_with_checksum('test/samples/print1250r.py')[0]
 
 
+def test_read_empty_file_with_checksum():
+    assert read_file_with_checksum('test/samples/empty.py')[0] == ''
+
+
+def test_read_2lines_file_with_checksum():
+    assert read_file_with_checksum('test/samples/2lines.py')[0] == '#2ndline'
+
+
 def test_module_with_1250():
     code_repr = Module(None, 'test/samples/print1250r.py').blocks[0].code
     assert "Str('\\xc5\\xa1')" in code_repr or "Str('š')" in Module(None, 'test/samples/print1250r.py').blocks[0].code
