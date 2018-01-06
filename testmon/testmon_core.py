@@ -11,12 +11,12 @@ import random
 import sqlite3
 import sys
 import textwrap
-import zlib
 
 import coverage
 
-from testmon.process_code import checksum_coverage
+from testmon.process_code import checksum_coverage, read_file_with_checksum
 from testmon.process_code import Module
+
 
 if sys.version_info > (3,):
     buffer = memoryview
@@ -146,19 +146,6 @@ def get_variant_inifile(inifile):
         run_variant_expression = None
 
     return eval_variant(run_variant_expression)
-
-
-def read_file_with_checksum(absfilename):
-    hasher = hashlib.sha1()
-    try:
-        with open(absfilename) as afile:
-            source = afile.read()
-    except UnicodeDecodeError:
-        raise Exception("""You are hitting https://github.com/tarpas/pytest-testmon/issues/14"""
-        """ when reading {}""".format(absfilename))
-
-    hasher.update(encode(source))
-    return source, hasher.hexdigest()
 
 
 def parse_file(filename, rootdir, source_code):

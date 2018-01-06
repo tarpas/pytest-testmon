@@ -1,10 +1,9 @@
 import pytest
 from collections import namedtuple
 
-from testmon.process_code import Module
+from testmon.process_code import Module, read_file_with_checksum
 from test.test_process_code import CodeSample
-from testmon.testmon_core import TestmonData as CoreTestmonData, SourceTree, flip_dictionary, unaffected, \
-    read_file_with_checksum
+from testmon.testmon_core import TestmonData as CoreTestmonData, SourceTree, flip_dictionary, unaffected
 
 pytest_plugins = "pytester",
 
