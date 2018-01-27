@@ -17,7 +17,6 @@ import coverage
 from testmon.process_code import checksum_coverage, read_file_with_checksum
 from testmon.process_code import Module
 
-
 if sys.version_info > (3,):
     buffer = memoryview
     encode = lambda x: bytes(x, 'utf_8')
@@ -190,7 +189,7 @@ class SourceTree():
 
 class TestmonData(object):
     # If you change the SQLlite schema, you should bump this number
-    DATA_VERSION = 1
+    DATA_VERSION = 2
 
     def __init__(self, rootdir, variant=None):
 
@@ -242,10 +241,10 @@ class TestmonData(object):
     def _fetch_node_data(self):
         dependencies = defaultdict(lambda: {})
         for row in self.connection.execute("""SELECT
-                                                node_name,
-                                                file_name,
-                                                checksums
-                                              FROM node_file WHERE node_variant=?""",
+                                                n.name,
+                                                nf.file_name,
+                                                nf.checksums
+                                              FROM node n, node_file nf WHERE n.id = nf.node_id AND n.variant=?""",
                                            (self.variant,)):
             dependencies[row[0]][row[1]] = json.loads(row[2])
 
@@ -271,19 +270,19 @@ class TestmonData(object):
         self.connection.execute('CREATE TABLE metadata (dataid TEXT PRIMARY KEY, data TEXT)')
         self.connection.execute("""
           CREATE TABLE node (
+              id INTEGER PRIMARY KEY ASC,
               variant TEXT,
               name TEXT,
               result TEXT,
-              failed BIT,
-              PRIMARY KEY (variant, name))
+              failed BIT
+              )
 """)
         self.connection.execute("""
           CREATE TABLE node_file (
-            node_variant TEXT,
-            node_name TEXT,
+            node_id INTEGER,
             file_name TEXT,
             checksums TEXT,
-            FOREIGN KEY(node_variant, node_name) REFERENCES node(variant, name) ON DELETE CASCADE)
+            FOREIGN KEY(node_id) REFERENCES node(id) ON DELETE CASCADE)
     """)
         self._write_attribute('__data_version', str(self.DATA_VERSION), variant='default')
 
@@ -334,12 +333,14 @@ class TestmonData(object):
     def set_dependencies(self, nodeid, nodedata, result=[]):
         with self.connection as con:
             outcome = bool([True for r in result if r.get('outcome') == u'failed'])
-            con.execute("INSERT OR REPLACE INTO "
-                        "node "
-                        "VALUES (?, ?, ?, ?)",
-                        (self.variant, nodeid, json.dumps(result) if outcome else '', outcome))
-            con.executemany("INSERT INTO node_file VALUES (?, ?, ?, ?)",
-                            [(self.variant, nodeid, filename, json.dumps(nodedata[filename])) for filename in nodedata])
+            cursor = con.cursor()
+            cursor.execute("INSERT OR REPLACE INTO "
+                           "node "
+                           "(variant, name, result, failed) "
+                           "VALUES (?, ?, ?, ?)",
+                           (self.variant, nodeid, json.dumps(result) if outcome else '', outcome))
+            con.executemany("INSERT INTO node_file VALUES (?, ?, ?)",
+                            [(cursor.lastrowid, filename, json.dumps(nodedata[filename])) for filename in nodedata])
 
     def read_source(self, tlf=None):
         mtimes = self._fetch_attribute('mtimes', default={})
