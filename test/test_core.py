@@ -3,12 +3,33 @@ from collections import namedtuple
 
 from testmon.process_code import Module, read_file_with_checksum
 from test.test_process_code import CodeSample
-from testmon.testmon_core import TestmonData as CoreTestmonData, SourceTree, flip_dictionary, unaffected
+from testmon.testmon_core import TestmonData as CoreTestmonData, SourceTree, flip_dictionary, unaffected, \
+    checksums_to_blob, CHECKUMS_ARRAY_TYPE, blob_to_checksums
+
+import sqlite3
 
 pytest_plugins = "pytester",
 
 Block = namedtuple('Block', 'checksums')
+from array import array
 
+def test_sqlite_assumption():
+
+    assert array(CHECKUMS_ARRAY_TYPE).itemsize == 4
+
+    checksums = [4294967295, 123456]
+
+    blob = checksums_to_blob(checksums)
+
+    con = sqlite3.connect(':memory:')
+    con.execute('CREATE TABLE a (c BLOB)')
+    con.execute('INSERT INTO a VALUES (?)', [blob])
+
+    cursor = con.execute('SELECT c FROM A')
+    assert checksums == blob_to_checksums(cursor.fetchone()[0])
+
+    cursor = con.execute('SELECT length(c) FROM A')
+    assert cursor.fetchone()[0] == len(checksums)*4
 
 def test_write_data(testdir):
     td = CoreTestmonData(testdir.tmpdir.strpath, 'V1')

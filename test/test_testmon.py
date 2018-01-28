@@ -12,6 +12,7 @@ from test.test_process_code import CodeSample
 
 pytest_plugins = "pytester",
 
+
 class TestVariant:
     def test_run_variant_header(self, testdir):
         testdir.makeini("""
@@ -23,7 +24,6 @@ class TestVariant:
             "*testmon=True, *, run variant: 1*",
         ])
 
-
     def test_run_variant_header_nonstr(self, testdir):
         testdir.makeini("""
                         [pytest]
@@ -34,11 +34,9 @@ class TestVariant:
             "*testmon=True, *, run variant: 1*",
         ])
 
-
     def test_run_variant_empty(self, testdir):
         config = testdir.parseconfigure()
         assert eval_variant(config.getini('run_variant_expression')) == ''
-
 
     def test_run_variant_md5(self, testdir, monkeypatch):
         testdir.makeini("""
@@ -47,7 +45,6 @@ class TestVariant:
                         """)
         config = testdir.parseconfigure()
         assert eval_variant(config.getini('run_variant_expression')) == '033bd94b1168d7e4f0d644c3c95e35bf'
-
 
     def test_run_variant_env(self, testdir, monkeypatch):
         monkeypatch.setenv('TEST_V', 'JUST_A_TEST')
@@ -58,7 +55,6 @@ class TestVariant:
         config = testdir.parseconfigure()
         assert eval_variant(config.getini('run_variant_expression')) == 'JUST_A_TEST'
 
-
     def test_run_variant_nonsense(self, testdir):
         testdir.makeini("""
                         [pytest]
@@ -66,7 +62,6 @@ class TestVariant:
                         """)
         config = testdir.parseconfigure()
         assert 'NameError' in eval_variant(config.getini('run_variant_expression'))
-
 
     def test_run_variant_complex(self, testdir, monkeypatch):
         "Test that ``os`` is available in list comprehensions."
@@ -210,7 +205,6 @@ class TestmonDeselect(object):
             "*1 failed in*",
         ])
 
-
     def test_easy(self, testdir):
         testdir.makepyfile(test_a="""
             def test_add():
@@ -247,7 +241,7 @@ class TestmonDeselect(object):
             testdir.runpytest("--testmon", )
         except:
             pass
-        assert 1800000000 == os.path.getmtime('.testmondata') # interrupted run shouldn't save .testmondata
+        assert 1800000000 == os.path.getmtime('.testmondata')  # interrupted run shouldn't save .testmondata
 
     def test_nonfunc_class(self, testdir, monkeypatch):
         """"
@@ -440,8 +434,9 @@ class TestmonDeselect(object):
         monkeypatch.setattr(TestmonData, 'DATA_VERSION', TestmonData.DATA_VERSION - 1)
         assert result.ret != 0
         result.stderr.fnmatch_lines([
-            "*The stored data file *.testmondata version (1) is not compatible with current version (2).*",
+            "*The stored data file *.testmondata version (2) is not compatible with current version (3).*",
         ])
+
 
 class Test_xdist(object):
 

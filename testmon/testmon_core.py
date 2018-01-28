@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from array import array
+
 try:
     import configparser
 except ImportError:
@@ -22,6 +24,18 @@ if sys.version_info > (3,):
     encode = lambda x: bytes(x, 'utf_8')
 else:
     encode = lambda x: x
+
+CHECKUMS_ARRAY_TYPE = 'I'
+
+
+def checksums_to_blob(checksums):
+    return sqlite3.Binary(array(CHECKUMS_ARRAY_TYPE, checksums).tostring())
+
+
+def blob_to_checksums(blob):
+    a = array(CHECKUMS_ARRAY_TYPE)
+    a.fromstring(blob)
+    return a.tolist()
 
 
 def _get_python_lib_paths():
@@ -246,7 +260,7 @@ class TestmonData(object):
                                                 nf.checksums
                                               FROM node n, node_file nf WHERE n.id = nf.node_id AND n.variant=?""",
                                            (self.variant,)):
-            dependencies[row[0]][row[1]] = json.loads(row[2])
+            dependencies[row[0]][row[1]] = blob_to_checksums(row[2])
 
         fail_reports = defaultdict(lambda: {})
 
@@ -281,7 +295,7 @@ class TestmonData(object):
           CREATE TABLE node_file (
             node_id INTEGER,
             file_name TEXT,
-            checksums TEXT,
+            checksums BLOB,
             FOREIGN KEY(node_id) REFERENCES node(id) ON DELETE CASCADE)
     """)
         self._write_attribute('__data_version', str(self.DATA_VERSION), variant='default')
@@ -340,7 +354,8 @@ class TestmonData(object):
                            "VALUES (?, ?, ?, ?)",
                            (self.variant, nodeid, json.dumps(result) if outcome else '', outcome))
             con.executemany("INSERT INTO node_file VALUES (?, ?, ?)",
-                            [(cursor.lastrowid, filename, json.dumps(nodedata[filename])) for filename in nodedata])
+                            [(cursor.lastrowid, filename, checksums_to_blob(nodedata[filename])) for filename in
+                             nodedata])
 
     def read_source(self, tlf=None):
         mtimes = self._fetch_attribute('mtimes', default={})

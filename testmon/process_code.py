@@ -22,7 +22,7 @@ class Block():
         if isinstance(self.code, int):
             return self.code
         else:
-            return zlib.adler32(self.code.encode('UTF-8'))
+            return zlib.adler32(self.code.encode('UTF-8')) & 0xffffffff
 
     def __repr__(self):
         return "{}-{} h: {}, n:{}, repr:{}".format(self.start,
