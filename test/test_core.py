@@ -13,51 +13,55 @@ pytest_plugins = "pytester",
 Block = namedtuple('Block', 'checksums')
 from array import array
 
-def test_sqlite_assumption():
 
-    assert array(CHECKUMS_ARRAY_TYPE).itemsize == 4
+class TestGeneral(object):
 
-    checksums = [4294967295, 123456]
+    def test_flip(self):
+        node_data = {'X': {'a': [1, 2, 3], 'b': [3, 4, 5]}, 'Y': {'b': [3, 6, 7]}}
+        files = flip_dictionary(node_data)
+        assert files == {'a': {'X': [1, 2, 3]}, 'b': {'X': [3, 4, 5], 'Y': [3, 6, 7]}}
 
-    blob = checksums_to_blob(checksums)
+    def test_sqlite_assumption(self):
+        assert array(CHECKUMS_ARRAY_TYPE).itemsize == 4
 
-    con = sqlite3.connect(':memory:')
-    con.execute('CREATE TABLE a (c BLOB)')
-    con.execute('INSERT INTO a VALUES (?)', [blob])
+        checksums = [4294967295, 123456]
 
-    cursor = con.execute('SELECT c FROM A')
-    assert checksums == blob_to_checksums(cursor.fetchone()[0])
+        blob = checksums_to_blob(checksums)
 
-    cursor = con.execute('SELECT length(c) FROM A')
-    assert cursor.fetchone()[0] == len(checksums)*4
+        con = sqlite3.connect(':memory:')
+        con.execute('CREATE TABLE a (c BLOB)')
+        con.execute('INSERT INTO a VALUES (?)', [blob])
 
-def test_write_data(testdir):
-    td = CoreTestmonData(testdir.tmpdir.strpath, 'V1')
-    td._write_attribute('1', {})
+        cursor = con.execute('SELECT c FROM A')
+        assert checksums == blob_to_checksums(cursor.fetchone()[0])
 
+        cursor = con.execute('SELECT length(c) FROM A')
+        assert cursor.fetchone()[0] == len(checksums) * 4
 
-def test_write_read_data(testdir):
-    td = CoreTestmonData(testdir.tmpdir.strpath, 'V1')
-    with td.connection:
-        td._write_attribute('1', {'a': 1})
-    td2 = CoreTestmonData(testdir.tmpdir.strpath, 'V1')
-    assert td2._fetch_attribute('1') == {'a': 1}
+    def test_write_data(self, testdir):
+        td = CoreTestmonData(testdir.tmpdir.strpath, 'V1')
+        td._write_attribute('1', {})
 
+    def test_write_read_data(self, testdir):
+        td = CoreTestmonData(testdir.tmpdir.strpath, 'V1')
+        with td.connection:
+            td._write_attribute('1', {'a': 1})
+        td2 = CoreTestmonData(testdir.tmpdir.strpath, 'V1')
+        assert td2._fetch_attribute('1') == {'a': 1}
 
-def test_read_nonexistent(testdir):
-    td = CoreTestmonData(testdir.tmpdir.strpath, 'V2')
-    assert td._fetch_attribute('1') == None
+    def test_read_nonexistent(self, testdir):
+        td = CoreTestmonData(testdir.tmpdir.strpath, 'V2')
+        assert td._fetch_attribute('1') == None
 
-
-def test_write_read_data2(testdir):
-    n1_node_data = {'a.py': [1]}
-    td = CoreTestmonData(testdir.tmpdir.strpath, 'default')
-    td.lastfailed = ['n1']
-    td.write_data()
-    td.set_dependencies('n1', n1_node_data, )
-    td2 = CoreTestmonData(testdir.tmpdir.strpath, 'default')
-    td2.read_data()
-    assert td2.node_data['n1'] == n1_node_data
+    def test_write_read_data2(self, testdir):
+        n1_node_data = {'a.py': [1]}
+        td = CoreTestmonData(testdir.tmpdir.strpath, 'default')
+        td.lastfailed = ['n1']
+        td.write_data()
+        td.set_dependencies('n1', n1_node_data, )
+        td2 = CoreTestmonData(testdir.tmpdir.strpath, 'default')
+        td2.read_data()
+        assert td2.node_data['n1'] == n1_node_data
 
 
 class TestDepGraph():
@@ -183,56 +187,8 @@ def blockify(changes):
     return block_changes
 
 
-def test_variants_separation(testdir):
-    testmon1_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
-    testmon1_data.node_data['node1'] = {'a.py': 1}
-    testmon1_data.write_data()
-
-    testmon2_data = CoreTestmonData(testdir.tmpdir.strpath, variant='2')
-    testmon2_data.node_data['node1'] = {'a.py': 2}
-    testmon2_data.write_data()
-
-    testmon_check_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
-    assert testmon1_data.node_data['node1'] == {'a.py': 1}
-
-
-def test_flip():
-    node_data = {'X': {'a': [1, 2, 3], 'b': [3, 4, 5]}, 'Y': {'b': [3, 6, 7]}}
-    files = flip_dictionary(node_data)
-    assert files == {'a': {'X': [1, 2, 3]}, 'b': {'X': [3, 4, 5], 'Y': [3, 6, 7]}}
-
-
 global_reports = []
 
-
-def test_serialize(testdir):
-    class PlugWrite:
-        def pytest_runtest_logreport(self, report):
-            global global_reports
-            global_reports.append(report)
-
-    class PlugRereport:
-        def pytest_runtest_protocol(self, item, nextitem):
-            hook = getattr(item.ihook, 'pytest_runtest_logreport')
-            for g in global_reports:
-                hook(report=g)
-            return True
-
-    testdir.makepyfile("""
-    def test_a():
-        raise Exception('exception from test_a')
-    """)
-
-    testdir.runpytest_inprocess(plugins=[PlugWrite()])
-
-    testdir.makepyfile("""
-    def test_a():
-        pass
-    """)
-
-    result = testdir.runpytest_inprocess(plugins=[PlugRereport()])
-
-    print(result)
 
 class TestSourceTree():
     @pytest.fixture
@@ -246,13 +202,15 @@ class TestSourceTree():
         code, checksum = read_file_with_checksum('a.py')
         assert checksum == 'ea4739bb5b0069cafb92af3874891898617ef590'
 
-        fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'a.py': a_py.mtime()}, checksums={'a.py': checksum})
+        fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'a.py': a_py.mtime()},
+                             checksums={'a.py': checksum})
         changed_files = fs_data.get_changed_files()
         assert changed_files == {}
 
     def test_basic_checksum(self, testdir, a_py):
         code, checksum = read_file_with_checksum('a.py')
-        fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'a.py': a_py.mtime()}, checksums={'a.py': checksum})
+        fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'a.py': a_py.mtime()},
+                             checksums={'a.py': checksum})
 
         a_py.setmtime(1424880936)
         changed_files = fs_data.get_changed_files()
@@ -279,7 +237,5 @@ class TestSourceTree():
         fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'b.py': -100}, checksums={'b.py': -200})
         fs_data.get_changed_files()
         pytest.raises((OSError, IOError), fs_data.get_file, 'c.py')
-
-
 
         # parse_fs_changes(stored_version={'a.py': [a_py.mtime, hash(a_py.read_mtime)]})

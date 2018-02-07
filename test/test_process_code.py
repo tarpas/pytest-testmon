@@ -4,6 +4,7 @@ from test.coveragepy.coveragetest import CoverageTest
 
 import pytest
 from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum, process_encoding
+
 try:
     from StringIO import StringIO as MemFile
 except ImportError:
@@ -14,46 +15,43 @@ def parse(source_code, file_name='a.py'):
     return Module(source_code=source_code, file_name=file_name).blocks
 
 
-def test_detect_encoding1():
-    lines = []
-    output = MemFile(b'#first comment\n#  -- coding: abcd --')
-    assert process_encoding(lines, output) == None
-    assert lines == [b'#first comment\n']
-    assert process_encoding(lines, output) == 'abcd'
-    assert lines == [b'#first comment\n']
+class TestReadSrc:
 
-
-def test_detect_encoding2():
-    lines = []
-    output = MemFile(b'1\n2\n')
-    assert process_encoding(lines, output) == None
-    assert lines == [b'1\n']
-    assert process_encoding(lines, output) == None
-    assert lines == [b'1\n', b'2\n']
-
-
-def test_detect_encoding2():
-    with open('test/samples/print1250r.py', 'rb') as f:
+    def test_detect_encoding1(self):
         lines = []
-        process_encoding(lines, f) == 'cp1250'
-        assert lines == []
+        output = MemFile(b'#first comment\n#  -- coding: abcd --')
+        assert process_encoding(lines, output) == None
+        assert lines == [b'#first comment\n']
+        assert process_encoding(lines, output) == 'abcd'
+        assert lines == [b'#first comment\n']
 
+    def test_detect_encoding2(self):
+        lines = []
+        output = MemFile(b'1\n2\n')
+        assert process_encoding(lines, output) == None
+        assert lines == [b'1\n']
+        assert process_encoding(lines, output) == None
+        assert lines == [b'1\n', b'2\n']
 
-def test_read_file_with_checksum():
-    assert u'š' in read_file_with_checksum('test/samples/print1250r.py')[0]
+    def test_detect_encoding2(self):
+        with open('test/samples/print1250r.py', 'rb') as f:
+            lines = []
+            process_encoding(lines, f) == 'cp1250'
+            assert lines == []
 
+    def test_read_file_with_checksum(self):
+        assert u'š' in read_file_with_checksum('test/samples/print1250r.py')[0]
 
-def test_read_empty_file_with_checksum():
-    assert read_file_with_checksum('test/samples/empty.py')[0] == ''
+    def test_read_empty_file_with_checksum(self):
+        assert read_file_with_checksum('test/samples/empty.py')[0] == ''
 
+    def test_read_2lines_file_with_checksum(self):
+        assert read_file_with_checksum('test/samples/2lines.py')[0] == '#2ndline'
 
-def test_read_2lines_file_with_checksum():
-    assert read_file_with_checksum('test/samples/2lines.py')[0] == '#2ndline'
-
-
-def test_module_with_1250():
-    code_repr = Module(None, 'test/samples/print1250r.py').blocks[0].code
-    assert "Str('\\xc5\\xa1')" in code_repr or "Str('š')" in Module(None, 'test/samples/print1250r.py').blocks[0].code
+    def test_module_with_1250(self):
+        code_repr = Module(None, 'test/samples/print1250r.py').blocks[0].code
+        assert "Str('\\xc5\\xa1')" in code_repr or "Str('š')" in Module(None, 'test/samples/print1250r.py').blocks[
+            0].code
 
 
 class TestSourceIntoBlocks(object):

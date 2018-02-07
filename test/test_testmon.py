@@ -5,7 +5,7 @@ import pytest
 import testmon.process_code
 from test.coveragepy import coveragetest
 from testmon.process_code import Module, checksum_coverage
-from testmon.testmon_core import eval_variant
+from testmon.testmon_core import eval_variant, TestmonData as CoreTestmonData
 from testmon.testmon_core import Testmon as CoreTestmon
 from testmon.testmon_core import TestmonData as CoreTestmonData
 from test.test_process_code import CodeSample
@@ -14,7 +14,20 @@ pytest_plugins = "pytester",
 
 
 class TestVariant:
-    def test_run_variant_header(self, testdir):
+
+    def test_separation(self, testdir):
+        testmon1_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
+        testmon1_data.node_data['node1'] = {'a.py': 1}
+        testmon1_data.write_data()
+
+        testmon2_data = CoreTestmonData(testdir.tmpdir.strpath, variant='2')
+        testmon2_data.node_data['node1'] = {'a.py': 2}
+        testmon2_data.write_data()
+
+        testmon_check_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
+        assert testmon1_data.node_data['node1'] == {'a.py': 1}
+
+    def test_header(self, testdir):
         testdir.makeini("""
                         [pytest]
                         run_variant_expression='1'
@@ -24,7 +37,7 @@ class TestVariant:
             "*testmon=True, *, run variant: 1*",
         ])
 
-    def test_run_variant_header_nonstr(self, testdir):
+    def test_header_nonstr(self, testdir):
         testdir.makeini("""
                         [pytest]
                         run_variant_expression=int(1)
@@ -34,7 +47,7 @@ class TestVariant:
             "*testmon=True, *, run variant: 1*",
         ])
 
-    def test_run_variant_empty(self, testdir):
+    def test_empty(self, testdir):
         config = testdir.parseconfigure()
         assert eval_variant(config.getini('run_variant_expression')) == ''
 
@@ -46,7 +59,7 @@ class TestVariant:
         config = testdir.parseconfigure()
         assert eval_variant(config.getini('run_variant_expression')) == '033bd94b1168d7e4f0d644c3c95e35bf'
 
-    def test_run_variant_env(self, testdir, monkeypatch):
+    def test_env(self, testdir, monkeypatch):
         monkeypatch.setenv('TEST_V', 'JUST_A_TEST')
         testdir.makeini("""
                         [pytest]
@@ -55,7 +68,7 @@ class TestVariant:
         config = testdir.parseconfigure()
         assert eval_variant(config.getini('run_variant_expression')) == 'JUST_A_TEST'
 
-    def test_run_variant_nonsense(self, testdir):
+    def test_nonsense(self, testdir):
         testdir.makeini("""
                         [pytest]
                         run_variant_expression=nonsense
@@ -63,7 +76,7 @@ class TestVariant:
         config = testdir.parseconfigure()
         assert 'NameError' in eval_variant(config.getini('run_variant_expression'))
 
-    def test_run_variant_complex(self, testdir, monkeypatch):
+    def test_complex(self, testdir, monkeypatch):
         "Test that ``os`` is available in list comprehensions."
         monkeypatch.setenv('TEST_V', 'JUST_A_TEST')
         testdir.makeini("""
@@ -83,59 +96,6 @@ def track_it(testdir, func):
     func()
     testmon.stop_and_save(testmon_data, testdir.tmpdir.strpath, 'testnode')
     return testmon_data._fetch_node_data()[0]['testnode']
-
-
-def test_track_pytest_equal(testdir, monkeypatch):
-    a = testdir.makepyfile(test_a="""\
-    def test_1():
-        a=1
-    """)
-
-    def func():
-        testdir.runpytest("test_a.py")
-
-    deps = track_it(testdir, func)
-
-    assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath):
-                checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
-
-
-@pytest.mark.xfail
-def test_testmon_recursive(testdir, monkeypatch):
-    a = testdir.makepyfile(test_a="""\
-    def test_1():
-        a=1
-    """)
-
-    def func():
-        testdir.runpytest("test_a.py", "--testmon", "--capture=no")
-
-    deps = track_it(testdir, func)
-    # os.environ.pop('COVERAGE_TEST_TRACER', None)
-
-    assert {os.path.abspath(a.strpath):
-                checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
-
-
-def test_run_dissapearing(testdir):
-    a = testdir.makepyfile(a="""\
-        import sys
-        import os
-        with open('b.py', 'w') as f:
-            f.write("print('printing from b.py')")
-        sys.path.append('.')
-        import b
-        os.remove('b.py')
-    """)
-
-    def f():
-        coveragetest.import_local_file('a')
-
-    deps = track_it(testdir, f)
-    assert os.path.relpath(a.strpath, testdir.tmpdir.strpath) in deps
-    assert len(deps) == 1
-
-    del sys.modules['a']
 
 
 class TestmonDeselect(object):
@@ -437,8 +397,86 @@ class TestmonDeselect(object):
             "*The stored data file *.testmondata version (2) is not compatible with current version (3).*",
         ])
 
+    def test_track_pytest_equal(self, testdir, monkeypatch):
+        a = testdir.makepyfile(test_a="""\
+        def test_1():
+            a=1
+        """)
 
-class Test_xdist(object):
+        def func():
+            testdir.runpytest("test_a.py")
+
+        deps = track_it(testdir, func)
+
+        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath):
+                    checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
+
+    @pytest.mark.xfail
+    def test_testmon_recursive(self, testdir, monkeypatch):
+        a = testdir.makepyfile(test_a="""\
+        def test_1():
+            a=1
+        """)
+
+        def func():
+            testdir.runpytest("test_a.py", "--testmon", "--capture=no")
+
+        deps = track_it(testdir, func)
+        # os.environ.pop('COVERAGE_TEST_TRACER', None)
+
+        assert {os.path.abspath(a.strpath):
+                    checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
+
+    def test_run_dissapearing(self, testdir):
+        a = testdir.makepyfile(a="""\
+            import sys
+            import os
+            with open('b.py', 'w') as f:
+                f.write("print('printing from b.py')")
+            sys.path.append('.')
+            import b
+            os.remove('b.py')
+        """)
+
+        def f():
+            coveragetest.import_local_file('a')
+
+        deps = track_it(testdir, f)
+        assert os.path.relpath(a.strpath, testdir.tmpdir.strpath) in deps
+        assert len(deps) == 1
+
+        del sys.modules['a']
+
+    def test_report_roundtrip(self, testdir):
+        class PlugWrite:
+            def pytest_runtest_logreport(self, report):
+                global global_reports
+                global_reports.append(report)
+
+        class PlugRereport:
+            def pytest_runtest_protocol(self, item, nextitem):
+                hook = getattr(item.ihook, 'pytest_runtest_logreport')
+                for g in global_reports:
+                    hook(report=g)
+                return True
+
+        testdir.makepyfile("""
+        def test_a():
+            raise Exception('exception from test_a')
+        """)
+
+        testdir.runpytest_inprocess(plugins=[PlugWrite()])
+
+        testdir.makepyfile("""
+        def test_a():
+            pass
+        """)
+
+        result = testdir.runpytest_inprocess(plugins=[PlugRereport()])
+
+
+
+class TestXdist(object):
 
     def test_xdist_4(self, testdir):
         pytest.importorskip("xdist")
