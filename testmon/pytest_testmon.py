@@ -211,7 +211,8 @@ class TestmonDeselect(object):
         if strpath in self.testmon_data.unaffected_files:
             if os.path.split(strpath)[1].startswith('test_'):
                 for nodeid in self.testmon_data.file_data()[strpath]:
-                    self.collection_ignored.add(nodeid)
+                    if nodeid.startswith(strpath):
+                        self.collection_ignored.add(nodeid)
                 config.hook.pytest_deselected(
                     items=([self.FakeItemFromTestmon(config)] *
                            len(self.testmon_data.file_data()[strpath])))
