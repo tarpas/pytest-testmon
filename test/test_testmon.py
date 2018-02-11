@@ -397,6 +397,31 @@ class TestmonDeselect(object):
             "*The stored data file *.testmondata version (2) is not compatible with current version (3).*",
         ])
 
+    def test_dependent_testmodule(self, testdir):
+        testdir.makepyfile(test_a="""
+            def test_1():
+                pass
+        """)
+        testdir.makepyfile(test_b="""
+            import test_a
+            def test_2():
+                pass
+        """)
+
+        result = testdir.runpytest("--testmon")
+        assert result.ret == 0
+
+        testdir.makepyfile(test_b="""
+            import test_a
+            def test_2():
+                pass
+                pass
+        """)
+
+        result = testdir.runpytest("--testmon")
+        assert result.ret == 0
+        result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
+
     def test_track_pytest_equal(self, testdir, monkeypatch):
         a = testdir.makepyfile(test_a="""\
         def test_1():
@@ -474,6 +499,30 @@ class TestmonDeselect(object):
 
         result = testdir.runpytest_inprocess(plugins=[PlugRereport()])
 
+    def test_dependent_testmodule(self, testdir):
+        testdir.makepyfile(test_a="""
+            def test_1():
+                pass
+        """)
+        testdir.makepyfile(test_b="""
+            import test_a
+            def test_2():
+                pass
+        """)
+
+        result = testdir.runpytest("--testmon")
+        assert result.ret == 0
+
+        testdir.makepyfile(test_b="""
+            import test_a
+            def test_2():
+                pass
+                pass
+        """)
+
+        result = testdir.runpytest("--testmon")
+        assert result.ret == 0
+        result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
 
 
 class TestXdist(object):
