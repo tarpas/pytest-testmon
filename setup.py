@@ -4,7 +4,7 @@ setup(
     name='pytest-testmon',
     description='take TDD to a new level with py.test and testmon',
     long_description=''.join(open('README.rst').readlines()),
-    version='0.9.8',
+    version='0.9.9',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
     packages=['testmon'],

@@ -123,6 +123,7 @@ def is_active(config):
 
 def pytest_configure(config):
     if is_active(config):
+        config.option.continue_on_collection_errors=True
         init_testmon_data(config)
         config.pluginmanager.register(TestmonDeselect(config, config.testmon_data),
                                       "TestmonDeselect")

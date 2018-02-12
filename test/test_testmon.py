@@ -524,6 +524,31 @@ class TestmonDeselect(object):
         assert result.ret == 0
         result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
 
+    def test_collection_not_abort(self, testdir):
+        testdir.makepyfile(test_collection_not_abort="""
+            def test_1():
+                1
+
+            def test_2():
+                assert False
+                """)
+
+        testdir.runpytest("--testmon")
+
+        tf = testdir.makepyfile(test_collection_not_abort="""
+            def test_1():
+                2
+
+            def test_2():
+                assert False
+        """)
+        tf.setmtime(1)
+
+        result = testdir.runpytest("-v", "--testmon")
+
+        assert result.ret == 1
+        result.stdout.fnmatch_lines(["*test_collection_not_abort.py::test_2 FAILED*", ])
+
 
 class TestXdist(object):
 
