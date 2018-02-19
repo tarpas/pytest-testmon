@@ -29,12 +29,20 @@ CHECKUMS_ARRAY_TYPE = 'I'
 
 
 def checksums_to_blob(checksums):
-    return sqlite3.Binary(array(CHECKUMS_ARRAY_TYPE, checksums).tostring())
+    blob = array(CHECKUMS_ARRAY_TYPE, checksums)
+    try:
+        data = blob.tobytes()
+    except AttributeError:
+        data = blob.tostring()
+    return sqlite3.Binary(data)
 
 
 def blob_to_checksums(blob):
     a = array(CHECKUMS_ARRAY_TYPE)
-    a.fromstring(blob)
+    try:
+        a.frombytes(blob)
+    except AttributeError:
+        a.fromstring(blob)
     return a.tolist()
 
 
