@@ -314,11 +314,12 @@ class TestmonData(object):
                 self._write_attribute('mtimes', self.source_tree.mtimes)
                 self._write_attribute('file_checksums', self.source_tree.checksums)
 
-    def collect_garbage(self, removed_nodeids):
-        for removed_nodeid in removed_nodeids:
-            self.node_data.pop(removed_nodeid, None)
+    def collect_garbage(self, retain):
+        delete = set(self.node_data.keys()) - retain
+        for node_id in delete:
+            self.node_data.pop(node_id, None)
         self.connection.executemany('DELETE FROM node WHERE variant=? AND name=?',
-                                    [(self.variant, removed_nodeid) for removed_nodeid in removed_nodeids])
+                                    [(self.variant, removed_nodeid) for removed_nodeid in delete])
 
     def repr_per_node(self, key):
         return "{}: {}\n".format(key,

@@ -188,10 +188,8 @@ class TestmonDeselect(object):
             return True
 
     def pytest_collection_modifyitems(self, session, config, items):
-        removed_nodeids = set(self.testmon_data.node_data) - self.collection_ignored - set(
-            [item.nodeid for item in items])
-        if removed_nodeids:
-            self.testmon_data.collect_garbage(removed_nodeids)
+        self.testmon_data.collect_garbage(retain=self.collection_ignored - set(
+            [item.nodeid for item in items]))
 
         for item in items:
             assert item.nodeid not in self.collection_ignored
