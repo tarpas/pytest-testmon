@@ -72,6 +72,9 @@ def unaffected(node_data, changed_files):
             if set(checksums) - set(changed_files[file].checksums):
                 affected_files = set(unaffected_nodes.pop(nodeid, []))
                 unaffected_files = unaffected_files - affected_files
+
+    unaffected_files = {uf for uf in unaffected_files if os.path.split(uf)[1].startswith('test_')}
+
     return unaffected_nodes, unaffected_files
 
 
