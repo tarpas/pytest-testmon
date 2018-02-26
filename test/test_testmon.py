@@ -546,7 +546,7 @@ class TestmonDeselect(object):
 
         result = testdir.runpytest("-v", "--testmon")
 
-        assert result.ret == 1
+        assert result.ret == 2
         result.stdout.fnmatch_lines(["*test_collection_not_abort.py::test_2 FAILED*", ])
 
 
