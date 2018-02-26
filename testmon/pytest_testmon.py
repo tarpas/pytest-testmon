@@ -105,7 +105,7 @@ def init_testmon_data(config, read_source=True):
                                    variant=variant)
         testmon_data.read_data()
         if read_source:
-            testmon_data.read_source(tlf=config.getoption('tlf'))
+            testmon_data.read_source()
         config.testmon_data = testmon_data
 
 
@@ -123,7 +123,7 @@ def is_active(config):
 
 def pytest_configure(config):
     if is_active(config):
-        config.option.continue_on_collection_errors=True
+        config.option.continue_on_collection_errors = True
         init_testmon_data(config)
         config.pluginmanager.register(TestmonDeselect(config, config.testmon_data),
                                       "TestmonDeselect")
@@ -144,9 +144,21 @@ class TestmonDeselect(object):
     def __init__(self, config, testmon_data):
         self.testmon_data = testmon_data
         self.testmon = Testmon(config.project_dirs, testmon_labels=testmon_options(config))
+
         self.collection_ignored = set()
         self.testmon_save = True
         self.config = config
+        self.selected, self.deselected = [], set()
+        self.collect_exceptions = set(nodeid.split("::", 1)[0] for nodeid in self.testmon_data.fail_reports)
+
+    def test_should_run(self, nodeid):
+        if self.config.getoption('tlf'):
+            if nodeid in self.testmon_data.fail_reports:
+                return True
+        if nodeid in self.testmon_data.unaffected_nodeids:
+            return False
+        else:
+            return True
 
     def pytest_report_header(self, config):
         changed_files = ",".join(self.testmon_data.source_tree.changed_files)
@@ -154,7 +166,7 @@ class TestmonDeselect(object):
             changed_files = len(self.testmon_data.source_tree.changed_files)
         active_message = "testmon={}, changed files: {}, skipping collection of {} items".format(
             config.getoption('testmon'),
-            changed_files, len(self.testmon_data.unaffected_nodeids))
+            changed_files, len(self.testmon_data.unaffected_files))
         if self.testmon_data.variant:
             return active_message + ", run variant: {}".format(self.testmon_data.variant)
         else:
@@ -166,25 +178,38 @@ class TestmonDeselect(object):
                 test_report = unserialize_report('testreport', report)
                 self.config.hook.pytest_runtest_logreport(report=test_report)
 
+    def pytest_ignore_collect(self, path, config):
+        strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
+        if strpath in self.testmon_data.unaffected_files.difference(self.collect_exceptions):
+            if os.path.split(strpath)[1].startswith('test_'):
+                for nodeid in self.testmon_data.file_data()[strpath]:
+                    if nodeid.startswith(strpath):
+                        self.collection_ignored.add(nodeid)
+                        self.deselected.add(nodeid)
+            return True
+
     def pytest_collection_modifyitems(self, session, config, items):
         removed_nodeids = set(self.testmon_data.node_data) - self.collection_ignored - set(
             [item.nodeid for item in items])
         if removed_nodeids:
             self.testmon_data.collect_garbage(removed_nodeids)
 
-        selected, deselected = [], []
         for item in items:
             assert item.nodeid not in self.collection_ignored
-            if self.testmon_data.test_should_run(item.nodeid):
-                selected.append(item)
+            if self.test_should_run(item.nodeid):
+                self.selected.append(item)
             else:
-                self.report_if_failed(item.nodeid)
-                deselected.append(item)
-        for nodeid in self.collection_ignored:
+                self.deselected.add(item.nodeid)
+        items[:] = self.selected
+
+    def pytest_runtestloop(self, session):
+        for nodeid in self.collection_ignored.union(self.deselected):
             self.report_if_failed(nodeid)
-        items[:] = selected
-        if deselected:
-            config.hook.pytest_deselected(items=deselected)
+
+        if self.deselected:
+            session.config.hook.pytest_deselected(
+                items=([self.FakeItemFromTestmon(session.config)] *
+                       len(self.deselected)))
 
     @pytest.mark.hookwrapper
     def pytest_runtest_protocol(self, item, nextitem):
@@ -197,7 +222,7 @@ class TestmonDeselect(object):
             self.testmon.stop()
         else:
             self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
-                                   self.testmon_data.reports[item.nodeid])
+                                       self.testmon_data.reports[item.nodeid])
             del self.testmon_data.reports[item.nodeid]
 
     def pytest_runtest_logreport(self, report):
@@ -206,18 +231,6 @@ class TestmonDeselect(object):
     class FakeItemFromTestmon(object):
         def __init__(self, config):
             self.config = config
-
-    def pytest_ignore_collect(self, path, config):
-        strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
-        if strpath in self.testmon_data.unaffected_files:
-            if os.path.split(strpath)[1].startswith('test_'):
-                for nodeid in self.testmon_data.file_data()[strpath]:
-                    if nodeid.startswith(strpath):
-                        self.collection_ignored.add(nodeid)
-                config.hook.pytest_deselected(
-                    items=([self.FakeItemFromTestmon(config)] *
-                           len(self.testmon_data.file_data()[strpath])))
-            return True
 
     def pytest_internalerror(self, excrepr, excinfo):
         self.testmon_save = False

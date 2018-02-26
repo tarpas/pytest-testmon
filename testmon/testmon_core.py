@@ -62,19 +62,16 @@ def flip_dictionary(node_data):
     return files
 
 
-def unaffected(node_data, changed_files, fail_reports=[]):
+def unaffected(node_data, changed_files):
     file_data = flip_dictionary(node_data)
     unaffected_nodes = dict(node_data)
     unaffected_files = set(file_data)
-    for fail_report in fail_reports:
-        affected = set(unaffected_nodes.pop(fail_report, []))
-        unaffected_files = unaffected_files - affected
 
     for file in set(changed_files) & set(file_data):
         for nodeid, checksums in file_data[file].items():
             if set(checksums) - set(changed_files[file].checksums):
-                affected = set(unaffected_nodes.pop(nodeid, []))
-                unaffected_files = unaffected_files - affected
+                affected_files = set(unaffected_nodes.pop(nodeid, []))
+                unaffected_files = unaffected_files - affected_files
     return unaffected_nodes, unaffected_files
 
 
@@ -329,12 +326,6 @@ class TestmonData(object):
                                   for (p, checksum)
                                   in self.node_data[key].items()])
 
-    def test_should_run(self, nodeid):
-        if nodeid in self.unaffected_nodeids:
-            return False
-        else:
-            return True
-
     def file_data(self):
         return flip_dictionary(self.node_data)
 
@@ -365,17 +356,16 @@ class TestmonData(object):
                             [(cursor.lastrowid, filename, checksums_to_blob(nodedata[filename])) for filename in
                              nodedata])
 
-    def read_source(self, tlf=None):
+    def read_source(self):
         mtimes = self._fetch_attribute('mtimes', default={})
         checksums = self._fetch_attribute('file_checksums', default={})
 
         self.source_tree = SourceTree(rootdir=self.rootdir, mtimes=mtimes, checksums=checksums)
-        self.compute_unaffected(self.source_tree.get_changed_files(), tlf)
+        self.compute_unaffected(self.source_tree.get_changed_files())
 
-    def compute_unaffected(self, changed_files, tlf):
+    def compute_unaffected(self, changed_files):
         self.unaffected_nodeids, self.unaffected_files = unaffected(self.node_data,
-                                                                    changed_files,
-                                                                    self.fail_reports if tlf else [])
+                                                                    changed_files)
 
         # possible data structures
         # nodeid1 -> [filename -> [block_a, block_b]]
