@@ -180,9 +180,7 @@ class TestmonDeselect(object):
     def pytest_ignore_collect(self, path, config):
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
         if strpath in self.testmon_data.unaffected_files.difference(self.collect_exceptions):
-            for nodeid in self.testmon_data.file_data()[strpath]:
-                if nodeid.startswith(strpath):
-                    self.collection_ignored.add(nodeid)
+            self.collection_ignored.update(self.testmon_data.file_data()[strpath].keys())
             return True
 
     def pytest_collection_modifyitems(self, session, config, items):

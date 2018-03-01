@@ -151,21 +151,64 @@ class TestDepGraph():
         assert affected_nodeids(dependencies, changes) == {'node1'}
 
 
+def get_changed_files(dependencies, changes):
+    changed_files = {}
+    file_data = flip_dictionary(dependencies)
+    for change, remove in changes.items():
+        changed_files[change] = []
+        for sublist in file_data[change].values():
+            for checksum in sublist:
+                if checksum not in remove:
+                    changed_files[change].append(checksum)
+    return changed_files
+
+
 class TestUnaffected():
     def test_nothing_changed(self):
         changed = {'a.py': [101, 102, 103]}
-        dependencies = {'node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]}}
+        dependencies = {'test_a.py::node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]}}
         assert unaffected(dependencies, blockify(changed))[0] == dependencies
 
     def test_simple_change(self):
         changed = {'a.py': [101, 102, 151]}
-        dependencies = {'node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]},
-                        'node2': {'test_b.py': [301, 302], 'a.py': [151]}}
+        dependencies = {'test_a.py::node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]},
+                        'test_b.py::node2': {'test_b.py': [301, 302], 'a.py': [151]}}
 
         nodes, files = unaffected(dependencies, blockify(changed))
 
-        assert set(nodes) == {'node2'}
+        assert set(nodes) == {'test_b.py::node2'}
         assert set(files) == {'test_b.py'}
+
+    def test_dependent_test_modules(self):
+        dependencies = {'test_a.py::test_1': {'test_a.py': [1],
+                                              'test_b.py': [3]},
+                        'test_b.py::test_2': {'test_b.py': [2]}}
+        changed = {'test_a.py': [-1]}
+
+        nodes, files = unaffected(dependencies, blockify(changed))
+        assert set(nodes) == {'test_b.py::test_2'}
+        assert set(files) == {'test_b.py'}
+
+        changed = {'test_b.py': [3]}
+        nodes, files = unaffected(dependencies, blockify(changed))
+        assert set(nodes) == {'test_a.py::test_1'}
+        assert set(files) == {'test_a.py'}
+
+    def test_dependent_test_modules2(self):
+        dependencies = {'test_a.py::test_1': {'test_a.py': [1],
+                                              'test_b.py': [3],
+                                              'c.py': [4, 5]},
+                        'test_b.py::test_2': {'test_b.py': [2]}}
+
+        changed_files = get_changed_files(dependencies, {'c.py': [4]})
+        nodes, files = unaffected(dependencies, blockify(changed_files))
+        assert set(nodes) == {'test_b.py::test_2'}
+        assert set(files) == {'test_b.py'}
+
+        changed_files = get_changed_files(dependencies, {'test_b.py': [2]})
+        nodes, files = unaffected(dependencies, blockify(changed_files))
+        assert set(nodes) == {'test_a.py::test_1'}
+        assert set(files) == {'test_a.py', 'c.py'}
 
 
 def get_modules(checksums):

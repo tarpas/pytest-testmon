@@ -336,6 +336,69 @@ class TestmonDeselect(object):
             "*5 deselected*",
         ])
 
+    def test_newr(self, testdir):
+        a = testdir.makepyfile(a="""
+            def add(a, b):
+                a = a
+                return a + b
+
+            def subtract(a, b):
+                return a - b
+        """)
+
+        testdir.makepyfile(b="""
+            def divide(a, b):
+                return a // b
+
+            def multiply(a, b):
+                return a * b
+        """)
+
+        testdir.makepyfile(a_test="""
+            from a import add, subtract
+            import time
+
+            def test_add():
+                assert add(1, 2) == 3
+
+            def test_subtract():
+                assert subtract(1, 2) == -1
+                    """)
+
+        testdir.makepyfile(b_test="""
+            import unittest
+
+            from b import multiply, divide
+
+            class TestB(unittest.TestCase):
+                def test_multiply(self):
+                    self.assertEqual(multiply(1, 2), 2)
+
+                def test_divide(self):
+                    self.assertEqual(divide(1, 2), 0)
+        """)
+
+        testdir.makepyfile(ab_test="""
+            from a import add
+            from b import multiply
+            def test_add_and_multiply():
+                assert add(2, 3) == 5
+                assert multiply(2, 3) == 6
+        """)
+        result = testdir.runpytest("--testmon", )
+        result.stdout.fnmatch_lines([
+            "*5 passed*",
+        ])
+        result = testdir.runpytest("--testmon")
+        result.stdout.fnmatch_lines([
+            "*collected 0 items*",
+        ])
+        a.setmtime(1424880935)
+        result = testdir.runpytest("--testmon")
+        result.stdout.fnmatch_lines([
+            "*5 deselected*",
+        ])
+
     def test_new2(self, testdir):
         a = testdir.makepyfile(a="""
             def add(a, b):
