@@ -123,6 +123,7 @@ def is_active(config):
 
 def pytest_configure(config):
     if is_active(config):
+        config.option.continue_on_collection_errors = True
         init_testmon_data(config)
         config.pluginmanager.register(TestmonDeselect(config, config.testmon_data),
                                       "TestmonDeselect")
@@ -187,22 +188,21 @@ class TestmonDeselect(object):
         self.testmon_data.collect_garbage(retain=self.collection_ignored.union(set([item.nodeid for item in items])))
 
         for item in items:
-            assert item.nodeid not in self.collection_ignored
             if self.test_should_run(item.nodeid):
                 self.selected.append(item)
             else:
                 self.deselected.add(item.nodeid)
         items[:] = self.selected
 
+
+        session.config.hook.pytest_deselected(
+            items=([self.FakeItemFromTestmon(session.config)] *
+                   len(self.collection_ignored.union(self.deselected))))
+
     def pytest_runtestloop(self, session):
         ignored_deselected = self.collection_ignored.union(self.deselected)
         for nodeid in ignored_deselected:
             self.report_if_failed(nodeid)
-
-        if ignored_deselected:
-            session.config.hook.pytest_deselected(
-                items=([self.FakeItemFromTestmon(session.config)] *
-                       len(ignored_deselected)))
 
     @pytest.mark.hookwrapper
     def pytest_runtest_protocol(self, item, nextitem):

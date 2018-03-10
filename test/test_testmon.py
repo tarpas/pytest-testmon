@@ -148,6 +148,24 @@ class TestmonDeselect(object):
         assert tuple(res) == (1, 0, 0), res
         sys.modules.pop('test_a', None)
 
+    def test_fantom_failure(self, testdir):
+        testdir.makepyfile(test_a="""
+            def test_add():
+                1/0
+        """, )
+        testdir.inline_run("--testmon", "-v")
+
+        tf = testdir.makepyfile(test_a="""
+            def test_add():
+                pass
+        """, )
+        tf.setmtime(1)
+        testdir.inline_run("--testmon", "-v")
+
+        reprec = testdir.inline_run("--testmon", "-v")
+        res = reprec.countoutcomes()
+        assert tuple(res) == (1, 0, 0), res
+
     def test_tlf(self, testdir):
         testdir.makepyfile(test_a="""
             def test_add():
