@@ -127,7 +127,7 @@ class Testmon(object):
     def stop(self):
         self.cov.stop()
 
-    def stop_and_save(self, testmon_data, rootdir, nodeid, result=[]):
+    def stop_and_save(self, testmon_data, rootdir, nodeid, result):
         self.stop()
         if hasattr(self, 'sub_cov_file'):
             self.cov.combine()
@@ -294,7 +294,8 @@ class TestmonData(object):
               variant TEXT,
               name TEXT,
               result TEXT,
-              failed BIT
+              failed BIT,
+              UNIQUE (variant, name)
               )
 """)
         self.connection.execute("""
@@ -345,7 +346,7 @@ class TestmonData(object):
             result[relfilename] = checksum_coverage(self.source_tree.get_file(relfilename).blocks, [1])
         return result
 
-    def set_dependencies(self, nodeid, nodedata, result=[]):
+    def set_dependencies(self, nodeid, nodedata, result=None):
         with self.connection as con:
             outcome = bool([True for r in result if r.get('outcome') == u'failed'])
             cursor = con.cursor()
@@ -353,7 +354,7 @@ class TestmonData(object):
                            "node "
                            "(variant, name, result, failed) "
                            "VALUES (?, ?, ?, ?)",
-                           (self.variant, nodeid, json.dumps(result) if outcome else '', outcome))
+                           (self.variant, nodeid, json.dumps(result) if outcome else '[]', outcome))
             con.executemany("INSERT INTO node_file VALUES (?, ?, ?)",
                             [(cursor.lastrowid, filename, checksums_to_blob(nodedata[filename])) for filename in
                              nodedata])

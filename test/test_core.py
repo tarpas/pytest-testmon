@@ -58,7 +58,7 @@ class TestGeneral(object):
         td = CoreTestmonData(testdir.tmpdir.strpath, 'default')
         td.lastfailed = ['n1']
         td.write_data()
-        td.set_dependencies('n1', n1_node_data, )
+        td.set_dependencies('n1', n1_node_data, [])
         td2 = CoreTestmonData(testdir.tmpdir.strpath, 'default')
         td2.read_data()
         assert td2.node_data['n1'] == n1_node_data

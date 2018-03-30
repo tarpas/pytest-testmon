@@ -94,7 +94,7 @@ def track_it(testdir, func):
     testmon_data.read_source()
     testmon.start()
     func()
-    testmon.stop_and_save(testmon_data, testdir.tmpdir.strpath, 'testnode')
+    testmon.stop_and_save(testmon_data, testdir.tmpdir.strpath, 'testnode', [])
     return testmon_data._fetch_node_data()[0]['testnode']
 
 
@@ -164,7 +164,7 @@ class TestmonDeselect(object):
 
         reprec = testdir.inline_run("--testmon", "-v")
         res = reprec.countoutcomes()
-        assert tuple(res) == (1, 0, 0), res
+        assert tuple(res) == (0, 0, 0), res
 
     def test_tlf(self, testdir):
         testdir.makepyfile(test_a="""
