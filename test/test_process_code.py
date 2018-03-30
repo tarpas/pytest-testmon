@@ -33,7 +33,7 @@ class TestReadSrc:
         assert process_encoding(lines, output) == None
         assert lines == [b'1\n', b'2\n']
 
-    def test_detect_encoding2(self):
+    def test_detect_encoding3(self):
         with open('test/samples/print1250r.py', 'rb') as f:
             lines = []
             process_encoding(lines, f) == 'cp1250'
