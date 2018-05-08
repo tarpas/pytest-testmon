@@ -150,6 +150,8 @@ class TestmonDeselect(object):
         self.config = config
         self.selected, self.deselected = [], set()
         self.collect_exceptions = set(nodeid.split("::", 1)[0] for nodeid in self.testmon_data.fail_reports)
+        self.collect_ignore = self.testmon_data.unaffected_files.difference(self.collect_exceptions)
+        self.file_data = self.testmon_data.file_data()
 
     def test_should_run(self, nodeid):
         if self.config.getoption('tlf'):
@@ -180,8 +182,8 @@ class TestmonDeselect(object):
 
     def pytest_ignore_collect(self, path, config):
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
-        if strpath in self.testmon_data.unaffected_files.difference(self.collect_exceptions):
-            self.collection_ignored.update(self.testmon_data.file_data()[strpath].keys())
+        if strpath in self.collect_ignore:
+            self.collection_ignored.update(self.file_data[strpath].keys())
             return True
 
     def pytest_collection_modifyitems(self, session, config, items):
