@@ -220,7 +220,9 @@ class TestmonData(object):
         self.reports = defaultdict(lambda: [])
 
     def init_connection(self):
-        self.datafile = os.path.join(self.rootdir, '.testmondata')
+        self.datafile = os.environ.get(
+            'TESTMON_DATAFILE',
+            os.path.join(self.rootdir, '.testmondata'))
         self.connection = None
 
         new_db = not os.path.exists(self.datafile)
