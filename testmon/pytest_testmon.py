@@ -190,13 +190,16 @@ class TestmonDeselect(object):
     def pytest_collection_modifyitems(self, session, config, items):
         self.testmon_data.collect_garbage(retain=self.collection_ignored.union(set([item.nodeid for item in items])))
 
+        selected_nodeids = []
         for item in items:
             if self.test_should_run(item.nodeid):
                 self.selected.append(item)
+                selected_nodeids.append(item.nodeid)
             else:
                 self.deselected.add(item.nodeid)
         items[:] = self.selected
 
+        self.collection_ignored -= set(selected_nodeids)
 
         session.config.hook.pytest_deselected(
             items=([self.FakeItemFromTestmon(session.config)] *
