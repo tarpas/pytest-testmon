@@ -10,6 +10,8 @@ try:
 except ImportError:
     from io import BytesIO as MemFile
 
+from collections import namedtuple
+
 
 def parse(source_code, file_name='a.py'):
     return Module(source_code=source_code, file_name=file_name).blocks
@@ -314,6 +316,43 @@ class TestModule(object):
         assert (b1.name) != (b2.name)
         assert module1.blocks[1] == module2.blocks[1]
         assert module1.blocks[2] != module2.blocks[2]
+
+
+def create_emental(blocks):
+    blocks = blocks.copy()
+    module_level_block = blocks.pop()
+    line_numbers = set(range(1, module_level_block.end + 1))
+    for block in blocks:
+        line_numbers.difference_update(set(range(block.start, block.end + 1)))
+    return line_numbers
+
+
+b = namedtuple('FakeBlock', 'start end')
+
+
+def block_list_list(afile, line_numbers):
+    previous = min(line_numbers) - 1
+    l2 = []
+    l1 = []
+    for i in sorted(line_numbers):
+        if previous != i - 1:
+            l1.append(l2)
+            l2 = []
+        l2.append(afile[i - 1])
+        previous = i
+    if l2:
+        l1.append(l2)
+    return l1
+
+
+
+def test_create_emental():
+    assert create_emental([b(2, 2), b(6, 8), b(1, 10)]) == set((1, 3, 4, 5, 9, 10))
+
+
+def test_block_list_list():
+    afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+    assert block_list_list(afile, set((1, 3, 4, 5, 9, 10))) == [['a'], ['c', 'd', 'e'], ['i', 'j']]
 
 
 class TestCoverageAssumptions(CoverageTest):
