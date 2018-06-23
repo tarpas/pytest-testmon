@@ -166,6 +166,41 @@ class TestmonDeselect(object):
         res = reprec.countoutcomes()
         assert tuple(res) == (0, 0, 0), res
 
+
+    def test_wrong_result_processing(self, testdir):
+        tf = testdir.makepyfile(test_a="""
+            def test_add():
+                1/0
+        """, )
+        testdir.inline_run("--testmon", "-v")
+        testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
+        testmon_data.read_data()
+        assert len(testmon_data.fail_reports['test_a.py::test_add']) == 3
+
+        tf = testdir.makepyfile(test_a="""
+            import pytest
+            @pytest.mark.skip
+            def test_add():
+                1/0/0
+        """, )
+        tf.setmtime(1)
+        testdir.inline_run("--testmon", "-v")
+
+        testmon_data.read_data()
+        assert len(testmon_data.fail_reports['test_a.py::test_add']) == 0
+
+        tf = testdir.makepyfile(test_a="""
+            import pytest
+            def test_add():
+                1/0
+        """, )
+        tf.setmtime(2)
+        testdir.inline_run("--testmon", "-v")
+
+        testmon_data.read_data()
+        assert len(testmon_data.fail_reports['test_a.py::test_add']) == 3
+
+
     def test_tlf(self, testdir):
         testdir.makepyfile(test_a="""
             def test_add():
