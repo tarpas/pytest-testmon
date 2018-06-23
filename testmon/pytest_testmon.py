@@ -222,7 +222,8 @@ class TestmonDeselect(object):
                                            self.current_reports)
 
     def pytest_runtest_logreport(self, report):
-        assert report.when not in [r['when'] for r in self.current_reports]
+        assert report.when not in [r['when'] for r in self.current_reports], \
+            "{} {}".format(report.nodeid, report.when)
         self.current_reports.append(serialize_report(report))
 
     class FakeItemFromTestmon(object):
