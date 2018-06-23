@@ -148,6 +148,7 @@ class TestmonDeselect(object):
         self.collection_ignored = set()
         self.testmon_save = True
         self.config = config
+        self.current_reports = []
         self.selected, self.deselected = [], set()
         self.collect_exceptions = set(nodeid.split("::", 1)[0] for nodeid in self.testmon_data.fail_reports)
         self.collect_ignore = self.testmon_data.unaffected_files.difference(self.collect_exceptions)
@@ -210,18 +211,19 @@ class TestmonDeselect(object):
     def pytest_runtest_protocol(self, item, nextitem):
         if self.config.getoption('testmon') == u'readonly':
             yield
-
-        self.testmon.start()
-        result = yield
-        if result.excinfo and issubclass(result.excinfo[0], KeyboardInterrupt):
-            self.testmon.stop()
         else:
-            self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
-                                       self.testmon_data.reports[item.nodeid])
-            del self.testmon_data.reports[item.nodeid]
+            self.current_reports = []
+            self.testmon.start()
+            result = yield
+            if result.excinfo and issubclass(result.excinfo[0], KeyboardInterrupt):
+                self.testmon.stop()
+            else:
+                self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
+                                           self.current_reports)
 
     def pytest_runtest_logreport(self, report):
-        self.testmon_data.reports[report.nodeid].append(serialize_report(report))
+        assert report.when not in [r['when'] for r in self.current_reports]
+        self.current_reports.append(serialize_report(report))
 
     class FakeItemFromTestmon(object):
         def __init__(self, config):
