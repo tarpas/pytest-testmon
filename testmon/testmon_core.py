@@ -209,7 +209,7 @@ class SourceTree():
 
 class TestmonData(object):
     # If you change the SQLlite schema, you should bump this number
-    DATA_VERSION = 2
+    DATA_VERSION = 3
 
     def __init__(self, rootdir, variant=None):
 
