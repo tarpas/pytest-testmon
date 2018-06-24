@@ -167,6 +167,52 @@ class TestmonDeselect(object):
         assert tuple(res) == (0, 0, 0), res
 
 
+    def test_skipped(self, testdir):
+        testdir.makepyfile(test_a="""
+            import pytest
+            @pytest.mark.skip
+            def test_add():
+                1/0
+        """, )
+        testdir.inline_run("--testmon", "-v")
+        testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
+        testmon_data.read_data()
+        assert testmon_data.node_data['test_a.py::test_add']['test_a.py']
+
+
+    def test_skipped_starting_line2(self, testdir):
+        testdir.makepyfile(test_a="""
+            #line not in AST
+            import pytest
+            @pytest.mark.skip
+            def test_add():
+                1/0
+        """, )
+        testdir.inline_run("--testmon", "-v")
+        testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
+        testmon_data.read_data()
+        assert testmon_data.node_data['test_a.py::test_add']['test_a.py']
+
+
+    def test_skipped_under_dir(self, testdir):
+        subdir = testdir.mkdir("tests")
+
+        tf = subdir.join("test_a.py")
+        tf.write("""
+import pytest
+@pytest.mark.skip
+def test_add():
+    1/0
+        """, )
+        tf.setmtime(1)
+        testdir.inline_run("--testmon", "-v", "tests")
+
+        testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
+        testmon_data.read_data()
+
+        assert testmon_data.node_data['tests/test_a.py::test_add']['tests/test_a.py']
+
+
     def test_wrong_result_processing(self, testdir):
         tf = testdir.makepyfile(test_a="""
             def test_add():

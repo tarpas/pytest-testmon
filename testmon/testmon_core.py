@@ -342,8 +342,9 @@ class TestmonData(object):
         if not result:  # when testmon kicks-in the test module is already imported. If the test function is skipped
             # coverage_data is empty. However, we need to write down, that we depend on the
             # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)
+            # therefore we pick the last (which should be the outermost AST level) checksum
             relfilename = os.path.relpath(os.path.join(rootdir, nodeid).split("::", 1)[0], self.rootdir)
-            result[relfilename] = checksum_coverage(self.source_tree.get_file(relfilename).blocks, [1])
+            result[relfilename] = [self.source_tree.get_file(relfilename).blocks[-1].checksum]
         return result
 
     def set_dependencies(self, nodeid, nodedata, result=None):
