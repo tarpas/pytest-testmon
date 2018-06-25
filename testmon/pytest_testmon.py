@@ -190,21 +190,24 @@ class TestmonDeselect(object):
     def pytest_collection_modifyitems(self, session, config, items):
         self.testmon_data.collect_garbage(retain=self.collection_ignored.union(set([item.nodeid for item in items])))
 
+        selected_nodeids = []
         for item in items:
             if self.test_should_run(item.nodeid):
                 self.selected.append(item)
+                selected_nodeids.append(item.nodeid)
             else:
                 self.deselected.add(item.nodeid)
         items[:] = self.selected
 
+        self.ignored_deselected = self.collection_ignored.union(
+            self.deselected) - set(selected_nodeids)
 
         session.config.hook.pytest_deselected(
             items=([self.FakeItemFromTestmon(session.config)] *
-                   len(self.collection_ignored.union(self.deselected))))
+                   len(self.ignored_deselected)))
 
     def pytest_runtestloop(self, session):
-        ignored_deselected = self.collection_ignored.union(self.deselected)
-        for nodeid in ignored_deselected:
+        for nodeid in self.ignored_deselected:
             self.report_if_failed(nodeid)
 
     @pytest.mark.hookwrapper
