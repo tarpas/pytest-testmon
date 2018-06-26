@@ -553,10 +553,10 @@ def test_add():
         monkeypatch.setattr(TestmonData, 'DATA_VERSION', TestmonData.DATA_VERSION + 1)
 
         result = testdir.runpytest("--testmon")
-        monkeypatch.setattr(TestmonData, 'DATA_VERSION', TestmonData.DATA_VERSION - 1)
         assert result.ret != 0
         result.stderr.fnmatch_lines([
-            "*The stored data file *.testmondata version (2) is not compatible with current version (3).*",
+            "*The stored data file *.testmondata version ({}) is not compatible with current version ({}).*".format(
+                TestmonData.DATA_VERSION - 1, TestmonData.DATA_VERSION),
         ])
 
     def test_dependent_testmodule(self, testdir):
