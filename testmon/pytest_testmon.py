@@ -3,6 +3,8 @@ Main module of testmon pytest plugin.
 """
 from __future__ import division
 import os
+from collections import defaultdict
+
 import pytest
 
 from testmon.testmon_core import Testmon, eval_variant, TestmonData
@@ -148,7 +150,7 @@ class TestmonDeselect(object):
         self.collection_ignored = set()
         self.testmon_save = True
         self.config = config
-        self.current_reports = []
+        self.reports = defaultdict(lambda: {})
         self.selected, self.deselected = [], set()
         self.collect_exceptions = set(nodeid.split("::", 1)[0] for nodeid in self.testmon_data.fail_reports)
         self.collect_ignore = self.testmon_data.unaffected_files.difference(self.collect_exceptions)
@@ -197,7 +199,6 @@ class TestmonDeselect(object):
                 self.deselected.add(item.nodeid)
         items[:] = self.selected
 
-
         session.config.hook.pytest_deselected(
             items=([self.FakeItemFromTestmon(session.config)] *
                    len(self.collection_ignored.union(self.deselected))))
@@ -212,19 +213,18 @@ class TestmonDeselect(object):
         if self.config.getoption('testmon') == u'readonly':
             yield
         else:
-            self.current_reports = []
             self.testmon.start()
             result = yield
             if result.excinfo and issubclass(result.excinfo[0], KeyboardInterrupt):
                 self.testmon.stop()
             else:
                 self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
-                                           self.current_reports)
+                                           self.reports[item.nodeid])
 
     def pytest_runtest_logreport(self, report):
-        assert report.when not in [r['when'] for r in self.current_reports], \
-            "{} {}".format(report.nodeid, report.when)
-        self.current_reports.append(serialize_report(report))
+        assert report.when not in self.reports, \
+            "{} {} {}".format(report.nodeid, report.when, self.reports)
+        self.reports[report.nodeid][report.when] = serialize_report(report)
 
     class FakeItemFromTestmon(object):
         def __init__(self, config):

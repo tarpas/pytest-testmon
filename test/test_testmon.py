@@ -94,7 +94,7 @@ def track_it(testdir, func):
     testmon_data.read_source()
     testmon.start()
     func()
-    testmon.stop_and_save(testmon_data, testdir.tmpdir.strpath, 'testnode', [])
+    testmon.stop_and_save(testmon_data, testdir.tmpdir.strpath, 'testnode', {})
     return testmon_data._fetch_node_data()[0]['testnode']
 
 
@@ -166,7 +166,6 @@ class TestmonDeselect(object):
         res = reprec.countoutcomes()
         assert tuple(res) == (0, 0, 0), res
 
-
     def test_skipped(self, testdir):
         testdir.makepyfile(test_a="""
             import pytest
@@ -178,7 +177,6 @@ class TestmonDeselect(object):
         testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
         testmon_data.read_data()
         assert testmon_data.node_data['test_a.py::test_add']['test_a.py']
-
 
     def test_skipped_starting_line2(self, testdir):
         testdir.makepyfile(test_a="""
@@ -192,7 +190,6 @@ class TestmonDeselect(object):
         testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
         testmon_data.read_data()
         assert testmon_data.node_data['test_a.py::test_add']['test_a.py']
-
 
     def test_skipped_under_dir(self, testdir):
         subdir = testdir.mkdir("tests")
@@ -211,7 +208,6 @@ def test_add():
         testmon_data.read_data()
 
         assert testmon_data.node_data['tests/test_a.py::test_add']['tests/test_a.py']
-
 
     def test_wrong_result_processing(self, testdir):
         tf = testdir.makepyfile(test_a="""
@@ -245,7 +241,6 @@ def test_add():
 
         testmon_data.read_data()
         assert len(testmon_data.fail_reports['test_a.py::test_add']) == 3
-
 
     def test_tlf(self, testdir):
         testdir.makepyfile(test_a="""
@@ -713,7 +708,6 @@ def test_add():
 
 class TestXdist(object):
 
-    @pytest.mark.xfail
     def test_xdist_4(self, testdir):
         pytest.importorskip("xdist")
         testdir.makepyfile(test_a="""\
