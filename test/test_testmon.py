@@ -2,12 +2,10 @@ import os
 import sys
 
 import pytest
-import testmon.process_code
 from test.coveragepy import coveragetest
 from testmon.process_code import Module, checksum_coverage
 from testmon.testmon_core import eval_variant, TestmonData as CoreTestmonData
 from testmon.testmon_core import Testmon as CoreTestmon
-from testmon.testmon_core import TestmonData as CoreTestmonData
 from test.test_process_code import CodeSample
 
 pytest_plugins = "pytester",
@@ -25,7 +23,7 @@ class TestVariant:
         testmon2_data.write_data()
 
         testmon_check_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
-        assert testmon1_data.node_data['node1'] == {'a.py': 1}
+        assert testmon_check_data.node_data == {}
 
     def test_header(self, testdir):
         testdir.makeini("""
@@ -293,7 +291,7 @@ def test_add():
         tf.setmtime(1800000000)
         try:
             testdir.runpytest("--testmon", )
-        except:
+        except KeyboardInterrupt:
             pass
         assert 1800000000 == os.path.getmtime('.testmondata')  # interrupted run shouldn't save .testmondata
 
@@ -590,8 +588,9 @@ def test_add():
 
         deps = track_it(testdir, func)
 
-        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath):
-                    checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
+        assert deps == {
+            os.path.relpath(a.strpath, testdir.tmpdir.strpath):
+            checksum_coverage(Module(file_name=a.strpath).blocks, [2])}
 
     @pytest.mark.xfail
     def test_testmon_recursive(self, testdir, monkeypatch):
@@ -606,8 +605,9 @@ def test_add():
         deps = track_it(testdir, func)
         # os.environ.pop('COVERAGE_TEST_TRACER', None)
 
-        assert {os.path.abspath(a.strpath):
-                    checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
+        assert deps == {
+            os.path.abspath(a.strpath):
+            checksum_coverage(Module(file_name=a.strpath).blocks, [2])}
 
     def test_run_dissapearing(self, testdir):
         a = testdir.makepyfile(a="""\
@@ -654,32 +654,7 @@ def test_add():
             pass
         """)
 
-        result = testdir.runpytest_inprocess(plugins=[PlugRereport()])
-
-    def test_dependent_testmodule(self, testdir):
-        testdir.makepyfile(test_a="""
-            def test_1():
-                pass
-        """)
-        testdir.makepyfile(test_b="""
-            import test_a
-            def test_2():
-                pass
-        """)
-
-        result = testdir.runpytest("--testmon")
-        assert result.ret == 0
-
-        testdir.makepyfile(test_b="""
-            import test_a
-            def test_2():
-                pass
-                pass
-        """)
-
-        result = testdir.runpytest("--testmon")
-        assert result.ret == 0
-        result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
+        testdir.runpytest_inprocess(plugins=[PlugRereport()])
 
     def test_collection_not_abort(self, testdir):
         testdir.makepyfile(test_collection_not_abort="""
