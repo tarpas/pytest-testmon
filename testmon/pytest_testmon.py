@@ -153,6 +153,9 @@ class TestmonDeselect(object):
         self.reports = defaultdict(lambda: {})
         self.selected, self.deselected = [], set()
         self.file_data = self.testmon_data.file_data()
+        self.f_to_ignore = self.testmon_data.f_stable
+        if self.config.getoption('tlf'):
+            self.f_to_ignore -= self.testmon_data.f_last_failed
 
     def test_should_run(self, nodeid):
         if self.config.getoption('tlf'):
@@ -183,10 +186,8 @@ class TestmonDeselect(object):
 
     def pytest_ignore_collect(self, path, config):
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
-        if strpath in (self.testmon_data.f_stable - self.testmon_data.f_last_failed):
-            for nodeid in self.file_data[strpath].keys():
-                if nodeid.split('::')[0] == strpath:
-                    self.collection_ignored.add(nodeid)
+        if strpath in (self.f_to_ignore):
+            self.collection_ignored.update(self.testmon_data.f_tests[strpath])
             return True
 
     def pytest_collection_modifyitems(self, session, config, items):

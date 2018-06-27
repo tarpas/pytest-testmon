@@ -207,6 +207,14 @@ class SourceTree():
         return self.changed_files[filename]
 
 
+def node_data_to_f_tests(node_data):
+    """only return files that contain tests, without indirect dependencies"""
+    f_tests = defaultdict(lambda: set())
+    for nodeid, node_files in node_data.items():
+        f_tests[nodeid.split("::")[0]].add(nodeid)
+    return f_tests
+
+
 class TestmonData(object):
     # If you change the SQLlite schema, you should bump this number
     DATA_VERSION = 3
@@ -310,6 +318,7 @@ class TestmonData(object):
     def read_data(self):
         self.node_data, self.fail_reports = self._fetch_node_data()
         self.f_last_failed = set(nodeid.split("::", 1)[0] for nodeid in self.fail_reports)
+        self.f_tests = node_data_to_f_tests(self.node_data)
 
     def write_data(self):
         with self.connection:
@@ -373,7 +382,6 @@ class TestmonData(object):
     def compute_unaffected(self, changed_files):
         self.unaffected_nodeids, self.f_stable = unaffected(self.node_data,
                                                             changed_files)
-
 
         # possible data structures
         # nodeid1 -> [filename -> [block_a, block_b]]

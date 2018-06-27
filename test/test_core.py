@@ -4,7 +4,7 @@ from collections import namedtuple
 from testmon.process_code import Module, read_file_with_checksum
 from test.test_process_code import CodeSample
 from testmon.testmon_core import TestmonData as CoreTestmonData, SourceTree, flip_dictionary, unaffected, \
-    checksums_to_blob, CHECKUMS_ARRAY_TYPE, blob_to_checksums
+    checksums_to_blob, CHECKUMS_ARRAY_TYPE, blob_to_checksums, node_data_to_f_tests
 
 import sqlite3
 
@@ -54,14 +54,22 @@ class TestGeneral(object):
         assert td._fetch_attribute('1') == None
 
     def test_write_read_data2(self, testdir):
-        n1_node_data = {'a.py': [1]}
+        n1_node_data = {'test_a.py': [1]}
         td = CoreTestmonData(testdir.tmpdir.strpath, 'default')
-        td.lastfailed = ['n1']
+        td.lastfailed = ['test_a.py::n1']
         td.write_data()
-        td.set_dependencies('n1', n1_node_data, {})
+        td.set_dependencies('test_a.py::n1', n1_node_data, {})
         td2 = CoreTestmonData(testdir.tmpdir.strpath, 'default')
         td2.read_data()
-        assert td2.node_data['n1'] == n1_node_data
+        assert td2.node_data['test_a.py::n1'] == n1_node_data
+        assert td2.f_tests['test_a.py'] == set(['test_a.py::n1'])
+
+    def test_ndt_f_tests(self):
+        assert node_data_to_f_tests({'a.py::t1': {'a.py': [1], 'gla': [2]}}) == {'a.py': {'a.py::t1'}}
+
+    def test_ndt_f_tests2(self):
+        assert node_data_to_f_tests({'a.py::t1': {'a.py': [1], 'gla.py': [2]},
+                                     'a.py::t2': {'a.py': [3], 'gla.py': [4]}}) == {'a.py': {'a.py::t1', 'a.py::t2'}}
 
 
 class TestDepGraph():
