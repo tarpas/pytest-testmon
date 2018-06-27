@@ -4,13 +4,13 @@ setup(
     name='pytest-testmon',
     description='take TDD to a new level with py.test and testmon',
     long_description=''.join(open('README.rst').readlines()),
-    version='0.9.11',
+    version='0.9.12',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
     packages=['testmon'],
     url='https://github.com/tarpas/pytest-testmon/',
     author_email='tibor.arpas@infinit.sk',
-    author='Tibor Arpas, Jozef Knaperek, Martin Riesz',
+    author='Tibor Arpas, Jozef Knaperek, Martin Riesz, Daniel Hahler',
     entry_points={
         'pytest11': [
             'testmon = testmon.pytest_testmon',
