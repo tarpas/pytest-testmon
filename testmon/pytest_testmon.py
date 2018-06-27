@@ -152,8 +152,6 @@ class TestmonDeselect(object):
         self.config = config
         self.reports = defaultdict(lambda: {})
         self.selected, self.deselected = [], set()
-        self.collect_exceptions = set(nodeid.split("::", 1)[0] for nodeid in self.testmon_data.fail_reports)
-        self.collect_ignore = self.testmon_data.unaffected_files.difference(self.collect_exceptions)
         self.file_data = self.testmon_data.file_data()
 
     def test_should_run(self, nodeid):
@@ -177,7 +175,7 @@ class TestmonDeselect(object):
             changed_files = len(self.testmon_data.source_tree.changed_files)
         active_message = "testmon={}, changed files: {}, skipping collection of {} files".format(
             config.getoption('testmon'),
-            changed_files, len(self.testmon_data.unaffected_files))
+            changed_files, len(self.testmon_data.f_stable))
         if self.testmon_data.variant:
             return active_message + ", run variant: {}".format(self.testmon_data.variant)
         else:
@@ -185,12 +183,17 @@ class TestmonDeselect(object):
 
     def pytest_ignore_collect(self, path, config):
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
-        if strpath in self.collect_ignore:
-            self.collection_ignored.update(self.file_data[strpath].keys())
+        if strpath in (self.testmon_data.f_stable - self.testmon_data.f_last_failed):
+            for nodeid in self.file_data[strpath].keys():
+                if nodeid.split('::')[0] == strpath:
+                    self.collection_ignored.add(nodeid)
             return True
 
     def pytest_collection_modifyitems(self, session, config, items):
         self.testmon_data.collect_garbage(retain=self.collection_ignored.union(set([item.nodeid for item in items])))
+
+        for item in items:
+            assert item.nodeid not in self.collection_ignored, (item.nodeid, self.collection_ignored)
 
         for item in items:
             if self.test_should_run(item.nodeid):

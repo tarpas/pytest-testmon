@@ -309,6 +309,7 @@ class TestmonData(object):
 
     def read_data(self):
         self.node_data, self.fail_reports = self._fetch_node_data()
+        self.f_last_failed = set(nodeid.split("::", 1)[0] for nodeid in self.fail_reports)
 
     def write_data(self):
         with self.connection:
@@ -370,8 +371,9 @@ class TestmonData(object):
         self.compute_unaffected(self.source_tree.get_changed_files())
 
     def compute_unaffected(self, changed_files):
-        self.unaffected_nodeids, self.unaffected_files = unaffected(self.node_data,
-                                                                    changed_files)
+        self.unaffected_nodeids, self.f_stable = unaffected(self.node_data,
+                                                            changed_files)
+
 
         # possible data structures
         # nodeid1 -> [filename -> [block_a, block_b]]
