@@ -207,7 +207,8 @@ def test_add():
         testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
         testmon_data.read_data()
 
-        assert testmon_data.node_data['tests/test_a.py::test_add']['tests/test_a.py']
+        fname = os.path.sep.join(['tests', 'test_a.py'])
+        assert testmon_data.node_data['tests/test_a.py::test_add'][fname]
 
     def test_wrong_result_processing(self, testdir):
         tf = testdir.makepyfile(test_a="""
