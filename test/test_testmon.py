@@ -703,8 +703,8 @@ def test_add():
         """)
         tf.setmtime(1)
         result = testdir.runpytest("--testmon", "--tlf")
-        assert result.ret == 1
-        assert result.reprec.countoutcomes() == [1, 0, 1]
+        assert result.ret == 0
+        assert result.reprec.countoutcomes() == [1, 0, 0]
         result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
 
     def test_collection_not_abort(self, testdir):
