@@ -605,6 +605,32 @@ class TestmonDeselect(object):
         assert result.ret == 0
         result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
 
+    def test_dependent_testmodule_failures_accumulating(self, testdir):
+        testdir.makepyfile(test_a="""
+            def test_1():
+                pass
+        """)
+        testdir.makepyfile(test_b="""
+            import test_a
+            def test_2():
+                test_a.test_1()
+                raise Exception()
+        """)
+
+        hook_recorder = testdir.runpytest_inprocess("--testmon")
+        assert hook_recorder.reprec.countoutcomes() == [1, 0, 1]
+
+        tf = testdir.makepyfile(test_b="""
+            import test_a
+            def test_2():
+                pass
+        """)
+        tf.setmtime(1)
+        result = testdir.runpytest("--testmon", "--tlf")
+        assert result.ret == 1
+        assert result.reprec.countoutcomes() == [1, 0, 1]
+        result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
+
     def test_collection_not_abort(self, testdir):
         testdir.makepyfile(test_collection_not_abort="""
             def test_1():
