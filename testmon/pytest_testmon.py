@@ -153,7 +153,7 @@ class TestmonDeselect(object):
         self.reports = defaultdict(lambda: {})
         self.selected, self.deselected = [], set()
         self.file_data = self.testmon_data.file_data()
-        self.f_to_ignore = self.testmon_data.f_stable
+        self.f_to_ignore = self.testmon_data.stable_files
         if self.config.getoption('tlf'):
             self.f_to_ignore -= self.testmon_data.f_last_failed
 
@@ -161,7 +161,7 @@ class TestmonDeselect(object):
         if self.config.getoption('tlf'):
             if nodeid in self.testmon_data.fail_reports:
                 return True
-        if nodeid in self.testmon_data.unaffected_nodeids:
+        if nodeid in self.testmon_data.stable_nodeids:
             return False
         else:
             return True
@@ -178,7 +178,7 @@ class TestmonDeselect(object):
             changed_files = len(self.testmon_data.source_tree.changed_files)
         active_message = "testmon={}, changed files: {}, skipping collection of {} files".format(
             config.getoption('testmon'),
-            changed_files, len(self.testmon_data.f_stable))
+            changed_files, len(self.testmon_data.stable_files))
         if self.testmon_data.variant:
             return active_message + ", run variant: {}".format(self.testmon_data.variant)
         else:

@@ -62,18 +62,19 @@ def flip_dictionary(node_data):
     return files
 
 
-def unaffected(node_data, changed_files):
+def stable(node_data, changed_files):
     file_data = flip_dictionary(node_data)
-    unaffected_nodes = dict(node_data)
-    unaffected_files = set(file_data)
+    stable_nodes = dict(node_data)
+    stable_files = set(file_data)
 
     for file in set(changed_files) & set(file_data):
         for nodeid, checksums in file_data[file].items():
-            if set(checksums) - set(changed_files[file].checksums):
-                unaffected_nodes.pop(nodeid, None)
-                unaffected_files -= {nodeid.split('::')[0], file}
+            if set(checksums) - set(changed_files[file].checksums): #the nodeid requires checksums which disapeared from
+                                                                    #the filesystem => the nodeid is "affected"
+                stable_nodes.pop(nodeid, None)
+                stable_files -= {nodeid.split('::', 1)[0], file}
 
-    return unaffected_nodes, unaffected_files
+    return stable_nodes, stable_files
 
 
 class Testmon(object):
@@ -207,12 +208,12 @@ class SourceTree():
         return self.changed_files[filename]
 
 
-def node_data_to_f_tests(node_data):
+def node_data_to_test_files(node_data):
     """only return files that contain tests, without indirect dependencies"""
-    f_tests = defaultdict(lambda: set())
+    test_files = defaultdict(lambda: set())
     for nodeid, node_files in node_data.items():
-        f_tests[nodeid.split("::")[0]].add(nodeid)
-    return f_tests
+        test_files[nodeid.split("::", 1)[0]].add(nodeid)
+    return test_files
 
 
 class TestmonData(object):
@@ -377,12 +378,5 @@ class TestmonData(object):
         checksums = self._fetch_attribute('file_checksums', default={})
 
         self.source_tree = SourceTree(rootdir=self.rootdir, mtimes=mtimes, checksums=checksums)
-        self.compute_unaffected(self.source_tree.get_changed_files())
-
-    def compute_unaffected(self, changed_files):
-        self.unaffected_nodeids, self.f_stable = unaffected(self.node_data,
-                                                            changed_files)
-
-        # possible data structures
-        # nodeid1 -> [filename -> [block_a, block_b]]
-        # filename -> [block_a -> [nodeid1, ], block_b -> [nodeid1], block_c -> [] ]
+        self.stable_nodeids, self.stable_files = stable(self.node_data,
+                                                        self.source_tree.get_changed_files())

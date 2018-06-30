@@ -3,7 +3,7 @@ from collections import namedtuple
 
 from testmon.process_code import Module, read_file_with_checksum
 from test.test_process_code import CodeSample
-from testmon.testmon_core import TestmonData as CoreTestmonData, SourceTree, flip_dictionary, unaffected, \
+from testmon.testmon_core import TestmonData as CoreTestmonData, SourceTree, flip_dictionary, stable, \
     checksums_to_blob, CHECKUMS_ARRAY_TYPE, blob_to_checksums, node_data_to_f_tests
 
 import sqlite3
@@ -171,18 +171,18 @@ def get_changed_files(dependencies, changes):
     return changed_files
 
 
-class TestUnaffected():
+class TestStable():
     def test_nothing_changed(self):
         changed = {'a.py': [101, 102, 103]}
         dependencies = {'test_a.py::node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]}}
-        assert unaffected(dependencies, blockify(changed))[0] == dependencies
+        assert stable(dependencies, blockify(changed))[0] == dependencies
 
     def test_simple_change(self):
         changed = {'a.py': [101, 102, 151]}
         dependencies = {'test_a.py::node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]},
                         'test_b.py::node2': {'test_b.py': [301, 302], 'a.py': [151]}}
 
-        nodes, files = unaffected(dependencies, blockify(changed))
+        nodes, files = stable(dependencies, blockify(changed))
 
         assert set(nodes) == {'test_b.py::node2'}
         assert set(files) == {'test_b.py'}
@@ -193,12 +193,12 @@ class TestUnaffected():
                         'test_b.py::test_2': {'test_b.py': [2]}}
         changed = {'test_a.py': [-1]}
 
-        nodes, files = unaffected(dependencies, blockify(changed))
+        nodes, files = stable(dependencies, blockify(changed))
         assert set(nodes) == {'test_b.py::test_2'}
         assert set(files) == {'test_b.py'}
 
         changed = {'test_b.py': [3]}
-        nodes, files = unaffected(dependencies, blockify(changed))
+        nodes, files = stable(dependencies, blockify(changed))
         assert set(nodes) == {'test_a.py::test_1'}
         assert set(files) == {'test_a.py'}
 
@@ -209,12 +209,12 @@ class TestUnaffected():
                         'test_b.py::test_2': {'test_b.py': [2]}}
 
         changed_files = get_changed_files(dependencies, {'c.py': [4]})
-        nodes, files = unaffected(dependencies, blockify(changed_files))
+        nodes, files = stable(dependencies, blockify(changed_files))
         assert set(nodes) == {'test_b.py::test_2'}
         assert set(files) == {'test_b.py'}
 
         changed_files = get_changed_files(dependencies, {'test_b.py': [2]})
-        nodes, files = unaffected(dependencies, blockify(changed_files))
+        nodes, files = stable(dependencies, blockify(changed_files))
         assert set(nodes) == {'test_a.py::test_1'}
         assert set(files) == {'test_a.py', 'c.py'}
 
@@ -229,8 +229,8 @@ def is_dependent(dependencies, changes):
 
 
 def affected_nodeids(dependencies, changes):
-    unaffected_nodes, files = unaffected(dependencies, blockify(changes))
-    return set(dependencies) - set(unaffected_nodes)
+    stable_nodes, files = stable(dependencies, blockify(changes))
+    return set(dependencies) - set(stable_nodes)
 
 
 def blockify(changes):
