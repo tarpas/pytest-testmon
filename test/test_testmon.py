@@ -708,6 +708,33 @@ def test_add():
         assert result.reprec.countoutcomes() == [1, 0, 0]
         result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
 
+    def test_dependent_testmodule_collect_ignore_error(self, testdir):
+        testdir.makepyfile(test_a="""
+            def test_1():
+                pass
+
+            def a():
+                pass
+        """)
+        testdir.makepyfile(test_b="""
+            import test_a
+            def test_2():
+                test_a.a()
+                pass
+                        """)
+        testdir.runpytest_inprocess("--testmon")
+
+        tf = testdir.makepyfile(test_b="""
+            import test_a
+            def test_2():
+                test_a.a()
+                pass
+                pass
+        """)
+        tf.setmtime(1)
+        result = testdir.runpytest_inprocess("--testmon")
+        result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
+
     def test_collection_not_abort(self, testdir):
         testdir.makepyfile(test_collection_not_abort="""
             def test_1():
