@@ -183,6 +183,7 @@ class TestmonDeselect(object):
             self.collection_ignored.update(self.testmon_data.f_tests[strpath])
             return True
 
+    @pytest.mark.trylast
     def pytest_collection_modifyitems(self, session, config, items):
         self.testmon_data.collect_garbage(retain=self.collection_ignored.union(set([item.nodeid for item in items])))
 
