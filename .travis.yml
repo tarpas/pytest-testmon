@@ -8,24 +8,26 @@ cache:
 
 matrix:
   include:
-    - env: TOXENV=py36-pytest31
+    - env: TOXENV=py36-pytest36
       python: 3.6
+    - env: TOXENV=py37-pytest31
+      python: 3.7
+    - env: TOXENV=py37-pytest35
+      python: 3.7
+    - env: TOXENV=py37-pytest36
+      python: 3.7
+    - env: TOXENV=py37-pytestmaster
+      python: 3.7
+    - env: TOXENV=py37-pytestfeatures
+      python: 3.7
+    - env: TOXENV=py36-pytest35-xdist
+      python: 3.7
     - env: TOXENV=py27-pytest31
       python: 2.7
     - env: TOXENV=py27-pytestmaster
       python: 2.7
     - env: TOXENV=py27-pytestfeatures
       python: 2.7
-    - env: TOXENV=py36-pytest32
-      python: 3.6
-    - env: TOXENV=py36-pytest33
-      python: 3.6
-    - env: TOXENV=py36-pytestmaster
-      python: 3.6
-    - env: TOXENV=py36-pytestfeatures
-      python: 3.6
-    - env: TOXENV=py36-pytest32-xdist
-      python: 3.6
 
 install:
   - pip install tox
