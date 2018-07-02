@@ -230,15 +230,23 @@ class TestmonData(object):
 
     def set_dependencies(self, nodeid, nodedata, result=None):
         with self.connection as con:
-            outcome = bool([True for r in result.values() if r.get('outcome') == u'failed'])
+            failed = any(r.get('outcome') == u'failed'
+                         for r in result.values())
+            if failed:
+                results_json = '[]'
+            else:
+                results = []
+                for k in ['setup', 'call', 'teardown']:
+                    r = result.get(k)
+                    if r is not None:
+                        results.append(r)
+                results_json = json.dumps(results)
             cursor = con.cursor()
             cursor.execute("INSERT OR REPLACE INTO "
                            "node "
                            "(variant, name, result, failed) "
                            "VALUES (?, ?, ?, ?)",
-                           (self.variant, nodeid,
-                            json.dumps([result['setup'], result['call'], result['teardown']]) if outcome else '[]',
-                            outcome))
+                           (self.variant, nodeid, results_json, failed))
             con.executemany("INSERT INTO node_file VALUES (?, ?, ?)",
                             [(cursor.lastrowid, filename, checksums_to_blob(nodedata[filename])) for filename in
                              nodedata])
