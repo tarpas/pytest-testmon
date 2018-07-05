@@ -14,7 +14,10 @@ setup(
     entry_points={
         'pytest11': [
             'testmon = testmon.pytest_testmon',
-        ]
+        ],
+        'tox': [
+            'testmon = testmon.tox_testmon',
+        ],
     },
     install_requires=['pytest>=2.8.0,<4', 'coverage>=4'],
     classifiers=[
