@@ -160,10 +160,12 @@ class TestmonDeselect(object):
             return True
 
     def report_if_failed(self, nodeid):
-        if nodeid in self.testmon_data.fail_reports:
-            for report in self.testmon_data.fail_reports[nodeid]:
-                test_report = runner.TestReport(**report)
-                self.config.hook.pytest_runtest_logreport(report=test_report)
+        node_reports = self.testmon_data.fail_reports.get(nodeid, None)
+        if node_reports:
+            for phase in ('setup', 'call', 'teardown'):
+                test_report = runner.TestReport(**node_reports.get(phase, None))
+                if test_report:
+                    self.config.hook.pytest_runtest_logreport(report=test_report)
 
     def pytest_report_header(self, config):
         changed_files = ",".join(self.testmon_data.source_tree.changed_files)

@@ -237,7 +237,7 @@ class TestmonData(object):
                            "(variant, name, result, failed) "
                            "VALUES (?, ?, ?, ?)",
                            (self.variant, nodeid,
-                            json.dumps([result['setup'], result['call'], result['teardown']]) if outcome else '[]',
+                            json.dumps(result) if outcome else '{}',
                             outcome))
             con.executemany("INSERT INTO node_file VALUES (?, ?, ?)",
                             [(cursor.lastrowid, filename, checksums_to_blob(nodedata[filename])) for filename in
