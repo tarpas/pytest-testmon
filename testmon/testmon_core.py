@@ -86,7 +86,7 @@ def node_data_to_test_files(node_data):
 
 class TestmonData(object):
     # If you change the SQLlite schema, you should bump this number
-    DATA_VERSION = 3
+    DATA_VERSION = 4
 
     def __init__(self, rootdir, variant=None):
 

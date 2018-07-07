@@ -655,9 +655,9 @@ def test_add():
             pass
         """)
 
-        result = testdir.runpytest_inprocess(plugins=[PlugRereport()])
+        testdir.runpytest_inprocess(plugins=[PlugRereport()])
 
-    def test_dependent_testmodule(self, testdir):
+    def test_dependent_testmodule2(self, testdir):
         testdir.makepyfile(test_a="""
             def test_1():
                 pass
@@ -758,6 +758,25 @@ def test_add():
         result = testdir.runpytest("-v", "--testmon")
 
         result.stdout.fnmatch_lines(["*test_collection_not_abort.py::test_2 FAILED*", ])
+
+    def test_failures_storage_retrieve(self, testdir):
+        testdir.makepyfile(test_a="""
+            import pytest
+
+            @pytest.fixture
+            def error():
+                raise Exception()
+
+            def test_b(error):
+                assert 1        
+        """)
+
+        hook_recorder = testdir.runpytest_inprocess("--testmon")
+        assert hook_recorder.reprec.countoutcomes() == [0, 0, 1]
+
+        result = testdir.runpytest("--testmon")
+        assert result.reprec.countoutcomes() == [0, 0, 1]
+        result.stdout.fnmatch_lines(["*1 error*", ])
 
 
 class TestXdist(object):
