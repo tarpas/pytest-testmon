@@ -163,8 +163,8 @@ class TestmonDeselect(object):
         node_reports = self.testmon_data.fail_reports.get(nodeid, None)
         if node_reports:
             for phase in ('setup', 'call', 'teardown'):
-                test_report = runner.TestReport(**node_reports.get(phase, None))
-                if test_report:
+                if phase in node_reports:
+                    test_report = runner.TestReport(**node_reports[phase])
                     self.config.hook.pytest_runtest_logreport(report=test_report)
 
     def pytest_report_header(self, config):
