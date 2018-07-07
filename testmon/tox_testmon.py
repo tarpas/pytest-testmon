@@ -42,9 +42,13 @@ def installed_testmon(venv):
 
 @hookimpl
 def tox_runenvreport(venv, action):
-    datafile = str(venv.path.join('.testmondata'))
-    action.setactivity('testmon', 'setting TESTMON_DATAFILE=%s' % datafile)
-    venv.envconfig.setenv['TESTMON_DATAFILE'] = datafile
+    if 'TESTMON_DATAFILE' in venv.envconfig.setenv:
+        datafile = venv.envconfig.setenv['TESTMON_DATAFILE']
+        action.setactivity('testmon', 'keeping TESTMON_DATAFILE=%s' % datafile)
+    else:
+        datafile = str(venv.path.join('.testmondata'))
+        action.setactivity('testmon', 'setting TESTMON_DATAFILE=%s' % datafile)
+        venv.envconfig.setenv['TESTMON_DATAFILE'] = datafile
 
     if (_uses_testmon(venv.envconfig)
             and 'pytest-testmon' not in (x.name for x in venv.envconfig.deps)):
