@@ -12,6 +12,8 @@ from test.test_process_code import CodeSample
 
 pytest_plugins = "pytester",
 
+datafilename = os.environ.get('TESTMON_DATAFILE', '.testmondata')
+
 
 class TestVariant:
 
@@ -290,13 +292,14 @@ def test_add():
              def test_2():
                  3
          """)
-        os.utime('.testmondata', (1800000000, 1800000000))
+        os.utime(datafilename, (1800000000, 1800000000))
         tf.setmtime(1800000000)
         try:
             testdir.runpytest("--testmon", )
         except:
             pass
-        assert 1800000000 == os.path.getmtime('.testmondata')  # interrupted run shouldn't save .testmondata
+        # interrupted run shouldn't save .testmondata
+        assert 1800000000 == os.path.getmtime(datafilename)
 
     def test_nonfunc_class(self, testdir, monkeypatch):
         """"
@@ -551,8 +554,10 @@ def test_add():
         result = testdir.runpytest("--testmon")
         assert result.ret != 0
         result.stderr.fnmatch_lines([
-            "*The stored data file *.testmondata version ({}) is not compatible with current version ({}).*".format(
-                TestmonData.DATA_VERSION - 1, TestmonData.DATA_VERSION),
+            "*The stored data file *{} version ({}) is not compatible with current version ({}).*".format(
+                datafilename,
+                TestmonData.DATA_VERSION - 1,
+                TestmonData.DATA_VERSION),
         ])
 
     def test_dependent_testmodule(self, testdir):
