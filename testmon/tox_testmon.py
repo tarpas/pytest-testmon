@@ -20,15 +20,10 @@ hookimpl = pluggy.HookimplMarker("tox")
 
 
 def _uses_testmon(envconfig):
-    """Test if an envconfig uses testmon by looking at the command(s).
-
-    The command will include resolved {posargs} already, i.e. arguments passed
-    on the command line.
-    """
+    """Test if an envconfig uses testmon by looking at the command(s)."""
     for command in envconfig.commands:
-        if command[0] == 'pytest' or command[0] == 'py.test':
-            if '--testmon' in command:
-                return True
+        if '--testmon' in command:
+            return True
     return False
 
 
