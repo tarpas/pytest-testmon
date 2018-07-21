@@ -1,6 +1,7 @@
 #  -- coding:utf8 --
-
+from coverage.python import get_python_source
 from test.coveragepy.coveragetest import CoverageTest
+import re
 
 import pytest
 from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum, process_encoding
@@ -345,7 +346,6 @@ def block_list_list(afile, line_numbers):
     return l1
 
 
-
 def test_create_emental():
     assert create_emental([b(2, 2), b(6, 8), b(1, 10)]) == set((1, 3, 4, 5, 9, 10))
 
@@ -353,6 +353,45 @@ def test_create_emental():
 def test_block_list_list():
     afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
     assert block_list_list(afile, set((1, 3, 4, 5, 9, 10))) == [['a'], ['c', 'd', 'e'], ['i', 'j']]
+
+
+blank_re = re.compile(r"\s*(#|$)")
+else_re = re.compile(r"\s*else\s*:\s*(#|$)")
+
+
+def annotate_file2(filename, statements, missing, missing_formatted):
+    result = []
+
+    i = 0
+    j = 0
+    covered = True
+    source = get_python_source(filename)
+    for lineno, line in enumerate(source.splitlines(True), start=1):
+        while i < len(statements) and statements[i] < lineno:
+            i += 1
+        while j < len(missing) and missing[j] < lineno:
+            j += 1
+        if i < len(statements) and statements[i] == lineno:
+            covered = j >= len(missing) or missing[j] > lineno
+        if else_re.match(line):
+            # Special logic for lines containing only 'else:'.
+            if i >= len(statements) or j >= len(missing):
+                result.append(lineno)
+            elif statements[i] == missing[j]:
+                pass
+            else:
+                result.append(lineno)
+        elif covered:
+            result.append(lineno)
+        else:
+            pass
+
+    return result
+
+
+def check_human_coverage(cov, filename):
+    analysis = cov.analysis(filename)
+    return annotate_file2(*analysis)
 
 
 class TestCoverageAssumptions(CoverageTest):
@@ -363,3 +402,23 @@ class TestCoverageAssumptions(CoverageTest):
                 self.check_coverage(mod_cov.source_code,
                                     cov_data=mod_cov.expected_coverage,
                                     msg="This is for code_sample['{}']".format(name))
+
+    def test_basic_human_coverage(self):
+
+        blocks = """\
+                print(1)
+                d = {
+                     'a': 'b',
+                     'c': 'd' }
+                print(d)
+                               """
+
+        cov, modname = self.check_coverage(blocks, [1, 3, 4, 5])
+
+        assert check_human_coverage(cov, modname + '.py') == [1, 2, 3, 4, 5]
+
+    def test_expe2(self):
+        d = {
+            1: '1',
+            2: 'b'
+        }

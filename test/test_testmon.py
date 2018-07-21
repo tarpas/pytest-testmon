@@ -2,7 +2,6 @@ import os
 import sys
 
 import pytest
-import testmon.process_code
 from test.coveragepy import coveragetest
 from testmon.process_code import Module, checksum_coverage
 from testmon.testmon_core import eval_variant, TestmonData as CoreTestmonData

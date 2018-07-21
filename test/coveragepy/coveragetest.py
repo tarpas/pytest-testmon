@@ -411,6 +411,8 @@ class CoverageTest(TestCase):
             rep = " ".join(frep.getvalue().split("\n")[2].split()[1:])
             self.assertEqual(report, rep)
 
+        return cov, modname
+
     def nice_file(self, *fparts):
         """Canonicalize the filename composed of the parts in `fparts`."""
         fname = os.path.join(*fparts)
