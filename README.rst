@@ -15,9 +15,6 @@ Usage
     # build the dependency database and save it to .testmondata
     py.test --testmon
 
-    # list of watched project files ordered by tests which reach each specific file
-    py.test --by-test-count
-
     # change some of your code (with test coverage)
 
     # only run tests affected by recent changes
@@ -72,17 +69,13 @@ by design. If you changed a method parameter name, you effectively changed the w
 parameter -> method -> class -> module, so any test using anything from that module will be
 re-executed.
 
-If you experience different, even random test outcomes with testmon as opposed to plain py.test
-chances are it is NOT a testmon bug. Every time I got a "bug" report about this we found out the tests
-depended on each other through some global state. The set of deselected and executed tests with
-testmon is highly variable, which means testmon is likely to expose the undesired test
-dependencies. That said, hidden test dependencies are a major no-no and you'll run into problems
-even without testmon. Fix your tests! 
+Tests are failing when running under testmon: It's quite unlikely testmon influenced the execution
+of the test itself. However set of deselected and executed tests with testmon is highly variable,
+which means testmon is likely to expose undesired test dependencies. Please fix your test suite.
 
-For filing a bug report, please isolate one test and report the unexpected outcomes of that one test. 
-(Most probably you'll experience the same behaviour regardless if you use --testmon or not. Of course 
-you should be adding/removing some no-op statement in the test to trigger re-execution)
-
+You can also try if your test is unfluenced under pytest-cov (coverage) without testmon. For reporting
+a bug a repository wiht description of unexpected behavior is the best, but please don't hesitate to
+report even if your project is closed source. We'll try to fix it!
 
 Roadmap
 =======
