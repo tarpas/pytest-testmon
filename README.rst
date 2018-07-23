@@ -74,7 +74,7 @@ of the test itself. However set of deselected and executed tests with testmon is
 which means testmon is likely to expose undesired test dependencies. Please fix your test suite.
 
 You can also try if your test is unfluenced under pytest-cov (coverage) without testmon. For reporting
-a bug a repository wiht description of unexpected behavior is the best, but please don't hesitate to
+a bug a repository with description of unexpected behavior is the best, but please don't hesitate to
 report even if your project is closed source. We'll try to fix it!
 
 Roadmap
@@ -110,4 +110,4 @@ Later versions can implement some detection of other categories
 Sponsors
 =============
 Big thanks to Qvantel, `Nick Coghlan <http://www.curiousefficiency.org/>`_
-,  `Abilian SAS <https://www.abilian.com/>`_ and `Infinit <http://www.infinit.sk>`_ for beeing silver sponsors of the first release of **testmon**. List of all contributors to our campaing is `here <https://www.indiegogo.com/projects/testmon#pledges>`_ . Thanks a lot to all contributors.
+,  `Abilian SAS <https://www.abilian.com/>`_ and `Infinit <http://www.infinit.sk>`_ for beeing silver sponsors of the first release of **testmon**. List of all contributors to our campaign is `here <https://www.indiegogo.com/projects/testmon#pledges>`_ . Thanks a lot to all contributors.
