@@ -1,10 +1,10 @@
 #  -- coding:utf8 --
-from coverage.python import get_python_source
 from test.coveragepy.coveragetest import CoverageTest
-import re
 
 import pytest
-from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum
+
+from test.test_testmon import CodeSample
+from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum, human_coverage
 
 try:
     from StringIO import StringIO as MemFile
@@ -141,13 +141,6 @@ class TestchecksumCoverage(object):
     @pytest.mark.parametrize("lines", [[4, 7], [7, 4]])
     def test_miss_both(self, lines):
         assert checksum_coverage([GLOBAL_BLOCK, Block(2, 3, 101), Block(5, 6, 102)], lines) == [1000, ]
-
-
-class CodeSample():
-    def __init__(self, source_code, expected_coverage=None, possible_lines=None):
-        self.source_code = source_code
-        self.expected_coverage = expected_coverage or {}
-        self.possible_lines = possible_lines or []
 
 
 code_samples = {
@@ -333,45 +326,6 @@ def test_block_list_list():
     assert block_list_list(afile, set((1, 3, 4, 5, 9, 10))) == [['a'], ['c', 'd', 'e'], ['i', 'j']]
 
 
-blank_re = re.compile(r"\s*(#|$)")
-else_re = re.compile(r"\s*else\s*:\s*(#|$)")
-
-
-def annotate_file2(filename, statements, missing, missing_formatted):
-    result = []
-
-    i = 0
-    j = 0
-    covered = True
-    source = get_python_source(filename)
-    for lineno, line in enumerate(source.splitlines(True), start=1):
-        while i < len(statements) and statements[i] < lineno:
-            i += 1
-        while j < len(missing) and missing[j] < lineno:
-            j += 1
-        if i < len(statements) and statements[i] == lineno:
-            covered = j >= len(missing) or missing[j] > lineno
-        if else_re.match(line):
-            # Special logic for lines containing only 'else:'.
-            if i >= len(statements) or j >= len(missing):
-                result.append(lineno)
-            elif statements[i] == missing[j]:
-                pass
-            else:
-                result.append(lineno)
-        elif covered:
-            result.append(lineno)
-        else:
-            pass
-
-    return result
-
-
-def human_coverage(cov, filename):
-    analysis = cov.analysis(filename)
-    return annotate_file2(*analysis)
-
-
 class TestCoverageAssumptions(CoverageTest):
 
     def test_easy(self):
@@ -383,7 +337,7 @@ class TestCoverageAssumptions(CoverageTest):
 
     def test_basic_human_coverage(self):
 
-        blocks = """\
+        text = """\
                 print(1)
                 d = {
                      'a': 'b',
@@ -391,7 +345,7 @@ class TestCoverageAssumptions(CoverageTest):
                 print(d)
                                """
 
-        cov, modname = self.check_coverage(blocks, [1, 3, 4, 5])
+        cov, modname = self.check_coverage(text, [1, 3, 4, 5])
 
         assert human_coverage(cov, modname + '.py') == [1, 2, 3, 4, 5]
 

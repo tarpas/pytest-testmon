@@ -134,3 +134,44 @@ def read_file_with_checksum(absfilename):
     source = get_python_source(absfilename)
     hasher.update(source.encode('utf-8'))
     return source, hasher.hexdigest()
+
+
+blank_re = re.compile(r"\s*(#|$)")
+else_re = re.compile(r"\s*else\s*:\s*(#|$)")
+
+def annotate_file2(filename, statements, missing, missing_formatted):
+    result = []
+
+    i = 0
+    j = 0
+    covered = True
+    source = get_python_source(filename)
+    for lineno, line in enumerate(source.splitlines(True), start=1):
+        while i < len(statements) and statements[i] < lineno:
+            i += 1
+        while j < len(missing) and missing[j] < lineno:
+            j += 1
+        if i < len(statements) and statements[i] == lineno:
+            covered = j >= len(missing) or missing[j] > lineno
+        if else_re.match(line):
+            # Special logic for lines containing only 'else:'.
+            if i >= len(statements) or j >= len(missing):
+                result.append(lineno)
+            elif statements[i] == missing[j]:
+                pass
+            else:
+                result.append(lineno)
+        elif covered:
+            result.append(lineno)
+        else:
+            pass
+
+    return result
+
+
+def human_coverage(cov, filename):
+    analysis = cov.analysis(filename)
+    return annotate_file2(*analysis)
+
+
+

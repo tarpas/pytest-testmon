@@ -6,12 +6,17 @@ from test.coveragepy import coveragetest
 from testmon.process_code import Module, checksum_coverage
 from testmon.testmon_core import eval_variant, TestmonData as CoreTestmonData
 from testmon.testmon_core import Testmon as CoreTestmon
-from testmon.testmon_core import TestmonData as CoreTestmonData
-from test.test_process_code import CodeSample
 
 pytest_plugins = "pytester",
 
 datafilename = os.environ.get('TESTMON_DATAFILE', '.testmondata')
+
+
+class CodeSample():
+    def __init__(self, source_code, expected_coverage=None, possible_lines=None):
+        self.source_code = source_code
+        self.expected_coverage = expected_coverage or {}
+        self.possible_lines = possible_lines or []
 
 
 class TestVariant:
