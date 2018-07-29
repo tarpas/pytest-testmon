@@ -5,6 +5,7 @@ import zlib
 import os
 
 import re
+from coverage.python import get_python_source
 
 coding_re = re.compile(b'coding[=:]\s*([-\w.]+)')
 
@@ -128,25 +129,8 @@ def checksum_coverage(blocks, lines):
     return result
 
 
-def process_encoding(lines, afile):
-    line = afile.readline()
-    match = coding_re.search(line)
-    if match:
-        return match.group(1).decode('ascii')
-    else:
-        lines.append(line)
-        return None
-
-
 def read_file_with_checksum(absfilename):
     hasher = hashlib.sha1()
-    with open(absfilename, 'rb') as afile:
-        lines = []
-        encoding = process_encoding(lines, afile)
-        if not encoding:
-            encoding = process_encoding(lines, afile)
-        if not encoding:
-            encoding = 'utf8'
-        source = b''.join(lines) + afile.read()
-    hasher.update(source)
-    return source.decode(encoding), hasher.hexdigest()
+    source = get_python_source(absfilename)
+    hasher.update(source.encode('utf-8'))
+    return source, hasher.hexdigest()

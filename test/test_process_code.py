@@ -4,7 +4,7 @@ from test.coveragepy.coveragetest import CoverageTest
 import re
 
 import pytest
-from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum, process_encoding
+from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum
 
 try:
     from StringIO import StringIO as MemFile
@@ -20,28 +20,6 @@ def parse(source_code, file_name='a.py'):
 
 class TestReadSrc:
 
-    def test_detect_encoding1(self):
-        lines = []
-        output = MemFile(b'#first comment\n#  -- coding: abcd --')
-        assert process_encoding(lines, output) == None
-        assert lines == [b'#first comment\n']
-        assert process_encoding(lines, output) == 'abcd'
-        assert lines == [b'#first comment\n']
-
-    def test_detect_encoding2(self):
-        lines = []
-        output = MemFile(b'1\n2\n')
-        assert process_encoding(lines, output) == None
-        assert lines == [b'1\n']
-        assert process_encoding(lines, output) == None
-        assert lines == [b'1\n', b'2\n']
-
-    def test_detect_encoding3(self):
-        with open('test/samples/print1250r.py', 'rb') as f:
-            lines = []
-            process_encoding(lines, f) == 'cp1250'
-            assert lines == []
-
     def test_read_file_with_checksum(self):
         assert u'š' in read_file_with_checksum('test/samples/print1250r.py')[0]
 
@@ -49,7 +27,7 @@ class TestReadSrc:
         assert read_file_with_checksum('test/samples/empty.py')[0] == ''
 
     def test_read_2lines_file_with_checksum(self):
-        assert read_file_with_checksum('test/samples/2lines.py')[0] == '#2ndline'
+        assert read_file_with_checksum('test/samples/2lines.py')[0] == '# -*- coding: cp1250 -*-\n#2ndline\n'
 
     def test_module_with_1250(self):
         code_repr = Module(None, 'test/samples/print1250r.py').blocks[0].code
@@ -389,7 +367,7 @@ def annotate_file2(filename, statements, missing, missing_formatted):
     return result
 
 
-def check_human_coverage(cov, filename):
+def human_coverage(cov, filename):
     analysis = cov.analysis(filename)
     return annotate_file2(*analysis)
 
@@ -415,7 +393,9 @@ class TestCoverageAssumptions(CoverageTest):
 
         cov, modname = self.check_coverage(blocks, [1, 3, 4, 5])
 
-        assert check_human_coverage(cov, modname + '.py') == [1, 2, 3, 4, 5]
+        assert human_coverage(cov, modname + '.py') == [1, 2, 3, 4, 5]
+
+
 
     def test_expe2(self):
         d = {

@@ -251,7 +251,7 @@ class TestSourceTree():
 
     def test_basic(self, testdir, a_py):
         code, checksum = read_file_with_checksum('a.py')
-        assert checksum == 'ea4739bb5b0069cafb92af3874891898617ef590'
+        assert checksum == 'de226b260917867990e4fb7aac70c5d6582266d4'
 
         fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'a.py': a_py.mtime()},
                              checksums={'a.py': checksum})
@@ -276,7 +276,7 @@ class TestSourceTree():
         changed_files = fs_data.get_changed_files()
         assert 'a.py' in changed_files
         assert [type(c) for c in changed_files['a.py'].checksums] == [int, int]
-        assert fs_data.checksums['a.py'] == 'ec1fd361d4d73353c3f65cb10b86fcea4e0d0e42'
+        assert fs_data.checksums['a.py'] == '2adaa5ffceef46b608233e0a65e7a64e56ca30ef'
 
     def test_get_file(self, testdir, a_py):
         fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'a.py': -100}, checksums={'a.py': -200})
@@ -287,6 +287,7 @@ class TestSourceTree():
     def test_disappeared(self, testdir, a_py):
         fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'b.py': -100}, checksums={'b.py': -200})
         fs_data.get_changed_files()
-        pytest.raises((OSError, IOError), fs_data.get_file, 'c.py')
+        from coverage.python import NoSource
+        pytest.raises(NoSource, fs_data.get_file, 'c.py')
 
         # parse_fs_changes(stored_version={'a.py': [a_py.mtime, hash(a_py.read_mtime)]})
