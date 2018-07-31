@@ -4,7 +4,7 @@ from test.coveragepy.coveragetest import CoverageTest
 import pytest
 
 from test.test_testmon import CodeSample
-from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum, human_coverage
+from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum
 
 try:
     from StringIO import StringIO as MemFile
@@ -335,43 +335,3 @@ class TestCoverageAssumptions(CoverageTest):
                                msg="This is for code_sample['{}']".format(2))
 
 
-    def test_write_and_run(self):
-        text = """\
-                def add(a, b):
-                    return a + b
-
-                def subtract(a, b):
-                    return a - b
-
-                assert add(1, 2) == 3
-                    """
-        cov, mod = self.write_and_run(text)
-
-        analysis = cov._analyze(mod)
-        filename = analysis.file_reporter.filename
-        assert filename == analysis.file_reporter.filename
-
-
-    def test_basic_human_coverage(self):
-
-        text = """\
-                print(1)
-                d = { 1: 2,
-                3: 4}     
-                
-                print(2)
-                               """
-
-        analysis = self.tm_check_coverage(text)
-        print(analysis.statements)
-        print(analysis.missing)
-        print(human_coverage(analysis))
-        assert None
-
-
-
-    def test_expe2(self):
-        d = {
-            1: '1',
-            2: 'b'
-        }

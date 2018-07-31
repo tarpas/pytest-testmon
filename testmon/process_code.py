@@ -137,7 +137,7 @@ def read_file_with_checksum(absfilename):
 
 
 blank_re = re.compile(r"\s*(#|$)")
-else_re = re.compile(r"\s*else\s*:\s*(#|$)")
+else_finally_re = re.compile(r"\s*(else|finally)\s*:\s*(#|$)")
 
 def annotate_file2(analysis):
     result = set()
@@ -158,7 +158,7 @@ def annotate_file2(analysis):
             covered = j >= len(missing) or missing[j] > lineno
         if blank_re.match(line):
             continue
-        if else_re.match(line):
+        if else_finally_re.match(line):
             # Special logic for lines containing only 'else:'.
             if i >= len(statements) or j >= len(missing):
                 result.add(lineno)

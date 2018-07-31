@@ -40,8 +40,11 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
 
     def test_multiline_initializer(self):
         self.check_human_coverage("""\
-            if None:
-                print(something)
+            d = {
+                'foo': 1+2,
+                'bar': (lambda x: x+1)(1),
+                'baz': str(1),
+            }
 
             e = { 'foo': 1, 'bar': 2 }
             """,
@@ -61,35 +64,6 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
 class SimpleStatementTest(TestmonCoverageTest):
     """Testing simple single-line statements."""
 
-    def test_expression(self):
-        # Bare expressions as statements are tricky: some implementations
-        # optimize some of them away.  All implementations seem to count
-        # the implicit return at the end as executable.
-        self.check_human_coverage("""\
-            12
-            23
-            """,
-            ([1,2],[2]), "")
-        self.check_human_coverage("""\
-            12
-            23
-            a = 3
-            """,
-            ([1,2,3],[3]), "")
-        self.check_human_coverage("""\
-            1 + 2
-            1 + \\
-                2
-            """,
-            ([1,2], [2]), "")
-        self.check_human_coverage("""\
-            1 + 2
-            1 + \\
-                2
-            a = 4
-            """,
-            ([1,2,4], [4]), "")
-
     def test_assert(self):
         self.check_human_coverage("""\
             assert (1 + 2)
@@ -100,7 +74,7 @@ class SimpleStatementTest(TestmonCoverageTest):
                 2), \\
                 'something is amiss'
             """,
-            [1,2,4,5], "")
+            [1,2,3,4,5,6,7], "")
 
     def test_assignment(self):
         # Simple variable assignment
@@ -111,7 +85,7 @@ class SimpleStatementTest(TestmonCoverageTest):
             c = \\
                 1
             """,
-            [1,2,4], "")
+            [1,2,3,4,5], "")
 
     def test_assign_tuple(self):
         self.check_human_coverage("""\
@@ -134,7 +108,7 @@ class SimpleStatementTest(TestmonCoverageTest):
             ] = \\
                 9
             """,
-            [1, 2, 3], "")
+            [1, 2, 3,4,5,6,7,8,9,10], "")
 
     def test_attribute_assignment(self):
         # Attribute assignment
@@ -161,7 +135,7 @@ class SimpleStatementTest(TestmonCoverageTest):
                 1, \\
                 2
             """,
-            [1,2,3,4,7], "")
+            [1,2,3,4,5,6,7,8,9], "")
 
     def test_augmented_assignment(self):
         self.check_human_coverage("""\
@@ -172,29 +146,8 @@ class SimpleStatementTest(TestmonCoverageTest):
             a += \\
                 1
             """,
-            [1,2,3,5], "")
+            [1,2,3,4,5,6], "")
 
-    def test_triple_string_stuff(self):
-        self.check_human_coverage("""\
-            a = '''
-                a multiline
-                string.
-                '''
-            b = '''
-                long expression
-                ''' + '''
-                on many
-                lines.
-                '''
-            c = len('''
-                long expression
-                ''' +
-                '''
-                on many
-                lines.
-                ''')
-            """,
-            [1,5,11], "")
 
     def test_pass(self):
         # pass is tricky: if it's the only statement in a block, then it is
@@ -216,7 +169,7 @@ class SimpleStatementTest(TestmonCoverageTest):
                 pass
             foo()
             """,
-            ([1,3,4], [1,4]), "")
+            [1,2,3,4], "")
         self.check_human_coverage("""\
             class Foo:
                 def foo(self):
@@ -231,7 +184,7 @@ class SimpleStatementTest(TestmonCoverageTest):
                     pass
             Foo().foo()
             """,
-            ([1,2,4,5], [1,2,5]), "")
+            [1,2,3,4,5], "")
 
     def test_del(self):
         self.check_human_coverage("""\
@@ -245,7 +198,7 @@ class SimpleStatementTest(TestmonCoverageTest):
                 d['e']
             assert(len(d.keys()) == 0)
             """,
-            [1,2,3,6,9], "")
+            [1,2,3,4,5,6,7,8,9], "")
 
     def test_print(self):
         if env.PY3:         # Print statement is gone in Py3k.
@@ -272,7 +225,7 @@ class SimpleStatementTest(TestmonCoverageTest):
             except:
                 pass
             """,
-            [1,2,5,6], "")
+            [1,2,3,4,5,6], "")
 
     def test_return(self):
         self.check_human_coverage("""\
@@ -294,7 +247,7 @@ class SimpleStatementTest(TestmonCoverageTest):
             x = fn()
             assert(x == 2)
             """,
-            [1,2,3,7,8], "")
+            [1,2,3,4,5,7,8], "")
         self.check_human_coverage("""\
             def fn():
                 a = 1
@@ -305,7 +258,7 @@ class SimpleStatementTest(TestmonCoverageTest):
             x,y,z = fn()
             assert x == 1 and y == 2 and z == 3
             """,
-            [1,2,3,7,8], "")
+            [1,2,3,4,5,7,8], "")
 
     def test_yield(self):
         self.check_human_coverage("""\
@@ -319,7 +272,7 @@ class SimpleStatementTest(TestmonCoverageTest):
             a,b,c = gen()
             assert a == 1 and b == 9 and c == (1,2)
             """,
-            [1,2,3,6,8,9], "")
+            [1,2,3,4,5,6,7,8,9], "")
 
     def test_break(self):
         self.check_human_coverage("""\
@@ -329,7 +282,7 @@ class SimpleStatementTest(TestmonCoverageTest):
                 a = 4
             assert a == 2
             """,
-            [1,2,3,4,5], "4")
+            [1,2,3,5],)
 
     def test_continue(self):
         self.check_human_coverage("""\
@@ -339,7 +292,7 @@ class SimpleStatementTest(TestmonCoverageTest):
                 a = 4
             assert a == 11
             """,
-            [1,2,3,4,5], "4")
+            [1,2,3,5])
 
     def test_strange_unexecuted_continue(self):     # pragma: not covered
         # Peephole optimization of jumps to jumps can mean that some statements
@@ -384,7 +337,7 @@ class SimpleStatementTest(TestmonCoverageTest):
                 from sys import path
             a = 1
             """,
-            [1,2,3,4], "3")
+            [1,2,4],)
         self.check_human_coverage("""\
             import string, \\
                 os, \\
@@ -393,7 +346,7 @@ class SimpleStatementTest(TestmonCoverageTest):
                 stdout
             a = 1
             """,
-            [1,4,6], "")
+            [1,2,3,4,5,6], "")
         self.check_human_coverage("""\
             import sys, sys as s
             assert s.path == sys.path
@@ -404,19 +357,19 @@ class SimpleStatementTest(TestmonCoverageTest):
                 sys as s
             assert s.path == sys.path
             """,
-            [1,3], "")
+            [1,2,3], "")
         self.check_human_coverage("""\
             from sys import path, \\
                 path as p
             assert p == path
             """,
-            [1,3], "")
+            [1,2,3], "")
         self.check_human_coverage("""\
             from sys import \\
                 *
             assert len(path) > 0
             """,
-            [1,3], "")
+            [1,2,3], "")
 
     def test_global(self):
         self.check_human_coverage("""\
@@ -429,7 +382,7 @@ class SimpleStatementTest(TestmonCoverageTest):
             fn()
             assert g == 2 and h == 2 and i == 2
             """,
-            [1,2,6,7,8], "")
+            [1,2,3,4,5,6,7,8], "")
         self.check_human_coverage("""\
             g = h = i = 1
             def fn():
@@ -439,1214 +392,8 @@ class SimpleStatementTest(TestmonCoverageTest):
             """,
             [1,2,3,4,5], "")
 
-    def test_exec(self):
-        self.check_human_coverage("""\
-            a = b = c = 1
-            exec("a = 2")
-            exec("b = " +
-                "c = " +
-                "2")
-            assert a == 2 and b == 2 and c == 2
-            """,
-            [1,2,3,6], "")
-        self.check_human_coverage("""\
-            vars = {'a': 1, 'b': 1, 'c': 1}
-            exec("a = 2", vars)
-            exec("b = " +
-                "c = " +
-                "2", vars)
-            assert vars['a'] == 2 and vars['b'] == 2 and vars['c'] == 2
-            """,
-            [1,2,3,6], "")
-        self.check_human_coverage("""\
-            globs = {}
-            locs = {'a': 1, 'b': 1, 'c': 1}
-            exec("a = 2", globs, locs)
-            exec("b = " +
-                "c = " +
-                "2", globs, locs)
-            assert locs['a'] == 2 and locs['b'] == 2 and locs['c'] == 2
-            """,
-            [1,2,3,4,7], "")
 
-    def test_extra_doc_string(self):
-        self.check_human_coverage("""\
-            a = 1
-            "An extra docstring, should be a comment."
-            b = 3
-            assert (a,b) == (1,3)
-            """,
-            [1,3,4], "")
-        self.check_human_coverage("""\
-            a = 1
-            "An extra docstring, should be a comment."
-            b = 3
-            123 # A number for some reason: ignored
-            1+1 # An expression: executed.
-            c = 6
-            assert (a,b,c) == (1,3,6)
-            """,
-            ([1,3,6,7], [1,3,5,6,7], [1,3,4,5,6,7]), "")
 
-    def test_nonascii(self):
-        self.check_human_coverage("""\
-            # coding: utf-8
-            a = 2
-            b = 3
-            """,
-            [2, 3]
-        )
-
-    def test_module_docstring(self):
-        self.check_human_coverage("""\
-            '''I am a module docstring.'''
-            a = 2
-            b = 3
-            """,
-            [2, 3]
-        )
-        if env.PYVERSION < (3, 7):
-            # Before 3.7, module docstrings were included in the lnotab table,
-            # unless they were the first line in the file?
-            lines = [2, 3, 4]
-        else:
-            lines = [3, 4]
-        self.check_human_coverage("""\
-            # Start with a comment, because it changes the behavior(!?)
-            '''I am a module docstring.'''
-            a = 3
-            b = 4
-            """,
-            lines
-        )
-
-
-class CompoundStatementTest(TestmonCoverageTest):
-    """Testing coverage of multi-line compound statements."""
-
-    def test_statement_list(self):
-        self.check_human_coverage("""\
-            a = 1;
-            b = 2; c = 3
-            d = 4; e = 5;
-
-            assert (a,b,c,d,e) == (1,2,3,4,5)
-            """,
-            [1,2,3,5], "")
-
-    def test_if(self):
-        self.check_human_coverage("""\
-            a = 1
-            if a == 1:
-                x = 3
-            assert x == 3
-            if (a ==
-                1):
-                x = 7
-            assert x == 7
-            """,
-            [1,2,3,4,5,7,8], "")
-        self.check_human_coverage("""\
-            a = 1
-            if a == 1:
-                x = 3
-            else:
-                y = 5
-            assert x == 3
-            """,
-            [1,2,3,5,6], "5")
-        self.check_human_coverage("""\
-            a = 1
-            if a != 1:
-                x = 3
-            else:
-                y = 5
-            assert y == 5
-            """,
-            [1,2,3,5,6], "3")
-        self.check_human_coverage("""\
-            a = 1; b = 2
-            if a == 1:
-                if b == 2:
-                    x = 4
-                else:
-                    y = 6
-            else:
-                z = 8
-            assert x == 4
-            """,
-            [1,2,3,4,6,8,9], "6-8")
-
-    def test_elif(self):
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if a == 1:
-                x = 3
-            elif b == 2:
-                y = 5
-            else:
-                z = 7
-            assert x == 3
-            """,
-            [1,2,3,4,5,7,8], "4-7", report="7 3 4 1 45% 4-7, 2->4",
-        )
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if a != 1:
-                x = 3
-            elif b == 2:
-                y = 5
-            else:
-                z = 7
-            assert y == 5
-            """,
-            [1,2,3,4,5,7,8], "3, 7", report="7 2 4 2 64% 3, 7, 2->3, 4->7",
-        )
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if a != 1:
-                x = 3
-            elif b != 2:
-                y = 5
-            else:
-                z = 7
-            assert z == 7
-            """,
-            [1,2,3,4,5,7,8], "3, 5", report="7 2 4 2 64% 3, 5, 2->3, 4->5",
-        )
-
-    def test_elif_no_else(self):
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if a == 1:
-                x = 3
-            elif b == 2:
-                y = 5
-            assert x == 3
-            """,
-            [1,2,3,4,5,6], "4-5", report="6 2 4 1 50% 4-5, 2->4",
-        )
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if a != 1:
-                x = 3
-            elif b == 2:
-                y = 5
-            assert y == 5
-            """,
-            [1,2,3,4,5,6], "3", report="6 1 4 2 70% 3, 2->3, 4->6",
-        )
-
-    def test_elif_bizarre(self):
-        self.check_human_coverage("""\
-            def f(self):
-                if self==1:
-                    x = 3
-                elif self.m('fred'):
-                    x = 5
-                elif (g==1) and (b==2):
-                    x = 7
-                elif self.m('fred')==True:
-                    x = 9
-                elif ((g==1) and (b==2))==True:
-                    x = 11
-                else:
-                    x = 13
-            """,
-            [1,2,3,4,5,6,7,8,9,10,11,13], "2-13")
-
-    def test_split_if(self):
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if \\
-                a == 1:
-                x = 3
-            elif \\
-                b == 2:
-                y = 5
-            else:
-                z = 7
-            assert x == 3
-            """,
-            [1,2,4,5,7,9,10], "5-9")
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if \\
-                a != 1:
-                x = 3
-            elif \\
-                b == 2:
-                y = 5
-            else:
-                z = 7
-            assert y == 5
-            """,
-            [1,2,4,5,7,9,10], "4, 9")
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if \\
-                a != 1:
-                x = 3
-            elif \\
-                b != 2:
-                y = 5
-            else:
-                z = 7
-            assert z == 7
-            """,
-            [1,2,4,5,7,9,10], "4, 7")
-
-    def test_pathological_split_if(self):
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if (
-                a == 1
-                ):
-                x = 3
-            elif (
-                b == 2
-                ):
-                y = 5
-            else:
-                z = 7
-            assert x == 3
-            """,
-            [1,2,5,6,9,11,12], "6-11")
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if (
-                a != 1
-                ):
-                x = 3
-            elif (
-                b == 2
-                ):
-                y = 5
-            else:
-                z = 7
-            assert y == 5
-            """,
-            [1,2,5,6,9,11,12], "5, 11")
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if (
-                a != 1
-                ):
-                x = 3
-            elif (
-                b != 2
-                ):
-                y = 5
-            else:
-                z = 7
-            assert z == 7
-            """,
-            [1,2,5,6,9,11,12], "5, 9")
-
-    def test_absurd_split_if(self):
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if a == 1 \\
-                :
-                x = 3
-            elif b == 2 \\
-                :
-                y = 5
-            else:
-                z = 7
-            assert x == 3
-            """,
-            [1,2,4,5,7,9,10], "5-9")
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if a != 1 \\
-                :
-                x = 3
-            elif b == 2 \\
-                :
-                y = 5
-            else:
-                z = 7
-            assert y == 5
-            """,
-            [1,2,4,5,7,9,10], "4, 9")
-        self.check_human_coverage("""\
-            a = 1; b = 2; c = 3;
-            if a != 1 \\
-                :
-                x = 3
-            elif b != 2 \\
-                :
-                y = 5
-            else:
-                z = 7
-            assert z == 7
-            """,
-            [1,2,4,5,7,9,10], "4, 7")
-
-    def test_constant_if(self):
-        self.check_human_coverage("""\
-            if 1:
-                a = 2
-            assert a == 2
-            """,
-            [2,3], "")
-
-    def test_while(self):
-        self.check_human_coverage("""\
-            a = 3; b = 0
-            while a:
-                b += 1
-                a -= 1
-            assert a == 0 and b == 3
-            """,
-            [1,2,3,4,5], "")
-        self.check_human_coverage("""\
-            a = 3; b = 0
-            while a:
-                b += 1
-                break
-                b = 99
-            assert a == 3 and b == 1
-            """,
-            [1,2,3,4,5,6], "5")
-
-    def test_while_else(self):
-        # Take the else branch.
-        self.check_human_coverage("""\
-            a = 3; b = 0
-            while a:
-                b += 1
-                a -= 1
-            else:
-                b = 99
-            assert a == 0 and b == 99
-            """,
-            [1,2,3,4,6,7], "")
-        # Don't take the else branch.
-        self.check_human_coverage("""\
-            a = 3; b = 0
-            while a:
-                b += 1
-                a -= 1
-                break
-                b = 123
-            else:
-                b = 99
-            assert a == 2 and b == 1
-            """,
-            [1,2,3,4,5,6,8,9], "6-8")
-
-    def test_split_while(self):
-        self.check_human_coverage("""\
-            a = 3; b = 0
-            while \\
-                a:
-                b += 1
-                a -= 1
-            assert a == 0 and b == 3
-            """,
-            [1,2,4,5,6], "")
-        self.check_human_coverage("""\
-            a = 3; b = 0
-            while (
-                a
-                ):
-                b += 1
-                a -= 1
-            assert a == 0 and b == 3
-            """,
-            [1,2,5,6,7], "")
-
-    def test_for(self):
-        self.check_human_coverage("""\
-            a = 0
-            for i in [1,2,3,4,5]:
-                a += i
-            assert a == 15
-            """,
-            [1,2,3,4], "")
-        self.check_human_coverage("""\
-            a = 0
-            for i in [1,
-                2,3,4,
-                5]:
-                a += i
-            assert a == 15
-            """,
-            [1,2,5,6], "")
-        self.check_human_coverage("""\
-            a = 0
-            for i in [1,2,3,4,5]:
-                a += i
-                break
-                a = 99
-            assert a == 1
-            """,
-            [1,2,3,4,5,6], "5")
-
-    def test_for_else(self):
-        self.check_human_coverage("""\
-            a = 0
-            for i in range(5):
-                a += i+1
-            else:
-                a = 99
-            assert a == 99
-            """,
-            [1,2,3,5,6], "")
-        self.check_human_coverage("""\
-            a = 0
-            for i in range(5):
-                a += i+1
-                break
-                a = 99
-            else:
-                a = 123
-            assert a == 1
-            """,
-            [1,2,3,4,5,7,8], "5-7")
-
-    def test_split_for(self):
-        self.check_human_coverage("""\
-            a = 0
-            for \\
-                i in [1,2,3,4,5]:
-                a += i
-            assert a == 15
-            """,
-            [1,2,4,5], "")
-        self.check_human_coverage("""\
-            a = 0
-            for \\
-                i in [1,
-                2,3,4,
-                5]:
-                a += i
-            assert a == 15
-            """,
-            [1,2,6,7], "")
-
-    def test_try_except(self):
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-            except:
-                a = 99
-            assert a == 1
-            """,
-            [1,2,3,4,5,6], "4-5")
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-                raise Exception("foo")
-            except:
-                a = 99
-            assert a == 99
-            """,
-            [1,2,3,4,5,6,7], "")
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-                raise Exception("foo")
-            except ImportError:
-                a = 99
-            except:
-                a = 123
-            assert a == 123
-            """,
-            [1,2,3,4,5,6,7,8,9], "6")
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-                raise IOError("foo")
-            except ImportError:
-                a = 99
-            except IOError:
-                a = 17
-            except:
-                a = 123
-            assert a == 17
-            """,
-            [1,2,3,4,5,6,7,8,9,10,11], "6, 9-10")
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-            except:
-                a = 99
-            else:
-                a = 123
-            assert a == 123
-            """,
-            [1,2,3,4,5,7,8], "4-5",
-            arcz=".1 12 23 45 58 37 78 8.",
-            arcz_missing="45 58",
-        )
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-                raise Exception("foo")
-            except:
-                a = 99
-            else:
-                a = 123
-            assert a == 99
-            """,
-            [1,2,3,4,5,6,8,9], "8",
-            arcz=".1 12 23 34 45 56 69 89 9.",
-            arcz_missing="89",
-        )
-
-    def test_try_finally(self):
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-            finally:
-                a = 99
-            assert a == 99
-            """,
-            [1,2,3,5,6], "")
-        self.check_human_coverage("""\
-            a = 0; b = 0
-            try:
-                a = 1
-                try:
-                    raise Exception("foo")
-                finally:
-                    b = 123
-            except:
-                a = 99
-            assert a == 99 and b == 123
-            """,
-            [1,2,3,4,5,7,8,9,10], "")
-
-    def test_function_def(self):
-        self.check_human_coverage("""\
-            a = 99
-            def foo():
-                ''' docstring
-                '''
-                return 1
-
-            a = foo()
-            assert a == 1
-            """,
-            [1,2,5,7,8], "")
-        self.check_human_coverage("""\
-            def foo(
-                a,
-                b
-                ):
-                ''' docstring
-                '''
-                return a+b
-
-            x = foo(17, 23)
-            assert x == 40
-            """,
-            [1,7,9,10], "")
-        self.check_human_coverage("""\
-            def foo(
-                a = (lambda x: x*2)(10),
-                b = (
-                    lambda x:
-                        x+1
-                    )(1)
-                ):
-                ''' docstring
-                '''
-                return a+b
-
-            x = foo()
-            assert x == 22
-            """,
-            [1,10,12,13], "")
-
-    def test_class_def(self):
-        if env.PYVERSION < (3, 7):
-            arcz="-22 2D DE E-2  23 36 6A A-2  -68 8-6   -AB B-A"
-        else:
-            # Python 3.7 no longer includes class docstrings in the lnotab table.
-            arcz="-22 2D DE E-2  26 6A A-2  -68 8-6   -AB B-A"
-        self.check_human_coverage("""\
-            # A comment.
-            class theClass:
-                ''' the docstring.
-                    Don't be fooled.
-                '''
-                def __init__(self):
-                    ''' Another docstring. '''
-                    self.a = 1
-
-                def foo(self):
-                    return self.a
-
-            x = theClass().foo()
-            assert x == 1
-            """,
-            [2, 6, 8, 10, 11, 13, 14], "",
-            arcz=arcz,
-        )
-
-
-class ExcludeTest(TestmonCoverageTest):
-    """Tests of the exclusion feature to mark lines as not covered."""
-
-    def test_default(self):
-        # A number of forms of pragma comment are accepted.
-        self.check_human_coverage("""\
-            a = 1
-            b = 2   # pragma: no cover
-            c = 3
-            d = 4   #pragma NOCOVER
-            e = 5
-            f = 6#\tpragma:\tno cover
-            g = 7
-            """,
-            [1,3,5,7]
-            )
-
-    def test_simple(self):
-        self.check_human_coverage("""\
-            a = 1; b = 2
-
-            if len([]):
-                a = 4   # -cc
-            """,
-            [1,3], "", excludes=['-cc'])
-
-    def test_two_excludes(self):
-        self.check_human_coverage("""\
-            a = 1; b = 2
-
-            if a == 99:
-                a = 4   # -cc
-                b = 5
-                c = 6   # -xx
-            assert a == 1 and b == 2
-            """,
-            [1,3,5,7], "5", excludes=['-cc', '-xx'])
-
-    def test_excluding_if_suite(self):
-        self.check_human_coverage("""\
-            a = 1; b = 2
-
-            if len([]):     # not-here
-                a = 4
-                b = 5
-                c = 6
-            assert a == 1 and b == 2
-            """,
-            [1,7], "", excludes=['not-here'])
-
-    def test_excluding_if_but_not_else_suite(self):
-        self.check_human_coverage("""\
-            a = 1; b = 2
-
-            if len([]):     # not-here
-                a = 4
-                b = 5
-                c = 6
-            else:
-                a = 8
-                b = 9
-            assert a == 8 and b == 9
-            """,
-            [1,8,9,10], "", excludes=['not-here'])
-
-    def test_excluding_else_suite(self):
-        self.check_human_coverage("""\
-            a = 1; b = 2
-
-            if 1==1:
-                a = 4
-                b = 5
-                c = 6
-            else:          #pragma: NO COVER
-                a = 8
-                b = 9
-            assert a == 4 and b == 5 and c == 6
-            """,
-            [1,3,4,5,6,10], "", excludes=['#pragma: NO COVER'])
-        self.check_human_coverage("""\
-            a = 1; b = 2
-
-            if 1==1:
-                a = 4
-                b = 5
-                c = 6
-
-            # Lots of comments to confuse the else handler.
-            # more.
-
-            else:          #pragma: NO COVER
-
-            # Comments here too.
-
-                a = 8
-                b = 9
-            assert a == 4 and b == 5 and c == 6
-            """,
-            [1,3,4,5,6,17], "", excludes=['#pragma: NO COVER'])
-
-    def test_excluding_elif_suites(self):
-        self.check_human_coverage("""\
-            a = 1; b = 2
-
-            if 1==1:
-                a = 4
-                b = 5
-                c = 6
-            elif 1==0:          #pragma: NO COVER
-                a = 8
-                b = 9
-            else:
-                a = 11
-                b = 12
-            assert a == 4 and b == 5 and c == 6
-            """,
-            [1,3,4,5,6,11,12,13], "11-12", excludes=['#pragma: NO COVER'])
-
-    def test_excluding_oneline_if(self):
-        self.check_human_coverage("""\
-            def foo():
-                a = 2
-                if len([]): x = 3       # no cover
-                b = 4
-
-            foo()
-            """,
-            [1,2,4,6], "", excludes=["no cover"])
-
-    def test_excluding_a_colon_not_a_suite(self):
-        self.check_human_coverage("""\
-            def foo():
-                l = list(range(10))
-                a = l[:3]   # no cover
-                b = 4
-
-            foo()
-            """,
-            [1,2,4,6], "", excludes=["no cover"])
-
-    def test_excluding_for_suite(self):
-        self.check_human_coverage("""\
-            a = 0
-            for i in [1,2,3,4,5]:     #pragma: NO COVER
-                a += i
-            assert a == 15
-            """,
-            [1,4], "", excludes=['#pragma: NO COVER'])
-        self.check_human_coverage("""\
-            a = 0
-            for i in [1,
-                2,3,4,
-                5]:                #pragma: NO COVER
-                a += i
-            assert a == 15
-            """,
-            [1,6], "", excludes=['#pragma: NO COVER'])
-        self.check_human_coverage("""\
-            a = 0
-            for i in [1,2,3,4,5
-                ]:                        #pragma: NO COVER
-                a += i
-                break
-                a = 99
-            assert a == 1
-            """,
-            [1,7], "", excludes=['#pragma: NO COVER'])
-
-    def test_excluding_for_else(self):
-        self.check_human_coverage("""\
-            a = 0
-            for i in range(5):
-                a += i+1
-                break
-                a = 99
-            else:               #pragma: NO COVER
-                a = 123
-            assert a == 1
-            """,
-            [1,2,3,4,5,8], "5", excludes=['#pragma: NO COVER'])
-
-    def test_excluding_while(self):
-        self.check_human_coverage("""\
-            a = 3; b = 0
-            while a*b:           #pragma: NO COVER
-                b += 1
-                break
-                b = 99
-            assert a == 3 and b == 0
-            """,
-            [1,6], "", excludes=['#pragma: NO COVER'])
-        self.check_human_coverage("""\
-            a = 3; b = 0
-            while (
-                a*b
-                ):           #pragma: NO COVER
-                b += 1
-                break
-                b = 99
-            assert a == 3 and b == 0
-            """,
-            [1,8], "", excludes=['#pragma: NO COVER'])
-
-    def test_excluding_while_else(self):
-        self.check_human_coverage("""\
-            a = 3; b = 0
-            while a:
-                b += 1
-                break
-                b = 99
-            else:           #pragma: NO COVER
-                b = 123
-            assert a == 3 and b == 1
-            """,
-            [1,2,3,4,5,8], "5", excludes=['#pragma: NO COVER'])
-
-    def test_excluding_try_except(self):
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-            except:           #pragma: NO COVER
-                a = 99
-            assert a == 1
-            """,
-            [1,2,3,6], "", excludes=['#pragma: NO COVER'])
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-                raise Exception("foo")
-            except:
-                a = 99
-            assert a == 99
-            """,
-            [1,2,3,4,5,6,7], "", excludes=['#pragma: NO COVER'])
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-                raise Exception("foo")
-            except ImportError:    #pragma: NO COVER
-                a = 99
-            except:
-                a = 123
-            assert a == 123
-            """,
-            [1,2,3,4,7,8,9], "", excludes=['#pragma: NO COVER'])
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-            except:       #pragma: NO COVER
-                a = 99
-            else:
-                a = 123
-            assert a == 123
-            """,
-            [1,2,3,7,8], "", excludes=['#pragma: NO COVER'],
-            arcz=".1 12 23 37 45 58 78 8.",
-            arcz_missing="45 58",
-        )
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-                raise Exception("foo")
-            except:
-                a = 99
-            else:              #pragma: NO COVER
-                a = 123
-            assert a == 99
-            """,
-            [1,2,3,4,5,6,9], "", excludes=['#pragma: NO COVER'],
-            arcz=".1 12 23 34 45 56 69 89 9.",
-            arcz_missing="89",
-        )
-
-    def test_excluding_try_except_pass(self):
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-            except:           #pragma: NO COVER
-                x = 2
-            assert a == 1
-            """,
-            [1,2,3,6], "", excludes=['#pragma: NO COVER'])
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-                raise Exception("foo")
-            except ImportError:    #pragma: NO COVER
-                x = 2
-            except:
-                a = 123
-            assert a == 123
-            """,
-            [1,2,3,4,7,8,9], "", excludes=['#pragma: NO COVER'])
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-            except:       #pragma: NO COVER
-                x = 2
-            else:
-                a = 123
-            assert a == 123
-            """,
-            [1,2,3,7,8], "", excludes=['#pragma: NO COVER'],
-            arcz=".1 12 23 37 45 58 78 8.",
-            arcz_missing="45 58",
-        )
-        self.check_human_coverage("""\
-            a = 0
-            try:
-                a = 1
-                raise Exception("foo")
-            except:
-                a = 99
-            else:              #pragma: NO COVER
-                x = 2
-            assert a == 99
-            """,
-            [1,2,3,4,5,6,9], "", excludes=['#pragma: NO COVER'],
-            arcz=".1 12 23 34 45 56 69 89 9.",
-            arcz_missing="89",
-        )
-
-    def test_excluding_if_pass(self):
-        # From a comment on the coverage.py page by Michael McNeil Forbes:
-        self.check_human_coverage("""\
-            def f():
-                if False:    # pragma: no cover
-                    pass     # This line still reported as missing
-                if False:    # pragma: no cover
-                    x = 1    # Now it is skipped.
-
-            f()
-            """,
-            [1,7], "", excludes=["no cover"])
-
-    def test_excluding_function(self):
-        self.check_human_coverage("""\
-            def fn(foo):      #pragma: NO COVER
-                a = 1
-                b = 2
-                c = 3
-
-            x = 1
-            assert x == 1
-            """,
-            [6,7], "", excludes=['#pragma: NO COVER'])
-
-    def test_excluding_method(self):
-        self.check_human_coverage("""\
-            class Fooey:
-                def __init__(self):
-                    self.a = 1
-
-                def foo(self):     #pragma: NO COVER
-                    return self.a
-
-            x = Fooey()
-            assert x.a == 1
-            """,
-            [1,2,3,8,9], "", excludes=['#pragma: NO COVER'])
-
-    def test_excluding_class(self):
-        self.check_human_coverage("""\
-            class Fooey:            #pragma: NO COVER
-                def __init__(self):
-                    self.a = 1
-
-                def foo(self):
-                    return self.a
-
-            x = 1
-            assert x == 1
-            """,
-            [8,9], "", excludes=['#pragma: NO COVER'])
-
-    def test_excludes_non_ascii(self):
-        self.check_human_coverage("""\
-            # coding: utf-8
-            a = 1; b = 2
-
-            if len([]):
-                a = 5   # ✘cover
-            """,
-            [2, 4], "", excludes=['✘cover']
-        )
-
-    def test_formfeed(self):
-        # https://bitbucket.org/ned/coveragepy/issues/461/multiline-asserts-need-too-many-pragma
-        self.check_human_coverage("""\
-            x = 1
-            assert len([]) == 0, (
-                "This won't happen %s" % ("hello",)
-            )
-            \f
-            x = 6
-            assert len([]) == 0, (
-                "This won't happen %s" % ("hello",)
-            )
-            """,
-            [1, 6], "", excludes=['assert'],
-        )
-
-
-class Py24Test(TestmonCoverageTest):
-    """Tests of new syntax in Python 2.4."""
-
-    def test_function_decorators(self):
-        self.check_human_coverage("""\
-            def require_int(func):
-                def wrapper(arg):
-                    assert isinstance(arg, int)
-                    return func(arg)
-
-                return wrapper
-
-            @require_int
-            def p1(arg):
-                return arg*2
-
-            assert p1(10) == 20
-            """,
-            [1,2,3,4,6,8,10,12], "")
-
-    def test_function_decorators_with_args(self):
-        self.check_human_coverage("""\
-            def boost_by(extra):
-                def decorator(func):
-                    def wrapper(arg):
-                        return extra*func(arg)
-                    return wrapper
-                return decorator
-
-            @boost_by(10)
-            def boosted(arg):
-                return arg*2
-
-            assert boosted(10) == 200
-            """,
-            [1,2,3,4,5,6,8,10,12], "")
-
-    def test_double_function_decorators(self):
-        self.check_human_coverage("""\
-            def require_int(func):
-                def wrapper(arg):
-                    assert isinstance(arg, int)
-                    return func(arg)
-                return wrapper
-
-            def boost_by(extra):
-                def decorator(func):
-                    def wrapper(arg):
-                        return extra*func(arg)
-                    return wrapper
-                return decorator
-
-            @require_int
-            @boost_by(10)
-            def boosted1(arg):
-                return arg*2
-
-            assert boosted1(10) == 200
-
-            @boost_by(10)
-            @require_int
-            def boosted2(arg):
-                return arg*2
-
-            assert boosted2(10) == 200
-            """,
-            ([1,2,3,4,5,7,8,9,10,11,12,14,15,17,19,21,22,24,26],
-             [1,2,3,4,5,7,8,9,10,11,12,14,   17,19,21,   24,26]), "")
-
-
-class Py25Test(TestmonCoverageTest):
-    """Tests of new syntax in Python 2.5."""
-
-    def test_with_statement(self):
-        self.check_human_coverage("""\
-            class Managed:
-                def __enter__(self):
-                    desc = "enter"
-
-                def __exit__(self, type, value, tb):
-                    desc = "exit"
-
-            m = Managed()
-            with m:
-                desc = "block1a"
-                desc = "block1b"
-
-            try:
-                with m:
-                    desc = "block2"
-                    raise Exception("Boo!")
-            except:
-                desc = "caught"
-            """,
-            [1,2,3,5,6,8,9,10,11,13,14,15,16,17,18], "")
-
-    def test_try_except_finally(self):
-        self.check_human_coverage("""\
-            a = 0; b = 0
-            try:
-                a = 1
-            except:
-                a = 99
-            finally:
-                b = 2
-            assert a == 1 and b == 2
-            """,
-            [1,2,3,4,5,7,8], "4-5",
-            arcz=".1 12 23 37 45 57 78 8.", arcz_missing="45 57",
-        )
-        self.check_human_coverage("""\
-            a = 0; b = 0
-            try:
-                a = 1
-                raise Exception("foo")
-            except:
-                a = 99
-            finally:
-                b = 2
-            assert a == 99 and b == 2
-            """,
-            [1,2,3,4,5,6,8,9], "",
-            arcz=".1 12 23 34 45 56 68 89 9.",
-        )
-        self.check_human_coverage("""\
-            a = 0; b = 0
-            try:
-                a = 1
-                raise Exception("foo")
-            except ImportError:
-                a = 99
-            except:
-                a = 123
-            finally:
-                b = 2
-            assert a == 123 and b == 2
-            """,
-            [1,2,3,4,5,6,7,8,10,11], "6",
-            arcz=".1 12 23 34 45 56 57 78 6A 8A AB B.", arcz_missing="56 6A",
-        )
         self.check_human_coverage("""\
             a = 0; b = 0
             try:
@@ -1662,9 +409,7 @@ class Py25Test(TestmonCoverageTest):
                 b = 2
             assert a == 17 and b == 2
             """,
-            [1,2,3,4,5,6,7,8,9,10,12,13], "6, 9-10",
-            arcz=".1 12 23 34 45 56 6C 57 78 8C 79 9A AC CD D.",
-            arcz_missing="56 6C 79 9A AC",
+            [1,2,3,4,5,7,8,11,12,13],
         )
         self.check_human_coverage("""\
             a = 0; b = 0
@@ -1678,9 +423,7 @@ class Py25Test(TestmonCoverageTest):
                 b = 2
             assert a == 123 and b == 2
             """,
-            [1,2,3,4,5,7,9,10], "4-5",
-            arcz=".1 12 23 37 45 59 79 9A A.",
-            arcz_missing="45 59",
+            [1,2,3,6,7,8,9,10],
         )
         self.check_human_coverage("""\
             a = 0; b = 0
@@ -1695,8 +438,6 @@ class Py25Test(TestmonCoverageTest):
                 b = 2
             assert a == 99 and b == 2
             """,
-            [1,2,3,4,5,6,8,10,11], "8",
-            arcz=".1 12 23 34 45 56 6A 8A AB B.",
-            arcz_missing="8A",
+            [1,2,3,4,5,6,9,10,11],
         )
 
