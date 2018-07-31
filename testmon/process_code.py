@@ -139,13 +139,16 @@ def read_file_with_checksum(absfilename):
 blank_re = re.compile(r"\s*(#|$)")
 else_re = re.compile(r"\s*else\s*:\s*(#|$)")
 
-def annotate_file2(filename, statements, missing, missing_formatted):
-    result = []
+def annotate_file2(analysis):
+    result = set()
+
+    source = analysis.file_reporter.source()
+    statements = sorted(analysis.statements)
+    missing = sorted(analysis.missing)
 
     i = 0
     j = 0
     covered = True
-    source = get_python_source(filename)
     for lineno, line in enumerate(source.splitlines(True), start=1):
         while i < len(statements) and statements[i] < lineno:
             i += 1
@@ -156,22 +159,21 @@ def annotate_file2(filename, statements, missing, missing_formatted):
         if else_re.match(line):
             # Special logic for lines containing only 'else:'.
             if i >= len(statements) or j >= len(missing):
-                result.append(lineno)
+                result.add(lineno)
             elif statements[i] == missing[j]:
                 pass
             else:
-                result.append(lineno)
+                result.add(lineno)
         elif covered:
-            result.append(lineno)
+            result.add(lineno)
         else:
             pass
 
     return result
 
 
-def human_coverage(cov, filename):
-    analysis = cov.analysis(filename)
-    return annotate_file2(*analysis)
+def human_coverage(analysis):
+    return annotate_file2(analysis)
 
 
 

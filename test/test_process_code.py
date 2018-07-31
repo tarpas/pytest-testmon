@@ -150,7 +150,7 @@ code_samples = {
     
         assert add(1, 2) == 3
             """,
-                  [1, 2, 4]),
+                  {1, 2, 4}),
 
     2: CodeSample("""\
         def add(a, b):
@@ -161,19 +161,19 @@ code_samples = {
 
         assert add(1, 2) == 3
             """,
-                  [1, 2, 4, 7]),
+                  {1, 2, 4, 7}),
     '3': CodeSample("""\
         class A(object):
             def add(self, a, b):
                 return a + b
         """,
-                    [1, 2]),
+                    {1, 2}),
     '3b': CodeSample("""\
         class A(object):
             def add(self, a, b):
                 return a - b
         """,
-                     [1, 2]),
+                     {1, 2}),
     'classes': CodeSample("""\
         class A(object):
             def add(self, a, b):
@@ -181,7 +181,7 @@ code_samples = {
             def subtract(self, a, b):
                 return a - b
         """,
-                          [1, 2, 4]),
+                          {1, 2, 4}),
 
     'classes_b': CodeSample("""\
         class A(object):
@@ -190,7 +190,7 @@ code_samples = {
             def subtract(self, a, b):
                 return a - b - 1
         """,
-                            [1, 2, 4]),
+                            {1, 2, 4}),
     'classes_c': CodeSample("""\
         class A(object):
             def add1(self, a, b):
@@ -198,7 +198,7 @@ code_samples = {
             def subtract(self, a, b):
                 return a - b
         """,
-                            [1, 2, 4]),
+                            {1, 2, 4}),
 }
 
 
@@ -329,25 +329,44 @@ def test_block_list_list():
 class TestCoverageAssumptions(CoverageTest):
 
     def test_easy(self):
-        for name, mod_cov in code_samples.items():
-            if mod_cov.expected_coverage:
-                self.check_coverage(mod_cov.source_code,
-                                    cov_data=mod_cov.expected_coverage,
-                                    msg="This is for code_sample['{}']".format(name))
+        mod_cov = code_samples[2]
+        self.tm_check_coverage(mod_cov.source_code,
+                               tm_lines=mod_cov.expected_coverage,
+                               msg="This is for code_sample['{}']".format(2))
+
+
+    def test_write_and_run(self):
+        text = """\
+                def add(a, b):
+                    return a + b
+
+                def subtract(a, b):
+                    return a - b
+
+                assert add(1, 2) == 3
+                    """
+        cov, mod = self.write_and_run(text)
+
+        analysis = cov._analyze(mod)
+        filename = analysis.file_reporter.filename
+        assert filename == analysis.file_reporter.filename
+
 
     def test_basic_human_coverage(self):
 
         text = """\
                 print(1)
-                d = {
-                     'a': 'b',
-                     'c': 'd' }
-                print(d)
+                d = { 1: 2,
+                3: 4}     
+                
+                print(2)
                                """
 
-        cov, modname = self.check_coverage(text, [1, 3, 4, 5])
-
-        assert human_coverage(cov, modname + '.py') == [1, 2, 3, 4, 5]
+        analysis = self.tm_check_coverage(text)
+        print(analysis.statements)
+        print(analysis.missing)
+        print(human_coverage(analysis))
+        assert None
 
 
 

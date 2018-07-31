@@ -1,12 +1,18 @@
 #  -- coding:utf8 --
+from coverage.backward import StringIO
+
 from coverage.python import get_python_source
 from test.coveragepy.coveragetest import CoverageTest
 from coverage import env
+from testmon.process_code import human_coverage
+
 
 class TestmonCoverageTest(CoverageTest):
 
     def check_human_coverage(self, text, lines=None, *args, **kwargs):
-        pass
+        analysis = self.tm_check_coverage(text)
+
+        assert sorted(human_coverage(analysis)) == lines
 
 
 class BasicTestmonCoverageTest(TestmonCoverageTest):
@@ -30,19 +36,16 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
             if not sys.path:
                 a = 1
                 """,    # indented last line
-            [1,2,3], "3")
+            [1,2])
 
     def test_multiline_initializer(self):
         self.check_human_coverage("""\
-            d = {
-                'foo': 1+2,
-                'bar': (lambda x: x+1)(1),
-                'baz': str(1),
-            }
+            if None:
+                print(something)
 
             e = { 'foo': 1, 'bar': 2 }
             """,
-            [1,7], "")
+            [1,2,3,4,5,7], "")
 
     def test_list_comprehension(self):
         self.check_human_coverage("""\
@@ -52,7 +55,7 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
                 ]
             assert l == [12, 14, 16, 18]
             """,
-            [1,5], "")
+            [1,2,3,4,5], "")
 
 
 class SimpleStatementTest(TestmonCoverageTest):
@@ -144,7 +147,7 @@ class SimpleStatementTest(TestmonCoverageTest):
             o.foo = \\
                 1
             """,
-            [1,2,3,4,6], "")
+            [1,2,3,4,5,6,7], "")
 
     def test_list_of_attribute_assignment(self):
         self.check_human_coverage("""\

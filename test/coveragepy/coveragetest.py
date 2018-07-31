@@ -4,8 +4,7 @@ import glob, imp, os, random, shlex, shutil, sys, tempfile, textwrap
 import atexit
 
 import coverage
-from coverage.backward import StringIO      # pylint: disable=W0622
-from coverage.backward import to_bytes
+from coverage.backward import StringIO, string_class, to_bytes      # pylint: disable=W0622
 _TEST_NAME_FILE = "" #"/tmp/covtest.txt"
 from test.coveragepy.backtest import run_command
 from test.coveragepy.backunittest import TestCase
@@ -311,9 +310,30 @@ class CoverageTest(TestCase):
         s2 = "\n".join([repr(a) for a in a2]) + "\n"
         self.assertMultiLineEqual(s1, s2, msg)
 
-    def check_coverage(self, text, cov_data=None, lines=None, missing="", report="",
-            excludes=None, partials="",
-            arcz=None, arcz_missing="", arcz_unpredicted="", msg=None):
+
+    def write_and_run(self, text, excludes=None, partials="", branch=False):
+        modname = self.get_module_name()
+        self.make_file(modname + ".py", text)
+        # Start up coverage.py.
+        cov = coverage.Coverage(branch=branch)
+        cov.erase()
+        for exc in excludes or []:
+            cov.exclude(exc)
+        for par in partials or []:
+            cov.exclude(par, which='partial')
+        mod = self.start_import_stop(cov, modname)
+        # Clean up our side effects
+        del sys.modules[modname]
+        # Get the analysis results, and check that they are right.
+        return cov, mod
+
+
+    def tm_check_coverage(
+        self, text, tm_lines=None, lines=None, missing="", report="",
+        excludes=None, partials="",
+        arcz=None, arcz_missing="", arcz_unpredicted="",
+        arcs=None, arcs_missing=None, arcs_unpredicted=None, msg=None
+    ):
         """Check the coverage measurement of `text`.
 
         The source `text` is run and measured.  `lines` are the line numbers
@@ -323,46 +343,34 @@ class CoverageTest(TestCase):
         of the measurement report.
 
         For arc measurement, `arcz` is a string that can be decoded into arcs
-        in the code (see `arcz_to_arcs` for the encoding scheme),
+        in the code (see `arcz_to_arcs` for the encoding scheme).
         `arcz_missing` are the arcs that are not executed, and
-        `arcs_unpredicted` are the arcs executed in the code, but not deducible
-        from the code.
+        `arcz_unpredicted` are the arcs executed in the code, but not deducible
+        from the code.  These last two default to "", meaning we explicitly
+        check that there are no missing or unpredicted arcs.
+
+        Returns the Coverage object, in case you want to poke at it some more.
 
         """
         # We write the code into a file so that we can import it.
-        # Coverage wants to deal with things as modules with file names.
-        modname = self.get_module_name()
-
-        self.make_file(modname+".py", text)
-
-        arcs = arcs_missing = arcs_unpredicted = None
-        if arcz is not None:
+        # Coverage.py wants to deal with things as modules with file names.
+        if arcs is None and arcz is not None:
             arcs = self.arcz_to_arcs(arcz)
-            arcs_missing = self.arcz_to_arcs(arcz_missing or "")
-            arcs_unpredicted = self.arcz_to_arcs(arcz_unpredicted or "")
+        if arcs_missing is None:
+            arcs_missing = self.arcz_to_arcs(arcz_missing)
+        if arcs_unpredicted is None:
+            arcs_unpredicted = self.arcz_to_arcs(arcz_unpredicted)
 
-        # Start up Coverage.
-        cov = coverage.coverage(branch=(arcs_missing is not None))
-        cov.erase()
-        for exc in excludes or []:
-            cov.exclude(exc)
-        for par in partials or []:
-            cov.exclude(par, which='partial')
-
-        mod = self.start_import_stop(cov, modname)
-
-        # Clean up our side effects
-        del sys.modules[modname]
-
-
-
-        # Get the analysis results, and check that they are right.
+        cov, mod = self.write_and_run(text, excludes, partials, branch=True)
         analysis = cov._analyze(mod)
         statements = sorted(analysis.statements)
-        if cov_data:
-            self.assertEqual(sorted(cov.get_data().lines(os.path.abspath(modname + ".py"))), cov_data, msg)
+
+
+        if tm_lines is not None:
+            self.assertEqual(analysis.statements - analysis.missing, tm_lines)
+
         if lines is not None:
-            if type(lines[0]) == type(1):
+            if isinstance(lines[0], int):
                 # lines is just a list of numbers, it must match the statements
                 # found in the code.
                 self.assertEqual(statements, lines)
@@ -373,45 +381,42 @@ class CoverageTest(TestCase):
                     if statements == line_list:
                         break
                 else:
-                    self.fail("None of the lines choices matched %r" %
-                                                                statements
-                        )
+                    self.fail("None of the lines choices matched %r" % statements)
 
-            if type(missing) == type(""):
-                self.assertEqual(analysis.missing_formatted(), missing)
+            missing_formatted = analysis.missing_formatted()
+            if isinstance(missing, string_class):
+                self.assertEqual(missing_formatted, missing)
             else:
                 for missing_list in missing:
-                    if analysis.missing_formatted() == missing_list:
+                    if missing_formatted == missing_list:
                         break
                 else:
-                    self.fail("None of the missing choices matched %r" %
-                                            analysis.missing_formatted()
-                        )
+                    self.fail("None of the missing choices matched %r" % missing_formatted)
 
         if arcs is not None:
-            self.assertEqualArcs(
-                analysis.arc_possibilities(), arcs, "Possible arcs differ"
+            with self.delayed_assertions():
+                self.assert_equal_args(
+                    analysis.arc_possibilities(), arcs,
+                    "Possible arcs differ: minus is actual, plus is expected"
                 )
 
-            if arcs_missing is not None:
-                self.assertEqualArcs(
+                self.assert_equal_args(
                     analysis.arcs_missing(), arcs_missing,
-                    "Missing arcs differ"
-                    )
+                    "Missing arcs differ: minus is actual, plus is expected"
+                )
 
-            if arcs_unpredicted is not None:
-                self.assertEqualArcs(
+                self.assert_equal_args(
                     analysis.arcs_unpredicted(), arcs_unpredicted,
-                    "Unpredicted arcs differ"
-                    )
+                    "Unpredicted arcs differ: minus is actual, plus is expected"
+                )
 
         if report:
             frep = StringIO()
-            cov.report(mod, file=frep)
+            cov.report(mod, file=frep, show_missing=True)
             rep = " ".join(frep.getvalue().split("\n")[2].split()[1:])
             self.assertEqual(report, rep)
 
-        return cov, modname
+        return analysis
 
     def nice_file(self, *fparts):
         """Canonicalize the filename composed of the parts in `fparts`."""
