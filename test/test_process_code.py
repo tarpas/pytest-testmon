@@ -301,15 +301,24 @@ def create_emental(blocks):
 
 b = namedtuple('FakeBlock', 'start end')
 
+import re
+
+blank_re = re.compile(r"\s*(#|$)")
+
 
 def block_list_list(afile, line_numbers):
-    previous = min(line_numbers) - 1
+    previous = min(line_numbers) - 1 if line_numbers else -1
+    nonempty = [lineno for lineno, line in enumerate(afile, start=1) if not blank_re.match(line)]
+    sorted_line_numbers = sorted(line_numbers)
     l2 = []
     l1 = []
-    for i in sorted(line_numbers):
-        if previous != i - 1:
-            l1.append(l2)
-            l2 = []
+    for i in sorted_line_numbers:
+        try:
+            if nonempty.index(previous) != nonempty.index(i) - 1:
+                l1.append(l2)
+                l2 = []
+        except ValueError:
+            pass
         l2.append(afile[i - 1])
         previous = i
     if l2:
@@ -317,13 +326,35 @@ def block_list_list(afile, line_numbers):
     return l1
 
 
-def test_create_emental():
-    assert create_emental([b(2, 2), b(6, 8), b(1, 10)]) == set((1, 3, 4, 5, 9, 10))
+class TestEmentalTests():
 
+    def test_create_emental(self):
+        assert create_emental([b(2, 2), b(6, 8), b(1, 10)]) == set((1, 3, 4, 5, 9, 10))
 
-def test_block_list_list():
-    afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
-    assert block_list_list(afile, set((1, 3, 4, 5, 9, 10))) == [['a'], ['c', 'd', 'e'], ['i', 'j']]
+    def test_block_list_list(self):
+        afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+        assert block_list_list(afile, set((1, 3, 4, 5, 9, 10))) == [['a'], ['c', 'd', 'e'], ['i', 'j']]
+
+    def test_block_1_block(self):
+        afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+        assert block_list_list(afile, set((1, 2, 4, 6, 7))) == [['a', 'b'], ['d'], ['f', 'g']]
+
+    def test_ignore_empty(self):
+        afile = ['a', '\n', 'b', 'c', 'd', 'e']
+        assert block_list_list(afile, set((1, 3, 5, 6))) == [['a', 'b'], ['d', 'e']]
+
+    def test_empty(self):
+        assert block_list_list(["a", ], []) == []
+
+    def test_empty_empty(self):
+        assert block_list_list([], []) == []
+
+    def test_1_3(self):
+        assert block_list_list(["a", "b", "c"], [1, 3]) == [["a"], ["c"]]
+
+    def test_1_34(self):
+        assert block_list_list(["a", "b", "c", "d"], [1, 3, 4]) == [["a"], ["c", "d"]]
+        pass
 
 
 class TestCoverageAssumptions(CoverageTest):
@@ -333,5 +364,3 @@ class TestCoverageAssumptions(CoverageTest):
         self.tm_check_coverage(mod_cov.source_code,
                                tm_lines=mod_cov.expected_coverage,
                                msg="This is for code_sample['{}']".format(2))
-
-
