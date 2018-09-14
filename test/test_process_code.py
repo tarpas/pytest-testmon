@@ -307,18 +307,20 @@ blank_re = re.compile(r"\s*(#|$)")
 
 
 def block_list_list(afile, line_numbers):
-    previous = min(line_numbers) - 1 if line_numbers else -1
-    nonempty = [lineno for lineno, line in enumerate(afile, start=1) if not blank_re.match(line)]
-    sorted_line_numbers = sorted(line_numbers)
+    previous = 'N/A'
+    nonempty = {}
+    i = 0
+    for (lineno, line) in enumerate(afile, start=1):
+        if not blank_re.match(line):
+            nonempty[lineno] = i
+            i += 1
+
     l2 = []
     l1 = []
-    for i in sorted_line_numbers:
-        try:
-            if nonempty.index(previous) != nonempty.index(i) - 1:
-                l1.append(l2)
-                l2 = []
-        except ValueError:
-            pass
+    for i in sorted(line_numbers):
+        if not(nonempty.get(previous, -1) == nonempty[i] - 1):
+            l1.append(l2)
+            l2 = []
         l2.append(afile[i - 1])
         previous = i
     if l2:
