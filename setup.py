@@ -7,13 +7,14 @@ setup(
     version='0.9.13',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
-    packages=['testmon'],
+    packages=['testmon', 'runtime_info'],
     url='https://github.com/tarpas/pytest-testmon/',
     author_email='tibor.arpas@infinit.sk',
     author='Tibor Arpas, Jozef Knaperek, Martin Riesz, Daniel Hahler',
     entry_points={
         'pytest11': [
             'testmon = testmon.pytest_testmon',
+            'runtime_info = runtime_info.pytest_runtime_info'
         ],
         'tox': [
             'testmon = testmon.tox_testmon',
