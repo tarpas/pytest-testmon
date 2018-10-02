@@ -4,6 +4,7 @@ from collections import defaultdict
 import os
 import json
 import tempfile
+import sqlite3
 
 files = defaultdict(list)
 exceptions = list()
@@ -19,12 +20,13 @@ def pytest_runtest_makereport(call, item):
             striped_statement = str(traceback_entry.statement).lstrip()
             start = len(str(traceback_entry.statement)) - len(striped_statement)
             mark_info = {
-                "exception_text": json.dumps(exception_text),
-                "path": json.dumps(str(traceback_entry.path)),
+                "description": item.nodeid + ": " + exception_text,
+                "exception_text": exception_text,
+                "path": str(traceback_entry.path),
                 "line": traceback_entry.lineno,
                 "start": start,
                 "end": len(str(traceback_entry.statement)),
-                "check_output": json.dumps(striped_statement)
+                "check_output": striped_statement
             }
             if last_mark_info:
                 mark_info["prev"] = last_mark_info
@@ -34,19 +36,23 @@ def pytest_runtest_makereport(call, item):
         if last_mark_info:
             exceptions.append({
                 "path": last_mark_info["path"],
-                "description": json.dumps(item.nodeid + ": " + exception_text),
-                "line": last_mark_info["line"]
+                "description": item.nodeid + ": " + exception_text,
+                "line": last_mark_info["line"],
+                "exception_text": exception_text
             })
 
 
-def pytest_sessionfinish():
-    file_marks = [get_file_mark_json(path, marks) for path, marks in files.items()]
-    file_marks_string = ",".join(file_marks)
-    exception_strings = [get_exception_json(e) for e in exceptions]
-    exception_string = ",".join(exception_strings)
-    json_output = FILE_TEMPLATE.format(file_marks_string, exception_string)
-    with open(get_temp_file_path(), "w") as output_file:
-        output_file.write(json_output)
+def pytest_sessionfinish(session):
+    # sqlite implementation
+    conn = sqlite3.connect(os.path.join(str(session.config.rootdir), "runtime_test_report.db"))
+    init_table(conn)
+
+    for e in exceptions:
+        insert_exception(conn, e["path"], e["line"], e["description"], e["exception_text"])
+
+    for path, marks in files.items():
+        insert_file_mark(conn, path, marks)
+    conn.close()
 
 
 def get_temp_file_path():
@@ -67,107 +73,81 @@ def get_exception_text(excinfo):
     return "{}: {}".format(typename, reason)
 
 
-def get_exception_json(exception):
-    return EXCEPTION_TEMPLATE.format(exception["path"],
-                                     exception["description"],
-                                     exception["line"])
+def init_table(conn):
+    c = conn.cursor()
+
+    # check if there is a table named FileMark in the database, if not: create
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='FileMark'")
+
+    if c.fetchone() is None:
+        with conn:
+            c.execute("""CREATE TABLE Exception (
+                        exception_id INTEGER PRIMARY KEY,
+                        file_name text,
+                        line integer,
+                        description text,
+                        exception_text text
+            )""")
+
+            c.execute("""CREATE TABLE FileMark (
+                        file_mark_id INTEGER PRIMARY KEY,
+                        type text,
+                        text text,
+                        file_name text,
+                        begin_line integer,
+                        begin_character integer,
+                        end_line integer,
+                        end_character integer,
+                        check_content text,
+                        target_path text,
+                        target_line integer,
+                        target_character integer,
+                        gutterLinkType text,
+                        exception_id integer NOT NULL,
+                            FOREIGN KEY (exception_id) REFERENCES exception(exception_id)
+                            ON DELETE CASCADE
+            )""")
+    # if tha tables are present, clear them
+    else:
+        with conn:
+            c.execute("DELETE FROM Exception")
+            c.execute("DELETE FROM FileMark")
 
 
-def get_file_mark_json(path, mark_list):
-    marks = [get_marks_json(mark) for mark in mark_list]
-    return FILE_MARK_TEMPLATE.format(json.dumps(path), ",".join(marks))
+def insert_exception(conn, path, line, description, exception_text):
+    c = conn.cursor()
+    with conn:
+        c.execute("INSERT INTO Exception VALUES (?, ?, ?, ?, ?)", (None, path, line, description, exception_text))
 
 
-def get_marks_json(mark):
-    marks = []
-    range_json = RANGE_TEMPLATE.format(mark["line"], mark["start"],
-                                       mark["line"], mark["end"])
-    underline_mark = UNDERLINE_MARK_TEMPLATE.format(range_json,
-                                                    mark["check_output"])
-    marks.append(underline_mark)
-    suffix_mark = SUFFIX_MARK_TEMPLATE.format(mark["exception_text"],
-                                              range_json,
-                                              mark["check_output"])
-    marks.append(suffix_mark)
-    if "prev" in mark:
-        target_path = mark["prev"]["path"]
-        gutter_mark = GUTTER_MARK_TEMPLATE.format("U", target_path,
-                                                  mark["prev"]["line"],
-                                                  mark["prev"]["start"],
-                                                  range_json,
-                                                  mark["check_output"])
-        marks.append(gutter_mark)
-    if "next" in mark:
-        target_path = mark["next"]["path"]
-        gutter_mark = GUTTER_MARK_TEMPLATE.format("D", target_path,
-                                                  mark["next"]["line"],
-                                                  mark["next"]["start"],
-                                                  range_json,
-                                                  mark["check_output"])
-        marks.append(gutter_mark)
-    return ",".join(marks)
+def insert_file_mark(conn, path, mark_list):
+    c = conn.cursor()
 
+    for mark in mark_list:
+        with conn:
+            c.execute("""INSERT INTO FileMark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (
+                        SELECT exception_id FROM Exception WHERE description = ?)
+            )""", (None, "RedUnderLineDecoration", None, path, mark["line"], mark["start"],
+                   mark["line"], mark["end"], mark["check_output"], None, None, None, None, mark["description"]))
 
-FILE_TEMPLATE = """
-{{
-  "fileMarkList":[{}
-  ],
-  "exceptions":[{}
-  ]
-}}
-"""
+            c.execute("""INSERT INTO FileMark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (
+                        SELECT exception_id FROM Exception WHERE description = ?)
+                        )""", (None, "Suffix", mark['exception_text'], path, mark["line"], mark["start"],
+                               mark["line"], mark["end"], mark["check_output"], None, None, None, None,
+                               mark["description"]))
 
-EXCEPTION_TEMPLATE = """
-    {{
-      "path": {},
-      "description": {},
-      "line": {}
-    }}
-"""
+            if "prev" in mark:
+                c.execute("""INSERT INTO FileMark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (
+                        SELECT exception_id FROM Exception WHERE description = ?)
+                        )""", (None, "GutterLink", mark['exception_text'], path, mark["line"], mark["start"],
+                               mark["line"], mark["end"], mark["check_output"], mark["prev"]["path"],
+                               mark["prev"]["line"],
+                               mark["prev"]["start"], "U", mark["description"]))
 
-FILE_MARK_TEMPLATE = """
-    {{
-        "path": {},
-        "marks": [{}
-        ]
-    }}"""
-
-UNDERLINE_MARK_TEMPLATE = """
-        {{
-          "type": "RedUnderLineDecoration",
-          "range": {},
-          "checkContent": {}
-        }}"""
-
-SUFFIX_MARK_TEMPLATE = """
-        {{
-          "type": "Suffix",
-          "text": {},
-          "range": {},
-          "checkContent": {}
-        }}"""
-
-GUTTER_MARK_TEMPLATE = """
-        {{
-          "type": "GutterLink",
-          "gutterLinkType": "{}",
-          "targetPath": {},
-          "target": {{
-            "line": {},
-            "character": {}
-          }},
-          "range": {},
-          "checkContent": {}
-        }}"""
-
-RANGE_TEMPLATE = """
-            {{
-              "start": {{
-                "line": {},
-                "character": {}
-              }},
-              "end": {{
-                "line": {},
-                "character": {}
-              }}
-            }}"""
+            if "next" in mark:
+                c.execute("""INSERT INTO FileMark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (
+                        SELECT exception_id FROM Exception WHERE description = ?)
+                        )""", (None, "GutterLink", mark['exception_text'], path, mark["line"], mark["start"],
+                               mark["line"], mark["end"], mark["check_output"], mark["next"]["path"],
+                               mark["next"]["line"],
+                               mark["next"]["start"], "D", mark["description"]))
