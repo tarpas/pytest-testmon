@@ -1,4 +1,4 @@
-import pytest_runtime_info
+from runtime_info import pytest_runtime_info
 import os
 import json
 import pytest
