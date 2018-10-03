@@ -39,3 +39,6 @@ nosetests.xml
 .*
 /htmlcov/
 /tags
+
+# Exclude Intellij Idea plugin project hidden files.
+!testmon-plugin/*
