@@ -267,6 +267,18 @@ class TestmonData(object):
                                                         self.source_tree.get_changed_files())
 
 
+
+class CoverageData:
+
+    def __init__(self, ):
+        self.files = dict()
+
+
+    def from_cov_data(self, covdata):
+        pass
+
+
+
 class Testmon(object):
     def __init__(self, project_dirs, testmon_labels=set()):
         self.project_dirs = project_dirs

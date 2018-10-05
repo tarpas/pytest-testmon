@@ -4,7 +4,8 @@ from test.coveragepy.coveragetest import CoverageTest
 import pytest
 
 from test.test_testmon import CodeSample
-from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum
+from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum, create_emental, \
+    block_list_list, file_has_lines
 
 try:
     from StringIO import StringIO as MemFile
@@ -290,43 +291,7 @@ class TestModule(object):
         assert module1.blocks[2] != module2.blocks[2]
 
 
-def create_emental(blocks):
-    blocks = blocks.copy()
-    module_level_block = blocks.pop()
-    line_numbers = set(range(1, module_level_block.end + 1))
-    for block in blocks:
-        line_numbers.difference_update(set(range(block.start, block.end + 1)))
-    return line_numbers
-
-
 b = namedtuple('FakeBlock', 'start end')
-
-import re
-
-blank_re = re.compile(r"\s*(#|$)")
-
-
-def block_list_list(afile, line_numbers):
-    previous = 'N/A'
-    nonempty = {}
-    i = 0
-    for (lineno, line) in enumerate(afile, start=1):
-        if not blank_re.match(line):
-            nonempty[lineno] = i
-            i += 1
-
-    l2 = []
-    l1 = []
-    for i in sorted(line_numbers):
-        if not (nonempty.get(previous, -1) == nonempty[i] - 1):
-            l1.append(l2)
-            l2 = []
-        l2.append(afile[i - 1])
-        previous = i
-    if l2:
-        l1.append(l2)
-    return l1
-
 
 class TestEmentalTests():
 
@@ -357,23 +322,6 @@ class TestEmentalTests():
     def test_1_34(self):
         assert block_list_list(["a", "b", "c", "d"], [1, 3, 4]) == [["a"], ["c", "d"]]
         pass
-
-
-def file_has_lines(file_fingerprints, required_fingerprints):
-    i = 0
-    fi = 0
-    while i < len(required_fingerprints):
-        j = 0
-        subblock = required_fingerprints[i]
-        while j < len(subblock) and fi < len(file_fingerprints):
-            if subblock[j] == file_fingerprints[fi]:
-                fi += 1
-                j += 1
-            else:
-                fi += 1
-        i += 1
-
-    return i == len(required_fingerprints) and j == len(required_fingerprints[-1])
 
 
 class TestModule2():

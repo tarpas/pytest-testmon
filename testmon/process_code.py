@@ -7,6 +7,9 @@ import os
 import re
 from coverage.python import get_python_source
 
+
+
+blank_re = re.compile(r"\s*(#|$)")
 coding_re = re.compile(b'coding[=:]\s*([-\w.]+)')
 
 
@@ -189,4 +192,49 @@ def human_coverage(analysis):
     return annotate_file2(analysis)
 
 
+def create_emental(blocks):
+    blocks = blocks.copy()
+    module_level_block = blocks.pop()
+    line_numbers = set(range(1, module_level_block.end + 1))
+    for block in blocks:
+        line_numbers.difference_update(set(range(block.start, block.end + 1)))
+    return line_numbers
 
+
+def block_list_list(afile, line_numbers):
+    previous = 'N/A'
+    nonempty = {}
+    i = 0
+    for (lineno, line) in enumerate(afile, start=1):
+        if not blank_re.match(line):
+            nonempty[lineno] = i
+            i += 1
+
+    l2 = []
+    l1 = []
+    for i in sorted(line_numbers):
+        if not (nonempty.get(previous, -1) == nonempty[i] - 1):
+            l1.append(l2)
+            l2 = []
+        l2.append(afile[i - 1])
+        previous = i
+    if l2:
+        l1.append(l2)
+    return l1
+
+
+def file_has_lines(file_fingerprints, required_fingerprints):
+    i = 0
+    fi = 0
+    while i < len(required_fingerprints):
+        j = 0
+        subblock = required_fingerprints[i]
+        while j < len(subblock) and fi < len(file_fingerprints):
+            if subblock[j] == file_fingerprints[fi]:
+                fi += 1
+                j += 1
+            else:
+                fi += 1
+        i += 1
+
+    return i == len(required_fingerprints) and j == len(required_fingerprints[-1])
