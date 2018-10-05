@@ -15,7 +15,7 @@ from collections import namedtuple
 
 
 def parse(source_code, file_name='a.py'):
-    return Module(source_code=source_code, file_name=file_name).blocks
+    return Module(source_code=source_code, filename=file_name).blocks
 
 
 class TestReadSrc:

@@ -601,7 +601,7 @@ def test_add():
         deps = track_it(testdir, func)
 
         assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath):
-                    checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
+                    checksum_coverage(Module(filename=a.strpath).blocks, [2])} == deps
 
     @pytest.mark.xfail
     def test_testmon_recursive(self, testdir, monkeypatch):
@@ -617,7 +617,7 @@ def test_add():
         # os.environ.pop('COVERAGE_TEST_TRACER', None)
 
         assert {os.path.abspath(a.strpath):
-                    checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
+                    checksum_coverage(Module(filename=a.strpath).blocks, [2])} == deps
 
     def test_run_dissapearing(self, testdir):
         a = testdir.makepyfile(a="""\
