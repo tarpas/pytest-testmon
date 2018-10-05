@@ -64,18 +64,23 @@ def flip_dictionary(node_data):
 
 
 def stable(node_data, changed_files):
-    file_data = flip_dictionary(node_data)
-    stable_nodes = dict(node_data)
-    stable_files = set(file_data)
+    file_data = node_data.file_data()
+    changed_nodes = set()
+    changed_files2 = set()
 
-    for file in set(changed_files) & set(file_data):
+    changed_files_set = changed_files & file_data.keys()  # changed_files will be a subset of file_data,
+    # but we'll make sure anyway
+    for file in changed_files_set:
         for nodeid, checksums in file_data[file].items():
-            if set(checksums) - set(changed_files[file].checksums): #the nodeid requires checksums which disapeared from
-                                                                    #the filesystem => the nodeid is "affected"
-                stable_nodes.pop(nodeid, None)
-                stable_files -= {nodeid.split('::', 1)[0], file}
+            if set(checksums) - set(
+                    changed_files[file].checksums):  # the nodeid requires checksums which disapeared from
+                # the filesystem => the nodeid is "affected"
+                changed_nodes.add(nodeid)
+                changed_files2.add(nodeid.split('::', 1)[0])
+                changed_files2.add(file)
 
-    return stable_nodes, stable_files
+    return node_data.keys() - changed_nodes, set(file_data) - changed_files2
+
 
 def node_data_to_test_files(node_data):
     """only return files that contain tests, without indirect dependencies"""
@@ -83,6 +88,12 @@ def node_data_to_test_files(node_data):
     for nodeid, node_files in node_data.items():
         test_files[nodeid.split("::", 1)[0]].add(nodeid)
     return test_files
+
+
+class NodesData(dict):
+
+    def file_data(self):
+        return flip_dictionary(self)
 
 
 class TestmonData(object):
@@ -94,7 +105,7 @@ class TestmonData(object):
         self.variant = variant if variant else 'default'
         self.rootdir = rootdir
         self.init_connection()
-        self.node_data = {}
+        self.node_data = NodesData({})
         self.reports = defaultdict(lambda: [])
 
     def init_connection(self):
@@ -139,14 +150,17 @@ class TestmonData(object):
             return default
 
     def _fetch_node_data(self):
-        dependencies = defaultdict(lambda: {})
+        dependencies = NodesData()
         for row in self.connection.execute("""SELECT
                                                 n.name,
                                                 nf.file_name,
                                                 nf.checksums
                                               FROM node n, node_file nf WHERE n.id = nf.node_id AND n.variant=?""",
                                            (self.variant,)):
-            dependencies[row[0]][row[1]] = blob_to_checksums(row[2])
+            if row[0] in dependencies:
+                dependencies[row[0]][row[1]] = blob_to_checksums(row[2])
+            else:
+                dependencies[row[0]] = {row[1]: blob_to_checksums(row[2])}
 
         fail_reports = defaultdict(lambda: {})
 

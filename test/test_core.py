@@ -4,7 +4,7 @@ from collections import namedtuple
 from testmon.process_code import Module, read_file_with_checksum
 from test.test_process_code import CodeSample
 from testmon.testmon_core import TestmonData as CoreTestmonData, SourceTree, flip_dictionary, stable, \
-    checksums_to_blob, CHECKUMS_ARRAY_TYPE, blob_to_checksums, node_data_to_test_files
+    checksums_to_blob, CHECKUMS_ARRAY_TYPE, blob_to_checksums, node_data_to_test_files, NodesData
 
 import sqlite3
 
@@ -69,7 +69,7 @@ class TestGeneral(object):
 
     def test_ndt_f_tests2(self):
         assert node_data_to_test_files({'a.py::t1': {'a.py': [1], 'gla.py': [2]},
-                                     'a.py::t2': {'a.py': [3], 'gla.py': [4]}}) == {'a.py': {'a.py::t1', 'a.py::t2'}}
+                                        'a.py::t2': {'a.py': [3], 'gla.py': [4]}}) == {'a.py': {'a.py::t1', 'a.py::t2'}}
 
 
 class TestDepGraph():
@@ -175,14 +175,14 @@ class TestStable():
     def test_nothing_changed(self):
         changed = {'a.py': [101, 102, 103]}
         dependencies = {'test_a.py::node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]}}
-        assert stable(dependencies, blockify(changed))[0] == dependencies
+        assert stable(NodesData(dependencies), blockify(changed))[0] == dependencies.keys()
 
     def test_simple_change(self):
         changed = {'a.py': [101, 102, 151]}
         dependencies = {'test_a.py::node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]},
                         'test_b.py::node2': {'test_b.py': [301, 302], 'a.py': [151]}}
 
-        nodes, files = stable(dependencies, blockify(changed))
+        nodes, files = stable(NodesData(dependencies), blockify(changed))
 
         assert set(nodes) == {'test_b.py::node2'}
         assert set(files) == {'test_b.py'}
@@ -193,12 +193,12 @@ class TestStable():
                         'test_b.py::test_2': {'test_b.py': [2]}}
         changed = {'test_a.py': [-1]}
 
-        nodes, files = stable(dependencies, blockify(changed))
+        nodes, files = stable(NodesData(dependencies), blockify(changed))
         assert set(nodes) == {'test_b.py::test_2'}
         assert set(files) == {'test_b.py'}
 
         changed = {'test_b.py': [3]}
-        nodes, files = stable(dependencies, blockify(changed))
+        nodes, files = stable(NodesData(dependencies), blockify(changed))
         assert set(nodes) == {'test_a.py::test_1'}
         assert set(files) == {'test_a.py'}
 
@@ -209,12 +209,12 @@ class TestStable():
                         'test_b.py::test_2': {'test_b.py': [2]}}
 
         changed_files = get_changed_files(dependencies, {'c.py': [4]})
-        nodes, files = stable(dependencies, blockify(changed_files))
+        nodes, files = stable(NodesData(dependencies), blockify(changed_files))
         assert set(nodes) == {'test_b.py::test_2'}
         assert set(files) == {'test_b.py'}
 
         changed_files = get_changed_files(dependencies, {'test_b.py': [2]})
-        nodes, files = stable(dependencies, blockify(changed_files))
+        nodes, files = stable(NodesData(dependencies), blockify(changed_files))
         assert set(nodes) == {'test_a.py::test_1'}
         assert set(files) == {'test_a.py', 'c.py'}
 
@@ -224,12 +224,12 @@ def get_modules(checksums):
 
 
 def is_dependent(dependencies, changes):
-    result = affected_nodeids({'testnode': dependencies}, changes)
+    result = affected_nodeids(NodesData({'testnode': dependencies}), changes)
     return result == {'testnode'}
 
 
 def affected_nodeids(dependencies, changes):
-    stable_nodes, files = stable(dependencies, blockify(changes))
+    stable_nodes, files = stable(NodesData(dependencies), blockify(changes))
     return set(dependencies) - set(stable_nodes)
 
 
