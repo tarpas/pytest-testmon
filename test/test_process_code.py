@@ -318,7 +318,7 @@ def block_list_list(afile, line_numbers):
     l2 = []
     l1 = []
     for i in sorted(line_numbers):
-        if not(nonempty.get(previous, -1) == nonempty[i] - 1):
+        if not (nonempty.get(previous, -1) == nonempty[i] - 1):
             l1.append(l2)
             l2 = []
         l2.append(afile[i - 1])
@@ -357,6 +357,33 @@ class TestEmentalTests():
     def test_1_34(self):
         assert block_list_list(["a", "b", "c", "d"], [1, 3, 4]) == [["a"], ["c", "d"]]
         pass
+
+
+def file_has_lines(file_fingerprints, required_fingerprints):
+    i = 0
+    fi = 0
+    while i < len(required_fingerprints):
+        j = 0
+        subblock = required_fingerprints[i]
+        while j < len(subblock) and fi < len(file_fingerprints):
+            if subblock[j] == file_fingerprints[fi]:
+                fi += 1
+                j += 1
+            else:
+                fi += 1
+        i += 1
+
+    return i == len(required_fingerprints) and j == len(required_fingerprints[-1])
+
+
+class TestModule2():
+
+    def test_matches(self):
+        required_fingerprints = [[2], [1, 0]]
+        file_fingerprints = [2, 'a', 'b', 1, 0]
+
+        assert file_has_lines(file_fingerprints, required_fingerprints)
+
 
 
 class TestCoverageAssumptions(CoverageTest):
