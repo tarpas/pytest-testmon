@@ -21,6 +21,7 @@ class TestGeneral(object):
         files = flip_dictionary(node_data)
         assert files == {'a': {'X': [1, 2, 3]}, 'b': {'X': [3, 4, 5], 'Y': [3, 6, 7]}}
 
+    @pytest.mark.xfail
     def test_sqlite_assumption(self):
         assert array(CHECKUMS_ARRAY_TYPE).itemsize == 4
 
@@ -74,7 +75,7 @@ class TestGeneral(object):
 
 class TestDepGraph():
     def test_dep_graph1(self):
-        assert is_dependent({'a.py': [101, 102]}, {'a.py': [101, 102, 3]}) == False
+        assert is_dependent({'a.py': [['1', '2']]}, {'a.py': ['1', '2', '3']}) == False
 
     def test_dep_graph_new(self):
         assert is_dependent({'a.py': [101, 102]}, {'new.py': get_modules([101, 102, 3]),
@@ -151,12 +152,13 @@ class TestDepGraph():
 
         assert set(td.file_data()) == set(['test_a.py', 'test_b.py'])
 
-        assert affected_nodeids(td.node_data, changes) == {'node1'}
+        assert stable(td.node_data, blockify(changes))[0] == {'node1'}
 
     def test_affected_list2(self):
-        changes = {'test_a.py': [102, 103]}
-        dependencies = {'node1': {'test_a.py': [102, 103, 104]}, }
-        assert affected_nodeids(dependencies, changes) == {'node1'}
+        changes = blockify({'test_a.py': [102, 103]})
+        dependencies = NodesData({'node1': {'test_a.py': [102, 103, 104]}, })
+
+        assert 'node1' not in stable(dependencies, changes)[0]
 
 
 def get_changed_files(dependencies, changes):
@@ -234,7 +236,7 @@ def affected_nodeids(dependencies, changes):
 
 
 def blockify(changes):
-    block_changes = {key: Block(value) for key, value in changes.items()}
+    block_changes = {key: Module(fingerprints=value) for key, value in changes.items()}
     return block_changes
 
 

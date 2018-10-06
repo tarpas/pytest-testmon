@@ -17,7 +17,8 @@ from testmon import import_mtimes
 
 import coverage
 
-from testmon.process_code import checksum_coverage, read_file_with_checksum
+from testmon.process_code import checksum_coverage, read_file_with_checksum, human_coverage, block_list_list, \
+    file_has_lines
 from testmon.process_code import Module
 
 if sys.version_info > (3,):
@@ -30,21 +31,12 @@ CHECKUMS_ARRAY_TYPE = 'I'
 
 
 def checksums_to_blob(checksums):
-    blob = array(CHECKUMS_ARRAY_TYPE, checksums)
-    try:
-        data = blob.tobytes()
-    except AttributeError:
-        data = blob.tostring()
-    return sqlite3.Binary(data)
+
+    return json.dumps(checksums)
 
 
 def blob_to_checksums(blob):
-    a = array(CHECKUMS_ARRAY_TYPE)
-    try:
-        a.frombytes(blob)
-    except AttributeError:
-        a.fromstring(blob)
-    return a.tolist()
+    return json.loads(blob)
 
 
 def _get_python_lib_paths():
@@ -72,8 +64,8 @@ def stable(node_data, changed_files):
     # but we'll make sure anyway
     for file in changed_files_set:
         for nodeid, checksums in file_data[file].items():
-            if set(checksums) - set(
-                    changed_files[file].checksums):  # the nodeid requires checksums which disapeared from
+            if file_has_lines(changed_files[file].fingerprints, checksums):
+                # the nodeid requires checksums which disapeared from
                 # the filesystem => the nodeid is "affected"
                 changed_nodes.add(nodeid)
                 changed_files2.add(nodeid.split('::', 1)[0])
@@ -196,7 +188,7 @@ class TestmonData(object):
           CREATE TABLE node_file (
             node_id INTEGER,
             file_name TEXT,
-            checksums BLOB,
+            checksums text,
             FOREIGN KEY(node_id) REFERENCES node(id) ON DELETE CASCADE)
     """)
         self._write_attribute('__data_version', str(self.DATA_VERSION), variant='default')
@@ -228,13 +220,13 @@ class TestmonData(object):
     def file_data(self):
         return flip_dictionary(self.node_data)
 
-    def get_nodedata(self, nodeid, coverage_data, rootdir):
+    def get_nodedata(self, nodeid, cov, rootdir):
         result = {}
-        for filename in coverage_data.measured_files():
+        for filename in cov.get_data().measured_files():
             relfilename = os.path.relpath(filename, rootdir)
-            lines = coverage_data.lines(filename)
+            lines = cov.get_data().lines(filename)
             if os.path.exists(filename):
-                result[relfilename] = checksum_coverage(self.source_tree.get_file(relfilename).blocks, lines)
+                result[relfilename] = block_list_list(self.source_tree.get_file(relfilename).lines, human_coverage(cov._analyze(filename)))  #checksum_coverage(self.source_tree.get_file(relfilename).blocks, lines)
         if not result:  # when testmon kicks-in the test module is already imported. If the test function is skipped
             # coverage_data is empty. However, we need to write down, that we depend on the
             # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)
@@ -335,7 +327,7 @@ class Testmon(object):
         if hasattr(self, 'sub_cov_file'):
             self.cov.combine()
 
-        testmon_data.set_dependencies(nodeid, testmon_data.get_nodedata(nodeid, self.cov.get_data(), rootdir), result)
+        testmon_data.set_dependencies(nodeid, testmon_data.get_nodedata(nodeid, self.cov, rootdir), result)
 
     def close(self):
         if hasattr(self, 'sub_cov_file'):

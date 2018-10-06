@@ -3,7 +3,7 @@ import sys
 
 import pytest
 from test.coveragepy import coveragetest
-from testmon.process_code import Module, checksum_coverage
+from testmon.process_code import Module, checksum_coverage, human_coverage
 from testmon.testmon_core import eval_variant, TestmonData as CoreTestmonData
 from testmon.testmon_core import Testmon as CoreTestmon
 
@@ -600,8 +600,7 @@ def test_add():
 
         deps = track_it(testdir, func)
 
-        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath):
-                    checksum_coverage(Module(filename=a.strpath).blocks, [2])} == deps
+        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath): [['def test_1():', '    a=1']]} == deps
 
     @pytest.mark.xfail
     def test_testmon_recursive(self, testdir, monkeypatch):

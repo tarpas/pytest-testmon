@@ -293,6 +293,7 @@ class TestModule(object):
 
 b = namedtuple('FakeBlock', 'start end')
 
+
 class TestEmentalTests():
 
     def test_create_emental(self):

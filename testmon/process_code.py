@@ -52,17 +52,20 @@ class Module(object):
     def __init__(self, source_code=None, filename='<unknown>', rootdir='', fingerprints=None):
         self.blocks = []
         self.counter = 0
-        self._fingerprints = fingerprints
-        if source_code is None:
-            source_code, _ = read_file_with_checksum(os.path.join(rootdir, filename))
+        if fingerprints:
+            self._fingerprints = fingerprints
         else:
-            source_code = textwrap.dedent(source_code)
-        self.lines = source_code.splitlines()
-        try:
-            tree = ast.parse(source_code, filename)
-            self.dump_and_block(tree, len(self.lines), name=filename)
-        except SyntaxError as e:
-            pass
+            self._fingerprints = None
+            if source_code is None:
+                source_code, _ = read_file_with_checksum(os.path.join(rootdir, filename))
+            else:
+                source_code = textwrap.dedent(source_code)
+            self.lines = source_code.splitlines()
+            try:
+                tree = ast.parse(source_code, filename)
+                self.dump_and_block(tree, len(self.lines), name=filename)
+            except SyntaxError as e:
+                pass
 
     def dump_and_block(self, node, end, name='unknown', into_block=False):
         """Frame of this method is taken from ast.dump
@@ -121,9 +124,12 @@ class Module(object):
         if self._fingerprints:
             return self._fingerprints
         else:
-            return [hashlib.sha1(l).hash() for l in self.lines]
+            return self.lines
 
 
+    def coverage_to_fingerprints(self, coverage):
+
+        return block_list_list(self.fingerprints, coverage)
 
 
 def checksum_coverage(blocks, lines):
@@ -153,7 +159,8 @@ def read_file_with_checksum(absfilename):
 blank_re = re.compile(r"\s*(#|$)")
 else_finally_re = re.compile(r"\s*(else|finally)\s*:\s*(#|$)")
 
-def annotate_file2(analysis):
+
+def human_coverage(analysis):
     result = set()
 
     source = analysis.file_reporter.source()
@@ -188,10 +195,6 @@ def annotate_file2(analysis):
     return result
 
 
-def human_coverage(analysis):
-    return annotate_file2(analysis)
-
-
 def create_emental(blocks):
     blocks = blocks.copy()
     module_level_block = blocks.pop()
@@ -201,7 +204,7 @@ def create_emental(blocks):
     return line_numbers
 
 
-def block_list_list(afile, line_numbers):
+def block_list_list(afile, coverage):
     previous = 'N/A'
     nonempty = {}
     i = 0
@@ -212,7 +215,7 @@ def block_list_list(afile, line_numbers):
 
     l2 = []
     l1 = []
-    for i in sorted(line_numbers):
+    for i in sorted(coverage):
         if not (nonempty.get(previous, -1) == nonempty[i] - 1):
             l1.append(l2)
             l2 = []
@@ -234,7 +237,7 @@ def file_has_lines(file_fingerprints, required_fingerprints):
                 fi += 1
                 j += 1
             else:
-                fi += 1
+                return False
         i += 1
 
     return i == len(required_fingerprints) and j == len(required_fingerprints[-1])

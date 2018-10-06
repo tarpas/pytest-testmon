@@ -4,15 +4,20 @@ from coverage.backward import StringIO
 from coverage.python import get_python_source
 from test.coveragepy.coveragetest import CoverageTest
 from coverage import env
-from testmon.process_code import human_coverage
+from testmon.process_code import human_coverage, Module
 
 
 class TestmonCoverageTest(CoverageTest):
 
-    def check_human_coverage(self, text, lines=None, *args, **kwargs):
+    def check_human_coverage(self, text, lines=None, fingerprints=None, *args, **kwargs):
         analysis = self.tm_check_coverage(text)
 
-        assert sorted(human_coverage(analysis)) == lines
+        m = Module(source_code=text)
+
+        hc = sorted(human_coverage(analysis))
+        assert hc == lines
+        if fingerprints:
+            assert m.coverage_to_fingerprints(hc) == fingerprints
 
 
 class BasicTestmonCoverageTest(TestmonCoverageTest):
@@ -20,14 +25,16 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
 
     def test_simple(self):
         self.check_human_coverage("""\
-            a = 1
-            b = 2
+        a = 1
+        b = 2
 
-            c = 4
-            # Nothing here
-            d = 6
-            """,
-            [1,2,4,6], report="4 0 0 0 100%")
+        c = 4
+        # Nothing here
+        d = 6
+        """,
+        [1,2,4,6],
+        fingerprints = [['a = 1', 'b = 2', 'c = 4', 'd = 6']],
+        report="4 0 0 0 100%")
 
     def test_indentation_wackiness(self):
         # Partial final lines are OK.
@@ -36,7 +43,7 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
             if not sys.path:
                 a = 1
                 """,    # indented last line
-            [1,2])
+            [1,2],)
 
     def test_multiline_initializer(self):
         self.check_human_coverage("""\
@@ -59,6 +66,17 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
             assert l == [12, 14, 16, 18]
             """,
             [1,2,3,4,5], "")
+
+    def test_method_surrounding(self):
+        self.check_human_coverage("""\
+            a = 1
+            def b():
+                pass
+            c = 1
+            """,
+            [1,2,4],
+            fingerprints=[['a = 1', 'def b():'], ['c = 1']],
+            report = "")
 
 
 class SimpleStatementTest(TestmonCoverageTest):
