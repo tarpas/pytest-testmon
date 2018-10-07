@@ -113,7 +113,8 @@ def pytest_cmdline_main(config):
 
 
 def is_active(config):
-    return config.getoption('testmon') and not (config.getoption("testmon_off"))
+    return (config.getoption('testmon') or config.getoption('testmon_readonly')) and not (
+        config.getoption("testmon_off"))
 
 
 def pytest_configure(config):
@@ -209,7 +210,7 @@ class TestmonDeselect(object):
 
     @pytest.mark.hookwrapper
     def pytest_runtest_protocol(self, item, nextitem):
-        if self.config.getoption('testmon') == u'readonly':
+        if self.config.getoption('testmon_readonly'):
             yield
         else:
             self.testmon.start()
