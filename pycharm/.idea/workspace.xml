@@ -2,7 +2,19 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="12bd0665-a97a-4e1f-83c6-15e12550ad0d" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/src/sk/infinit/testmon/SqliteMainTest.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/sk/infinit/testmon/TestmonAnnotator.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/sk/infinit/testmon/Util.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/sk/infinit/testmon/database/DatabaseService.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/sk/infinit/testmon/database/PyException.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/sk/infinit/testmon/database/PyFileMark.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/sk/infinit/testmon/server/HttpServerComponent.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/sk/infinit/testmon/server/TestmonPortServerManager.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources/META-INF/plugin.xml" beforeDir="false" afterPath="$PROJECT_DIR$/resources/META-INF/plugin.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/testmon-plugin.iml" beforeDir="false" afterPath="$PROJECT_DIR$/testmon-plugin.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/testmon-plugin.jar" beforeDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/out/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -53,32 +65,46 @@
     <session id="-1329596988">
       <usages-collector id="statistics.lifecycle.project">
         <counts>
-          <entry key="project.open.time.1" value="1" />
-          <entry key="project.opened" value="1" />
+          <entry key="project.closed" value="5" />
+          <entry key="project.open.time.1" value="2" />
+          <entry key="project.open.time.11" value="1" />
+          <entry key="project.open.time.2" value="1" />
+          <entry key="project.open.time.21" value="1" />
+          <entry key="project.open.time.23" value="1" />
+          <entry key="project.opened" value="6" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
+          <entry key="dummy" value="26" />
           <entry key="java" value="60" />
-          <entry key="kt" value="46" />
-          <entry key="xml" value="3" />
+          <entry key="kt" value="3478" />
+          <entry key="txt" value="26" />
+          <entry key="xml" value="68" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
           <entry key="JAVA" value="60" />
-          <entry key="Kotlin" value="46" />
-          <entry key="XML" value="3" />
+          <entry key="Kotlin" value="3478" />
+          <entry key="PLAIN_TEXT" value="52" />
+          <entry key="XML" value="68" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.open">
         <counts>
-          <entry key="java" value="1" />
+          <entry key="class" value="8" />
+          <entry key="java" value="3" />
+          <entry key="kt" value="29" />
+          <entry key="xml" value="3" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.open">
         <counts>
-          <entry key="JAVA" value="1" />
+          <entry key="CLASS" value="8" />
+          <entry key="JAVA" value="3" />
+          <entry key="Kotlin" value="29" />
+          <entry key="XML" value="3" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.vcs.git.usages" />
@@ -86,41 +112,35 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/resources/META-INF/plugin.xml">
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/TestmonAnnotator.kt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="195">
-              <caret line="13" column="41" lean-forward="true" selection-start-line="13" selection-start-column="41" selection-end-line="13" selection-end-column="41" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/JustForTestAction.java">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="180">
-              <caret line="12" column="70" selection-start-line="12" selection-start-column="70" selection-end-line="12" selection-end-column="70" />
+            <state relative-caret-position="147">
+              <caret line="39" lean-forward="true" selection-start-line="39" selection-end-line="39" />
               <folding>
-                <element signature="imports" expanded="true" />
+                <element signature="e#28#524#0" expanded="true" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/Message.kt">
+        <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/SqliteMainTest.kt">
           <provider selected="true" editor-type-id="text-editor">
-            <state>
-              <caret column="26" selection-start-column="8" selection-end-column="26" />
+            <state relative-caret-position="195">
+              <caret line="15" column="24" lean-forward="true" selection-start-line="15" selection-start-column="24" selection-end-line="15" selection-end-column="24" />
             </state>
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/MessageHttpService.kt">
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/database/DatabaseService.kt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="480">
-              <caret line="46" selection-start-line="46" selection-end-line="46" />
+            <state relative-caret-position="132">
+              <caret line="114" column="16" lean-forward="true" selection-start-line="114" selection-start-column="16" selection-end-line="114" selection-end-column="16" />
+              <folding>
+                <element signature="e#37#96#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -130,8 +150,9 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="Kotlin Class" />
         <option value="Class" />
+        <option value="Kotlin File" />
+        <option value="Kotlin Class" />
       </list>
     </option>
   </component>
@@ -140,6 +161,11 @@
       <find>byteArrayOutputStream</find>
       <find>--&gt;</find>
       <find>&lt;depends&gt;com.intellij.modules.lang&lt;/depends&gt;</find>
+      <find>Teste</find>
+      <find>errorSet</find>
+      <find>createErrorAnnotation</find>
+      <find>No suitable driver found for jdbc:sqlite: /home/winter/Projects/python/pytest-testmon-private/exampleproject/runtime_test_report.db</find>
+      <find>jdbc:sqlite:/home/winter/Projects/python/pytest-testmon-private/exampleproject/runtime_test_report.db</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -149,9 +175,21 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/src/sk/infinit/testmon/Message.kt" />
-        <option value="$PROJECT_DIR$/resources/META-INF/plugin.xml" />
         <option value="$PROJECT_DIR$/src/sk/infinit/testmon/JustForTestAction.java" />
         <option value="$PROJECT_DIR$/src/sk/infinit/testmon/MessageHttpService.kt" />
+        <option value="$PROJECT_DIR$/src/sk/infinit/testmon/HttpServerComponent.kt" />
+        <option value="$PROJECT_DIR$/src/sk/infinit/testmon/TestmonPortServerManager.kt" />
+        <option value="$PROJECT_DIR$/src/sk/infinit/testmon/SqliteMainTest.kt" />
+        <option value="$PROJECT_DIR$/resources/META-INF/plugin.xml" />
+        <option value="$PROJECT_DIR$/src/sk/infinit/testmon/Util.kt" />
+        <option value="$PROJECT_DIR$/src/sk/infinit/testmon/FileMark.kt" />
+        <option value="$PROJECT_DIR$/src/sk/infinit/testmon/FileMarkException.kt" />
+        <option value="$PROJECT_DIR$/src/sk/infinit/testmon/TestmonException.kt" />
+        <option value="$PROJECT_DIR$/src/sk/infinit/testmon/PyException.kt" />
+        <option value="$PROJECT_DIR$/src/sk/infinit/testmon/database/PyException.kt" />
+        <option value="$PROJECT_DIR$/src/sk/infinit/testmon/database/PyFileMark.kt" />
+        <option value="$PROJECT_DIR$/src/sk/infinit/testmon/database/DatabaseService.kt" />
+        <option value="$PROJECT_DIR$/src/sk/infinit/testmon/TestmonAnnotator.kt" />
       </list>
     </option>
   </component>
@@ -174,7 +212,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="PackagesPane" />
       <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
@@ -182,6 +219,17 @@
             <path>
               <item name="pycharm" type="b2602c69:ProjectViewProjectNode" />
               <item name="pycharm" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="pycharm" type="b2602c69:ProjectViewProjectNode" />
+              <item name="pycharm" type="462c0819:PsiDirectoryNode" />
+              <item name="resources" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="pycharm" type="b2602c69:ProjectViewProjectNode" />
+              <item name="pycharm" type="462c0819:PsiDirectoryNode" />
+              <item name="resources" type="462c0819:PsiDirectoryNode" />
+              <item name="META-INF" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="pycharm" type="b2602c69:ProjectViewProjectNode" />
@@ -194,18 +242,32 @@
               <item name="src" type="462c0819:PsiDirectoryNode" />
               <item name="testmon" type="462c0819:PsiDirectoryNode" />
             </path>
+            <path>
+              <item name="pycharm" type="b2602c69:ProjectViewProjectNode" />
+              <item name="pycharm" type="462c0819:PsiDirectoryNode" />
+              <item name="src" type="462c0819:PsiDirectoryNode" />
+              <item name="testmon" type="462c0819:PsiDirectoryNode" />
+              <item name="database" type="462c0819:PsiDirectoryNode" />
+            </path>
           </expand>
           <select />
         </subPane>
       </pane>
+      <pane id="PackagesPane" />
     </panes>
   </component>
   <component name="PropertiesComponent">
-    <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1538668560020" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1538917188593" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../../java/examples/ka-pycharm-plugin" />
     <property name="project.structure.last.edited" value="Modules" />
-    <property name="project.structure.proportion" value="0.0" />
-    <property name="project.structure.side.proportion" value="0.0" />
+    <property name="project.structure.proportion" value="0.15" />
+    <property name="project.structure.side.proportion" value="0.2" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveKotlinTopLevelDeclarationsDialog.RECENTS_KEY">
+      <recent name="sk.infinit.testmon.database" />
+      <recent name="sk.infinit.testmon.server" />
+    </key>
   </component>
   <component name="RunDashboard">
     <option name="ruleStates">
@@ -219,7 +281,20 @@
       </list>
     </option>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Plugin.Plugin">
+    <configuration name="sk.infinit.testmon.SqliteMainTestKt" type="JetRunConfigurationType" factoryName="Kotlin" temporary="true" nameIsGenerated="true">
+      <module name="testmon-plugin" />
+      <option name="VM_PARAMETERS" />
+      <option name="PROGRAM_PARAMETERS" />
+      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="false" />
+      <option name="ALTERNATIVE_JRE_PATH" />
+      <option name="PASS_PARENT_ENVS" value="true" />
+      <option name="MAIN_CLASS_NAME" value="sk.infinit.testmon.SqliteMainTestKt" />
+      <option name="WORKING_DIRECTORY" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="Plugin" type="#org.jetbrains.idea.devkit.run.PluginConfigurationType" factoryName="Plugin">
       <module name="testmon-plugin" />
       <option name="VM_PARAMETERS" value="-Xmx512m -Xms256m -ea" />
@@ -238,6 +313,15 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
+    <list>
+      <item itemvalue="Plugin.Plugin" />
+      <item itemvalue="Kotlin.sk.infinit.testmon.SqliteMainTestKt" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Kotlin.sk.infinit.testmon.SqliteMainTestKt" />
+      </list>
+    </recent_temporary>
   </component>
   <component name="SvnConfiguration">
     <configuration />
@@ -250,13 +334,21 @@
       <option name="presentableId" value="Default" />
       <updated>1538566759017</updated>
     </task>
+    <task id="LOCAL-00001" summary="Update vendor information.">
+      <created>1538668594232</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1538668594232</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="-1" y="26" width="1922" height="995" extended-state="7" />
+    <frame x="-1" y="26" width="1922" height="999" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.16927083" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.2203125" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Image Layers" order="2" />
       <window_info id="Designer" order="3" />
@@ -264,16 +356,16 @@
       <window_info id="Capture Tool" order="5" />
       <window_info id="Favorites" order="6" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
-      <window_info anchor="bottom" id="Find" order="1" />
-      <window_info anchor="bottom" id="Run" order="2" weight="0.32845894" />
-      <window_info anchor="bottom" id="Debug" order="3" weight="0.47356582" />
+      <window_info anchor="bottom" id="Find" order="1" weight="0.32922733" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.41769317" />
+      <window_info active="true" anchor="bottom" id="Debug" order="3" visible="true" weight="0.49832028" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" />
-      <window_info anchor="bottom" id="Terminal" order="7" />
+      <window_info anchor="bottom" id="Terminal" order="7" weight="0.32922733" />
       <window_info anchor="bottom" id="Event Log" order="8" side_tool="true" />
-      <window_info anchor="bottom" id="Version Control" order="9" show_stripe_button="false" />
-      <window_info anchor="bottom" id="Messages" order="10" />
+      <window_info anchor="bottom" id="Version Control" order="9" weight="0.3295838" />
+      <window_info anchor="bottom" id="Messages" order="10" weight="0.32922733" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
@@ -287,6 +379,10 @@
   <component name="VcsContentAnnotationSettings">
     <option name="myLimit" value="2678400000" />
   </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Update vendor information." />
+    <option name="LAST_COMMIT_MESSAGE" value="Update vendor information." />
+  </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
@@ -296,11 +392,70 @@
           <properties />
           <option name="timeStamp" value="1" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/sk/infinit/testmon/server/HttpServerComponent.kt</url>
+          <line>25</line>
+          <properties />
+          <option name="timeStamp" value="2" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/sk/infinit/testmon/server/HttpServerComponent.kt</url>
+          <line>37</line>
+          <properties />
+          <option name="timeStamp" value="3" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/sk/infinit/testmon/SqliteMainTest.kt</url>
+          <line>13</line>
+          <properties />
+          <option name="timeStamp" value="6" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/src/sk/infinit/testmon/TestmonAnnotator.kt</url>
+          <line>38</line>
+          <properties />
+          <option name="timeStamp" value="11" />
+        </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>
   <component name="debuggerHistoryManager">
     <expressions id="evaluateExpression">
+      <expression>
+        <expression-string>pyException.fileName</expression-string>
+        <language-id>kotlin</language-id>
+        <evaluation-mode>EXPRESSION</evaluation-mode>
+      </expression>
+      <expression>
+        <expression-string>pyExceptions</expression-string>
+        <language-id>kotlin</language-id>
+        <evaluation-mode>EXPRESSION</evaluation-mode>
+      </expression>
+      <expression>
+        <expression-string>virtualFileRelativePath</expression-string>
+        <language-id>kotlin</language-id>
+        <evaluation-mode>EXPRESSION</evaluation-mode>
+      </expression>
+      <expression>
+        <expression-string>sqlException</expression-string>
+        <language-id>kotlin</language-id>
+        <evaluation-mode>EXPRESSION</evaluation-mode>
+      </expression>
+      <expression>
+        <expression-string>databaseFilePath</expression-string>
+        <language-id>kotlin</language-id>
+        <evaluation-mode>EXPRESSION</evaluation-mode>
+      </expression>
+      <expression>
+        <expression-string>projectRootVirtualFile.path</expression-string>
+        <language-id>kotlin</language-id>
+        <evaluation-mode>EXPRESSION</evaluation-mode>
+      </expression>
+      <expression>
+        <expression-string>projectRootVirtualFile</expression-string>
+        <language-id>kotlin</language-id>
+        <evaluation-mode>EXPRESSION</evaluation-mode>
+      </expression>
       <expression>
         <expression-string>(ApplicationManagerEx.getApplication() as ApplicationImpl).name</expression-string>
         <language-id>kotlin</language-id>
@@ -309,16 +464,6 @@
       </expression>
       <expression>
         <expression-string>ApplicationManagerEx.getApplication().isHeadlessEnvironment</expression-string>
-        <language-id>kotlin</language-id>
-        <evaluation-mode>EXPRESSION</evaluation-mode>
-      </expression>
-      <expression>
-        <expression-string>ApplicationManagerEx.IDEA_APPLICATION</expression-string>
-        <language-id>kotlin</language-id>
-        <evaluation-mode>EXPRESSION</evaluation-mode>
-      </expression>
-      <expression>
-        <expression-string>ApplicationManager.getApplication().isUnitTestMode</expression-string>
         <language-id>kotlin</language-id>
         <evaluation-mode>EXPRESSION</evaluation-mode>
       </expression>
@@ -353,34 +498,163 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/resources/META-INF/plugin.xml">
+    <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/JustForTestAction.java" />
+    <entry file="jar://$USER_HOME$/Development/java/jdk/jdk1.8.0_112/jre/lib/rt.jar!/com/sun/net/httpserver/HttpServer.class">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="195">
-          <caret line="13" column="41" lean-forward="true" selection-start-line="13" selection-start-column="41" selection-end-line="13" selection-end-column="41" />
+        <state relative-caret-position="105">
+          <caret line="14" column="32" selection-start-line="14" selection-start-column="22" selection-end-line="14" selection-end-column="32" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/JustForTestAction.java">
+    <entry file="jar://$APPLICATION_HOME_DIR$/lib/platform-impl.jar!/com/intellij/openapi/components/impl/ComponentManagerImpl.class">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="180">
-          <caret line="12" column="70" selection-start-line="12" selection-start-column="70" selection-end-line="12" selection-end-column="70" />
+        <state relative-caret-position="147">
+          <caret line="646" selection-start-line="646" selection-end-line="646" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$APPLICATION_HOME_DIR$/lib/platform-api.jar!/com/intellij/codeInspection/LocalInspectionEP.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="90">
+          <caret line="11" column="63" lean-forward="true" selection-start-line="11" selection-start-column="63" selection-end-line="11" selection-end-column="63" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/server/TestmonPortServerManager.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="150">
+          <caret line="10" lean-forward="true" selection-start-line="10" selection-end-line="10" />
           <folding>
-            <element signature="imports" expanded="true" />
+            <element signature="e#28#106#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/server/HttpServerComponent.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="135">
+          <caret line="14" column="38" selection-start-line="14" selection-start-column="28" selection-end-line="14" selection-end-column="38" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$APPLICATION_HOME_DIR$/lib/platform-api.jar!/com/intellij/openapi/fileEditor/FileEditorManager.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="195">
+          <caret line="25" column="18" lean-forward="true" selection-start-line="25" selection-start-column="18" selection-end-line="25" selection-end-column="35" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$APPLICATION_HOME_DIR$/lib/platform-impl.jar!/com/intellij/codeInsight/daemon/impl/DefaultHighlightVisitor.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="124">
+          <caret line="154" column="52" selection-start-line="154" selection-start-column="52" selection-end-line="154" selection-end-column="52" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$APPLICATION_HOME_DIR$/lib/platform-impl.jar!/com/intellij/codeInsight/daemon/impl/GeneralHighlightingPass.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="139">
+          <caret line="524" selection-start-line="524" selection-end-line="524" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/Message.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state>
-          <caret column="26" selection-start-column="8" selection-end-column="26" />
+        <state relative-caret-position="75">
+          <caret line="5" column="6" selection-start-line="5" selection-start-column="6" selection-end-line="5" selection-end-column="6" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/MessageHttpService.kt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="480">
-          <caret line="46" selection-start-line="46" selection-end-line="46" />
+        <state relative-caret-position="375">
+          <caret line="41" selection-start-line="41" selection-end-line="41" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/Util.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="285">
+          <caret line="19" column="62" lean-forward="true" selection-start-line="19" selection-start-column="62" selection-end-line="19" selection-end-column="62" />
+          <folding>
+            <element signature="e#28#197#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/resources/META-INF/plugin.xml">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="585">
+          <caret line="39" column="94" lean-forward="true" selection-start-line="39" selection-start-column="94" selection-end-line="39" selection-end-column="94" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/database/PyException.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="75">
+          <caret line="5" column="29" selection-start-line="5" selection-start-column="29" selection-end-line="5" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/database/PyFileMark.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="75">
+          <caret line="5" column="48" selection-start-line="5" selection-start-column="48" selection-end-line="5" selection-end-column="48" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/Development/python/pycharm-community-2018.2.4/lib/openapi.jar!/com/intellij/openapi/vfs/VfsUtilCore.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="289">
+          <caret line="161" column="25" selection-start-line="161" selection-start-column="25" selection-end-line="161" selection-end-column="25" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/Development/python/pycharm-community-2018.2.4/lib/openapi.jar!/com/intellij/openapi/editor/EditorFactory.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="165">
+          <caret line="22" selection-start-line="22" selection-end-line="22" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/Development/java/jdk/jdk1.8.0_112/src.zip!/java/sql/Connection.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="304">
+          <caret line="104" lean-forward="true" selection-start-line="104" selection-end-line="104" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/Development/java/jdk/jdk1.8.0_112/src.zip!/java/lang/Class.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="281">
+          <caret line="260" column="27" selection-start-line="260" selection-start-column="27" selection-end-line="260" selection-end-column="27" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/database/DatabaseService.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="132">
+          <caret line="114" column="16" lean-forward="true" selection-start-line="114" selection-start-column="16" selection-end-line="114" selection-end-column="16" />
+          <folding>
+            <element signature="e#37#96#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/SqliteMainTest.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="195">
+          <caret line="15" column="24" lean-forward="true" selection-start-line="15" selection-start-column="24" selection-end-line="15" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/sk/infinit/testmon/TestmonAnnotator.kt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="147">
+          <caret line="39" lean-forward="true" selection-start-line="39" selection-end-line="39" />
+          <folding>
+            <element signature="e#28#524#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -441,7 +715,6 @@
             <option name="proportions">
               <list>
                 <option value="0.2" />
-                <option value="0.6" />
               </list>
             </option>
           </splitter-proportions>
@@ -449,6 +722,7 @@
       </state>
       <state key="ProjectLibrariesConfigurable.UI">
         <settings>
+          <last-edited>sqlite-jdbc-3.23.1</last-edited>
           <splitter-proportions>
             <option name="proportions">
               <list>
