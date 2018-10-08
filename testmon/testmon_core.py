@@ -13,6 +13,7 @@ import random
 import sqlite3
 import sys
 import textwrap
+from testmon import import_mtimes
 
 import coverage
 
@@ -377,7 +378,7 @@ class SourceTree():
     def get_file(self, filename):
         if filename not in self.changed_files:
             code, checksum = read_file_with_checksum(os.path.join(self.rootdir, filename))
-            self.mtimes[filename] = os.path.getmtime(os.path.join(self.rootdir, filename))
+            self.mtimes[filename] = import_mtimes.get(os.path.join(self.rootdir, filename))
             self.checksums[filename] = checksum
             self.changed_files[filename] = parse_file(filename=filename, rootdir=self.rootdir, source_code=code)
         return self.changed_files[filename]
