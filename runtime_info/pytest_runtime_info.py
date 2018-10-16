@@ -7,14 +7,16 @@ import sqlite3
 
 marks = list()
 
+
 def pytest_sessionstart(session):
-    conn = sqlite3.connect(os.path.join(str(session.config.rootdir), "runtime_test_report.db"))
+    conn = sqlite3.connect(os.path.join(str(session.config.rootdir), ".runtime_info"))
+    conn.execute("PRAGMA recursive_triggers = TRUE ")
     init_table(conn.cursor())
-    conn.close()
+    session.config.conn = conn
 
 
 def pytest_runtest_makereport(call, item):
-    conn = sqlite3.connect(os.path.join(str(item.config.rootdir), "runtime_test_report.db"))
+    conn = item.config.conn
     c = conn.cursor()
     c.execute("PRAGMA foreign_keys=on")
 
@@ -54,7 +56,6 @@ def pytest_runtest_makereport(call, item):
             if call.when == "call" and exception_id:
                 remove_exception_by_nodeid(c, exception_id[0])
     marks.clear()
-    conn.close()
 
 
 def is_project_path(path, cwd):
@@ -68,6 +69,7 @@ def get_exception_text(excinfo):
     reason = str(excinfo.value)
     typename = str(excinfo.typename)
     return "{}: {}".format(typename, reason)
+
 
 def contains_item(c, nodeid):
     c.execute("""SELECT exception_id,
@@ -89,7 +91,7 @@ def contains_exception(c, description):
     c.execute("""SELECT *
                 FROM Exception
                 WHERE description=:description
-    """, {"description":description})
+    """, {"description": description})
 
     if c.fetchall():
         return True
@@ -143,68 +145,52 @@ def insert_exception(c, excep):
 
 def insert_file_mark(c, mark_list, exception_id):
     for mark in mark_list:
+        param_list = []
+
+        common_params = {
+            "file_name": mark["path"],
+            "begin_line": mark["line"],
+            "check_output": mark["check_output"],
+            "exception_id": exception_id
+        }
+
         for mark_type in ["RedUnderLineDecoration", "Suffix"]:
-            c.execute("""INSERT INTO FileMark (
-                        type,
-                        text,
-                        file_name,
-                        begin_line,
-                        begin_character,
-                        end_line,
-                        end_character,
-                        check_content,
-                        exception_id)
-                        VALUES (:type, :text, :file_name, :begin_line, :begin_character,
-                                :end_line, :end_character, :check_output, :exception_id)""", {
-                                    "type": mark_type,
-                                    "text": mark["exception_text"],
-                                    "file_name": mark["path"],
-                                    "begin_line": mark["line"],
-                                    "begin_character": mark["start"],
-                                    "end_line": mark["line"],
-                                    "end_character": mark["end"],
-                                    "check_output": mark["check_output"],
-                                    "exception_id": exception_id
-                })
+
+            param_list.append(dict(
+                common_params,
+                **{
+                    "type": mark_type,
+                    "text": mark["exception_text"],
+                    "begin_character": mark["start"],
+                    "end_line": mark["line"],
+                    "end_character": mark["end"],
+                    "exception_id": exception_id
+                }))
 
         if "prev" in mark:
-            c.execute("""INSERT INTO FileMark
-                        VALUES (:id, :type, :text, :file_name, :begin_line, :begin_character,
-                                :end_line, :end_character, :check_output, :target_path,
-                                :target_line, :target_character, :gutterLinkType, :exception_id)""", {
-                                    "id": None,
-                                    "type": "GutterLink",
-                                    "text": mark["exception_text"],
-                                    "file_name": mark["path"],
-                                    "begin_line": mark["line"],
-                                    "begin_character": mark["start"],
-                                    "end_line": mark["line"],
-                                    "end_character": mark["end"],
-                                    "target_path": mark["prev"]["path"],
-                                    "target_line": mark["prev"]["line"],
-                                    "target_character": mark["prev"]["start"],
-                                    "gutterLinkType": "U",
-                                    "check_output": mark["check_output"],
-                                    "exception_id": exception_id
-                })
+            up = dict(common_params,
+                      **{"type": "GutterLink",
+                         "gutterLinkType": "U",
+                         "target_path": mark["prev"]["path"],
+                         "target_line": mark["prev"]["line"],
+                         "target_character": mark["prev"]["start"],
+                         })
+            param_list.append(up)
 
         if "next" in mark:
+            down = dict(common_params,
+                        **{
+                            "type": "GutterLink",
+                            "gutterLinkType": "D",
+                            "target_path": mark["next"]["path"],
+                            "target_line": mark["next"]["line"],
+                            "target_character": mark["next"]["start"],
+                        })
+            param_list.append(down)
+
+        for params in param_list:
             c.execute("""INSERT INTO FileMark
-                        VALUES (:id, :type, :text, :file_name, :begin_line, :begin_character,
-                                :end_line, :end_character, :check_output,
-                                :target_path, :target_line, :target_character, :gutterLinkType, :exception_id)""", {
-                                    "id": None,
-                                    "type": "GutterLink",
-                                    "text": mark["exception_text"],
-                                    "file_name": mark["path"],
-                                    "begin_line": mark["line"],
-                                    "begin_character": mark["start"],
-                                    "end_line": mark["line"],
-                                    "end_character": mark["end"],
-                                    "target_path": mark["next"]["path"],
-                                    "target_line": mark["next"]["line"],
-                                    "target_character": mark["next"]["start"],
-                                    "gutterLinkType": "D",
-                                    "check_output": mark["check_output"],
-                                    "exception_id": exception_id
-                })
+                         VALUES (:id, :type, :text, :file_name, :begin_line, :begin_character,
+                                :end_line, :end_character, :check_output, :target_path,
+                                :target_line, :target_character, :gutterLinkType, :exception_id)""",
+                      defaultdict(lambda: None, params))

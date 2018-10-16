@@ -38,7 +38,7 @@ def b_py(testdir):
 
 
 def test_plugin(testdir, lib_py, a_py, b_py):
-    db_file = os.path.join(os.getcwd(), "runtime_test_report.db")
+    db_file = os.path.join(os.getcwd(), ".runtime_info")
     conn = sqlite3.connect(db_file)
 
     c = conn.cursor()
