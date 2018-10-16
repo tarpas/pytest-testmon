@@ -32,7 +32,7 @@ fun logErrorMessage(exception: Exception) {
  * Get project Sqlite database file path.
  */
 fun getProjectDatabaseFilePath(projectRootVirtualFile: VirtualFile?) =
-        projectRootVirtualFile?.path + File.separator + "runtime_test_report.db"
+        projectRootVirtualFile?.path + File.separator + ".runtime_info"
 
 /**
  * Get virtual file relative path.
