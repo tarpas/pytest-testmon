@@ -3,14 +3,11 @@ package sk.infinit.testmon
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.Annotator
 import com.intellij.openapi.editor.*
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.openapi.util.TextRange
 import sk.infinit.testmon.database.DatabaseService
 import java.io.File
 import com.intellij.psi.PsiFile
-import sk.infinit.testmon.database.FileMarkType
-
 
 /**
  * Testmon Annotator implementation.
@@ -29,46 +26,33 @@ class TestmonAnnotator : Annotator {
 
             val databaseFilePath = getProjectDatabaseFilePath(projectRootVirtualFile)
 
+            val databaseService = DatabaseService(databaseFilePath)
+
+            val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
+
+            val pyFileFullPath = projectRootVirtualFile?.path + File.separator + virtualFileRelativePath
+
+            val fileMarks = databaseService.getRedUnderlineDecorationFileMarksByFileName(pyFileFullPath)
+
             val editor = EditorFactory.getInstance().allEditors[0] // FileEditorManager manager = FileEditorManager.getInstance(ModificationsPlugin.myProject);
 
-            val databaseService = DatabaseService(databaseFilePath)
-            val pyExceptions = databaseService.getPyExceptions()
+            for (fileMark in fileMarks) {
+                try {
+                    val logicalStartPosition = LogicalPosition(fileMark.beginLine, fileMark.beginCharacter)
+                    val logicalEndPosition = LogicalPosition(fileMark.endLine, fileMark.endCharacter)
 
-            for (pyException in pyExceptions) {
-                val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
+                    val startOffset = editor.logicalPositionToOffset(logicalStartPosition)
+                    val endOffset = editor.logicalPositionToOffset(logicalEndPosition)
 
-                val pyFileFullPath = projectRootVirtualFile?.path + File.separator + virtualFileRelativePath
+                    val range = TextRange(startOffset, endOffset)
 
-                if (pyFileFullPath == pyException.fileName) {
-                    val fileMarks = databaseService.getExceptionFileMarks(pyException)
+                    val pyException = databaseService.getPyException(fileMark.exceptionId)
 
-                    for (fileMark in fileMarks) {
-                        if (FileMarkType.RED_UNDERLINE_DECORATION.value == fileMark.type) {
-                            val currentVirtualFile = FileDocumentManager.getInstance().getFile(editor.document)
+                    val annotation = annotationHolder.createErrorAnnotation(range, pyException?.exceptionText)
 
-                            val currentVirtualFileRelativePath = getVirtualFileRelativePath(currentVirtualFile!!, projectRootVirtualFile)
-
-                            val currentPyFileFullPath = projectRootVirtualFile?.path + File.separator + currentVirtualFileRelativePath
-
-                            if (fileMark.fileName == currentPyFileFullPath) {
-                                try {
-                                    val logicalStartPosition = LogicalPosition(fileMark.beginLine, fileMark.beginCharacter)
-                                    val logicalEndPosition = LogicalPosition(fileMark.endLine, fileMark.endCharacter)
-
-                                    val startOffset = editor.logicalPositionToOffset(logicalStartPosition)
-                                    val endOffset = editor.logicalPositionToOffset(logicalEndPosition)
-
-                                    val range = TextRange(startOffset, endOffset)
-
-                                    val annotation = annotationHolder.createErrorAnnotation(range, pyException.exceptionText)
-
-                                    annotation.tooltip = pyException.description
-                                } catch (exception: Exception) {
-                                    logErrorMessage(exception.message!!)
-                                }
-                            }
-                        }
-                    }
+                    annotation.tooltip = pyException?.description
+                } catch (exception: Exception) {
+                    logErrorMessage(exception.message!!)
                 }
             }
         }

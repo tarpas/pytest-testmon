@@ -65,6 +65,42 @@ class DatabaseService(private val sqlLiteFilePath: String) {
     }
 
     /**
+     * Get PyFileMark's list by file name (path) and with type FileMarkType.RED_UNDERLINE_DECORATION.
+     */
+    fun getRedUnderlineDecorationFileMarksByFileName(fileName: String): List<PyFileMark> {
+        val pyFileMarks: MutableList<PyFileMark> = ArrayList()
+
+        var connection: Connection? = null
+        var statement: PreparedStatement? = null
+        var resultSet: ResultSet? = null
+
+        try {
+            try {
+                connection = openConnection()
+
+                statement = connection?.prepareStatement("select * from FileMark where file_name = ? and type = ?")
+
+                statement?.setString(1, fileName)
+                statement?.setString(2, FileMarkType.RED_UNDERLINE_DECORATION.value)
+
+                resultSet = statement?.executeQuery()
+
+                while (resultSet!!.next()) {
+                    pyFileMarks.add(mapResultSetToPyFileMark(resultSet))
+                }
+            } catch (sqlException: SQLException) {
+                logErrorMessage(sqlException)
+            }
+        } catch (sqlException: SQLException) {
+            logErrorMessage(sqlException)
+        } finally {
+            closeAll(connection, statement, resultSet)
+        }
+
+        return pyFileMarks
+    }
+
+    /**
      * Get PyFileMark's list for PyException.
      *
      * @return List<PyFileMark>
@@ -135,6 +171,39 @@ class DatabaseService(private val sqlLiteFilePath: String) {
         }
 
         return pyExceptions
+    }
+
+    /**
+     * Get PyException object by id.
+     */
+    fun getPyException(exceptionId: Int): PyException? {
+        var connection: Connection? = null
+        var statement: PreparedStatement? = null
+        var resultSet: ResultSet? = null
+
+        try {
+            try {
+                connection = openConnection()
+
+                statement = connection?.prepareStatement("SELECT * FROM Exception where exception_id = ?")
+
+                statement?.setInt(1, exceptionId)
+
+                resultSet = statement?.executeQuery()
+
+                if (resultSet!!.next()) {
+                    return mapResultSetToPyException(resultSet)
+                }
+            } catch (sqlException: SQLException) {
+                logErrorMessage(sqlException)
+            }
+        } catch (sqlException: SQLException) {
+            logErrorMessage(sqlException)
+        } finally {
+            closeAll(connection, statement, resultSet)
+        }
+
+        return null
     }
 
     /**
