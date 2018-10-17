@@ -1,10 +1,7 @@
 package sk.infinit.testmon
 
 import com.intellij.codeHighlighting.Pass
-import com.intellij.codeInsight.daemon.LineMarkerInfo
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo
-import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder
-import com.intellij.icons.AllIcons
 import com.intellij.ide.util.PsiNavigationSupport
 import com.intellij.navigation.GotoRelatedItem
 import com.intellij.openapi.editor.EditorFactory
@@ -40,9 +37,7 @@ class TestmonLineMarkerProvider : PyiRelatedItemLineMarkerProvider() {
 
         val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
 
-        val databaseFilePath = getProjectDatabaseFilePath(projectRootVirtualFile)
-
-        val databaseService = DatabaseService(databaseFilePath)
+        val databaseService = DatabaseService.getInstance(projectRootVirtualFile?.path)
 
         val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
 
@@ -84,6 +79,9 @@ class TestmonLineMarkerProvider : PyiRelatedItemLineMarkerProvider() {
         return targetPsiFile.findElementAt(targetLineStartOffset!!)
     }
 
+    /**
+     * Create RelatedItemLineMarkerInfo for provided PsiElement.
+     */
     private fun createLineMarkerInfo(element: PsiElement,
                                      relatedElement: PsiElement,
                                      itemTitle: String): RelatedItemLineMarkerInfo<PsiElement> {
