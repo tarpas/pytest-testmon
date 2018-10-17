@@ -17,6 +17,7 @@ import com.jetbrains.python.psi.PyFile
 import com.jetbrains.python.pyi.PyiRelatedItemLineMarkerProvider
 import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.PyFileMark
+import java.awt.event.MouseEvent
 import java.io.File
 
 /**
@@ -47,7 +48,7 @@ class TestmonLineMarkerProvider : PyiRelatedItemLineMarkerProvider() {
 
         for (fileMark in fileMarks) {
             if (fileMark.checkContent == psiElement.text) {
-                val targetPsiElement = getTargetPsiElement(fileMark, project)
+                val targetPsiElement = findTargetPsiElement(fileMark, project)
 
 //                val gutterIconBuilder = NavigationGutterIconBuilder
 //                        .create(AllIcons.General.Error)
@@ -67,7 +68,7 @@ class TestmonLineMarkerProvider : PyiRelatedItemLineMarkerProvider() {
     /**
      * Get target PsiElement to navigate.
      */
-    private fun getTargetPsiElement(fileMark: PyFileMark, project: Project): PsiElement? {
+    private fun findTargetPsiElement(fileMark: PyFileMark, project: Project): PsiElement? {
         val targetVirtualFile = VfsUtil.findFileByIoFile(File(fileMark.targetPath), false)
 
         val targetPsiFile = targetVirtualFile!!.toPsi(project) as PyFile
@@ -82,25 +83,25 @@ class TestmonLineMarkerProvider : PyiRelatedItemLineMarkerProvider() {
     /**
      * Create RelatedItemLineMarkerInfo for provided PsiElement.
      */
-    private fun createLineMarkerInfo(element: PsiElement,
-                                     relatedElement: PsiElement,
-                                     itemTitle: String): RelatedItemLineMarkerInfo<PsiElement> {
+    private fun createLineMarkerInfo(element: PsiElement, relatedElement: PsiElement, itemTitle: String): RelatedItemLineMarkerInfo<PsiElement> {
         val pointerManager = SmartPointerManager.getInstance(element.project)
         val relatedElementPointer = pointerManager.createSmartPsiElementPointer(relatedElement)
         val stubFileName = relatedElement.containingFile.name
 
-        return RelatedItemLineMarkerInfo(
-                element, element.textRange, ICON, Pass.LINE_MARKERS,
-                { element1 -> "$itemTitle in $stubFileName" }, { e, elt ->
+        val tooltipProvider: (PsiElement) -> String = { element1 -> "$itemTitle in $stubFileName" }
+
+        val navHandler: (MouseEvent, PsiElement) -> Unit = { e, elt ->
             val restoredRelatedElement = relatedElementPointer.element
 
             val offset = if (restoredRelatedElement is PsiFile) -1 else restoredRelatedElement!!.textOffset
             val virtualFile = PsiUtilCore.getVirtualFile(restoredRelatedElement)
+
             if (virtualFile != null && virtualFile.isValid) {
-                PsiNavigationSupport.getInstance()
-                        .createNavigatable(restoredRelatedElement.project, virtualFile, offset)
-                        .navigate(true)
+                PsiNavigationSupport.getInstance().createNavigatable(restoredRelatedElement.project, virtualFile, offset).navigate(true)
             }
-        }, GutterIconRenderer.Alignment.RIGHT, GotoRelatedItem.createItems(listOf(relatedElement)))
+        }
+
+        return RelatedItemLineMarkerInfo(element, element.textRange, ICON, Pass.LINE_MARKERS,
+                tooltipProvider, navHandler, GutterIconRenderer.Alignment.RIGHT, GotoRelatedItem.createItems(listOf(relatedElement)))
     }
 }
