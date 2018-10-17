@@ -6,7 +6,6 @@ import com.intellij.openapi.editor.markup.EffectType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import sk.infinit.testmon.database.DatabaseService
-import sk.infinit.testmon.database.FileMarkType
 import java.awt.Color
 import java.awt.Font
 import java.io.File
@@ -24,31 +23,21 @@ class TestmonEditorLinePainter : EditorLinePainter() {
     override fun getLineExtensions(project: Project, virtualFile: VirtualFile, lineNumber: Int): MutableCollection<LineExtensionInfo> {
         val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
 
-        val databaseFilePath = getProjectDatabaseFilePath(projectRootVirtualFile)
+        val databaseService = DatabaseService.getInstance(projectRootVirtualFile?.path)
 
-        val databaseService = DatabaseService(databaseFilePath)
-        val pyExceptions = databaseService.getPyExceptions()
+        val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
+        val pyFileFullPath = projectRootVirtualFile?.path + File.separator + virtualFileRelativePath
 
-        for (pyException in pyExceptions) {
-            if (lineNumber == pyException.lineNumber) {
-                val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
+        val fileMarks = databaseService.getRedUnderlineDecorationFileMarks(pyFileFullPath, lineNumber)
 
-                val pyFileFullPath = projectRootVirtualFile?.path + File.separator + virtualFileRelativePath
+        val lineExtensionInfos = mutableListOf<LineExtensionInfo>()
 
-                if (pyFileFullPath == pyException.fileName) {
-                    val fileMarks = databaseService.getExceptionFileMarks(pyException)
+        for (fileMark in fileMarks) {
+            val lineExtensionInfo = LineExtensionInfo("     ${fileMark.text}", Color.RED, EffectType.ROUNDED_BOX, null, Font.PLAIN)
 
-                    for (fileMark in fileMarks) {
-                        if (FileMarkType.RED_UNDERLINE_DECORATION.value == fileMark.type) {
-                            val lineExtensionInfo = LineExtensionInfo("     ${pyException.exceptionText}", Color.RED, EffectType.ROUNDED_BOX, null, Font.PLAIN)
-
-                            return mutableListOf(lineExtensionInfo)
-                        }
-                    }
-                }
-            }
+            lineExtensionInfos.add(lineExtensionInfo)
         }
 
-        return mutableListOf()
+        return lineExtensionInfos
     }
 }

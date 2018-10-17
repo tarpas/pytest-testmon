@@ -24,15 +24,13 @@ class TestmonAnnotator : Annotator {
 
             val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
 
-            val databaseFilePath = getProjectDatabaseFilePath(projectRootVirtualFile)
-
-            val databaseService = DatabaseService(databaseFilePath)
+            val databaseService = DatabaseService.getInstance(projectRootVirtualFile?.path)
 
             val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
 
             val pyFileFullPath = projectRootVirtualFile?.path + File.separator + virtualFileRelativePath
 
-            val fileMarks = databaseService.getRedUnderlineDecorationFileMarksByFileName(pyFileFullPath)
+            val fileMarks = databaseService.getRedUnderlineDecorationFileMarks(pyFileFullPath)
 
             val editor = EditorFactory.getInstance().allEditors[0] // FileEditorManager manager = FileEditorManager.getInstance(ModificationsPlugin.myProject);
 

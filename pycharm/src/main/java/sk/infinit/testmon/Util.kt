@@ -7,7 +7,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
-import java.io.File
 import java.lang.Exception
 
 /**
@@ -27,12 +26,6 @@ fun logErrorMessage(message: String) {
 fun logErrorMessage(exception: Exception) {
     Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Testmon message", exception.message.toString(), NotificationType.INFORMATION))
 }
-
-/**
- * Get project Sqlite database file path.
- */
-fun getProjectDatabaseFilePath(projectRootVirtualFile: VirtualFile?) =
-        projectRootVirtualFile?.path + File.separator + ".runtime_info"
 
 /**
  * Get virtual file relative path.

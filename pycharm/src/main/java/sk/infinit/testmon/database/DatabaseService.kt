@@ -1,6 +1,7 @@
 package sk.infinit.testmon.database
 
 import sk.infinit.testmon.logErrorMessage
+import java.io.File
 import java.sql.*
 
 
@@ -17,7 +18,19 @@ class DatabaseService(private val sqlLiteFilePath: String) {
             Class.forName("org.sqlite.JDBC")
         }
 
-        const val NAME = "DatabaseService"
+        /**
+         * Create new instance of DatabaseService.
+         */
+        fun getInstance(projectRootDirectoryPath: String?): DatabaseService {
+            val databaseFilePath = getProjectDatabaseFilePath(projectRootDirectoryPath)
+
+            return DatabaseService(databaseFilePath)
+        }
+
+        /**
+         * Get project Sqlite database file path.
+         */
+        private fun getProjectDatabaseFilePath(projectRootDirectoryPath: String?) = projectRootDirectoryPath + File.separator + ".runtime_info"
     }
 
     /**
@@ -67,7 +80,7 @@ class DatabaseService(private val sqlLiteFilePath: String) {
     /**
      * Get PyFileMark's list by file name (path) and with type FileMarkType.RED_UNDERLINE_DECORATION.
      */
-    fun getRedUnderlineDecorationFileMarksByFileName(fileName: String): List<PyFileMark> {
+    fun getRedUnderlineDecorationFileMarks(fileName: String): List<PyFileMark> {
         val pyFileMarks: MutableList<PyFileMark> = ArrayList()
 
         var connection: Connection? = null
@@ -82,6 +95,43 @@ class DatabaseService(private val sqlLiteFilePath: String) {
 
                 statement?.setString(1, fileName)
                 statement?.setString(2, FileMarkType.RED_UNDERLINE_DECORATION.value)
+
+                resultSet = statement?.executeQuery()
+
+                while (resultSet!!.next()) {
+                    pyFileMarks.add(mapResultSetToPyFileMark(resultSet))
+                }
+            } catch (sqlException: SQLException) {
+                logErrorMessage(sqlException)
+            }
+        } catch (sqlException: SQLException) {
+            logErrorMessage(sqlException)
+        } finally {
+            closeAll(connection, statement, resultSet)
+        }
+
+        return pyFileMarks
+    }
+
+    /**
+     * Get PyFileMark's list by file name (path) and begin line number and with type FileMarkType.RED_UNDERLINE_DECORATION.
+     */
+    fun getRedUnderlineDecorationFileMarks(fileName: String, lineNumber: Int): List<PyFileMark> {
+        val pyFileMarks: MutableList<PyFileMark> = ArrayList()
+
+        var connection: Connection? = null
+        var statement: PreparedStatement? = null
+        var resultSet: ResultSet? = null
+
+        try {
+            try {
+                connection = openConnection()
+
+                statement = connection?.prepareStatement("select * from FileMark where file_name = ? and begin_line = ? and type = ?")
+
+                statement?.setString(1, fileName)
+                statement?.setInt(2, lineNumber)
+                statement?.setString(3, FileMarkType.RED_UNDERLINE_DECORATION.value)
 
                 resultSet = statement?.executeQuery()
 
