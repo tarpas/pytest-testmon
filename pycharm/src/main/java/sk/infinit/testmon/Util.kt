@@ -3,10 +3,16 @@ package sk.infinit.testmon
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.Notifications
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiDocumentManager
+import com.intellij.psi.PsiFile
+import java.io.File
 import java.lang.Exception
 
 /**
@@ -40,3 +46,19 @@ fun getVirtualFileRelativePath(virtualFile: VirtualFile, projectRootVirtualFile:
  * @return VirtualFile?
  */
 fun getProjectRootDirectoryVirtualFile(project: Project, virtualFile: VirtualFile): VirtualFile? = ProjectFileIndex.SERVICE.getInstance(project).getContentRootForFile(virtualFile)
+
+/**
+ * Return VirtualFile by full real path to file.
+ */
+fun findVirtualFile(filePath: String?) = VfsUtil.findFileByIoFile(File(filePath), false)
+
+/**
+ * Get Editor object for PsiFile.
+ */
+fun getEditor(project: Project, psiFile: PsiFile): Editor {
+    val document = PsiDocumentManager.getInstance(project).getDocument(psiFile)
+
+    val editors = EditorFactory.getInstance().getEditors(document!!)
+
+    return editors[0]
+}

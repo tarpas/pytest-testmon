@@ -28,7 +28,8 @@
         <annotator language="Python" implementationClass="sk.infinit.testmon.TestmonAnnotator"/>
 
         <editor.linePainter implementation="sk.infinit.testmon.TestmonEditorLinePainter"/>
-        <codeInsight.lineMarkerProvider language="Python" implementationClass="sk.infinit.testmon.TestmonLineMarkerProvider"/>
+
+        <codeInsight.lineMarkerProvider language="Python" implementationClass="sk.infinit.testmon.TestmonRelatedItemLineMarkerProvider"/>
     </extensions>
 
     <actions>
