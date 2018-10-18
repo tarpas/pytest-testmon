@@ -55,10 +55,14 @@ fun findVirtualFile(filePath: String?) = VfsUtil.findFileByIoFile(File(filePath)
 /**
  * Get Editor object for PsiFile.
  */
-fun getEditor(project: Project, psiFile: PsiFile): Editor {
+fun getEditor(project: Project, psiFile: PsiFile): Editor? {
     val document = PsiDocumentManager.getInstance(project).getDocument(psiFile)
 
     val editors = EditorFactory.getInstance().getEditors(document!!)
 
-    return editors[0]
+    if (editors.isNotEmpty()) {
+        return editors[0]
+    }
+
+    return null
 }

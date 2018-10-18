@@ -27,7 +27,7 @@ class TestmonRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() {
             val project = psiElement.project
             val virtualFile = psiElement.containingFile.virtualFile
 
-            val editor = getEditor(project, psiElement.containingFile)
+            val editor = getEditor(project, psiElement.containingFile) ?: return
 
             val offsetToLogicalPosition = editor.offsetToLogicalPosition(psiElement.textOffset)
 
@@ -66,7 +66,15 @@ class TestmonRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() {
 
         val targetDocument = targetPsiFile.viewProvider.document
 
-        val targetLineStartOffset = targetDocument?.getLineStartOffset(fileMark.targetLine + 1)
+        val targetLine = fileMark.targetLine + 1
+
+        val targetLineStartOffset: Int?
+
+        targetLineStartOffset = if (targetLine == targetDocument?.lineCount) {
+            targetDocument.getLineStartOffset(targetLine - 1)
+        } else {
+            targetDocument?.getLineStartOffset(targetLine)
+        }
 
         return targetPsiFile.findElementAt(targetLineStartOffset!!)
     }
