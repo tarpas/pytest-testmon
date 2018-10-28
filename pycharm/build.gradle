@@ -43,22 +43,14 @@ task setupPycharm() {
                 from tarTree(resources.gzip('.gradle/downloads/pycharm.zip'))
                 into '.gradle/ide'
             }
-        } else if (Os.isFamily(Os.FAMILY_MAC)) {
-            download {
-                src 'https://download.jetbrains.com/python/pycharm-community-2018.2.4.zip'
-                dest '.gradle/downloads/pycharm.zip'
-            }
-            copy {
-                from tarTree(resources.gzip('.gradle/downloads/pycharm.zip'))
-                into '.gradle/ide'
-            }
-        } else if (Os.isFamily(Os.FAMILY_UNIX)) {
+        } else if (Os.isFamily(Os.FAMILY_UNIX) || Os.isFamily(Os.FAMILY_MAC)) {
             download {
                 src 'https://download.jetbrains.com/python/pycharm-community-2018.2.4.tar.gz'
-                dest '.gradle/downloads/pycharm.zip'
+                dest '.gradle/downloads/pycharm.tar.gz'
+                overwrite false
             }
             copy {
-                from tarTree(resources.gzip('.gradle/downloads/pycharm.zip'))
+                from tarTree(resources.gzip('.gradle/downloads/pycharm.tar.gz'))
                 into '.gradle/ide'
             }
         }
