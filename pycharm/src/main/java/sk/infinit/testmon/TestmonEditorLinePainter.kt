@@ -33,7 +33,11 @@ class TestmonEditorLinePainter : EditorLinePainter() {
         val lineExtensionInfos = mutableListOf<LineExtensionInfo>()
 
         for (fileMark in fileMarks) {
-            val lineExtensionInfo = LineExtensionInfo("     ${fileMark.text}", Color.RED, EffectType.ROUNDED_BOX, null, Font.PLAIN)
+            val lineExtensionInfo = LineExtensionInfo(
+                    "     ${fileMark.text}",
+                    Color.RED,
+                    EffectType.ROUNDED_BOX,
+                    null, Font.PLAIN)
 
             lineExtensionInfos.add(lineExtensionInfo)
         }

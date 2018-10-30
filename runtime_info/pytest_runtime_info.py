@@ -11,6 +11,7 @@ marks = list()
 def pytest_sessionstart(session):
     conn = sqlite3.connect(os.path.join(str(session.config.rootdir), ".runtime_info"))
     conn.execute("PRAGMA recursive_triggers = TRUE ")
+    conn.execute("PRAGMA foreign_keys=on")
     init_table(conn.cursor())
     session.config.conn = conn
 
@@ -18,7 +19,6 @@ def pytest_sessionstart(session):
 def pytest_runtest_makereport(call, item):
     conn = item.config.conn
     c = conn.cursor()
-    c.execute("PRAGMA foreign_keys=on")
 
     with conn:
         if call.excinfo:
@@ -42,19 +42,14 @@ def pytest_runtest_makereport(call, item):
                     last_mark_info["next"] = mark_info
                 marks.append(mark_info)
                 last_mark_info = mark_info
-            if last_mark_info and not contains_exception(c, item.nodeid + ": " + exception_text):
-                exception = {
-                    "path": last_mark_info["path"],
-                    "description": item.nodeid + ": " + exception_text,
-                    "line": last_mark_info["line"],
-                    "exception_text": exception_text
-                }
-                exception_id = insert_exception(c, exception)
+            if last_mark_info:
+                exception_id = insert_exception(c,
+                                                item.nodeid,
+                                                exception_text,
+                                                last_mark_info)
                 insert_file_mark(c, marks, exception_id)
-        else:
-            exception_id = contains_item(c, item.nodeid)
-            if call.when == "call" and exception_id:
-                remove_exception_by_nodeid(c, exception_id[0])
+        elif call.when == 'setup':
+            remove_exception_by_nodeid(c, item.nodeid)
     marks.clear()
 
 
@@ -71,31 +66,10 @@ def get_exception_text(excinfo):
     return "{}: {}".format(typename, reason)
 
 
-def contains_item(c, nodeid):
-    c.execute("""SELECT exception_id,
-                INSTR(description, :nodeid) found
-                FROM Exception
-                WHERE found > 0
-    """, {"nodeid": nodeid})
-
-    return c.fetchone()
-
-
-def remove_exception_by_nodeid(c, exception_id):
+def remove_exception_by_nodeid(c, nodeid):
     c.execute("""DELETE FROM Exception
-                WHERE exception_id=:exception_id
-    """, {"exception_id": exception_id})
-
-
-def contains_exception(c, description):
-    c.execute("""SELECT *
-                FROM Exception
-                WHERE description=:description
-    """, {"description": description})
-
-    if c.fetchall():
-        return True
-    return False
+                WHERE nodeid=:nodeid
+    """, {"nodeid": nodeid})
 
 
 def init_table(c):
@@ -105,9 +79,9 @@ def init_table(c):
     if c.fetchone() is None:
         c.execute("""CREATE TABLE Exception (
                     exception_id INTEGER PRIMARY KEY,
+                    nodeid text UNIQUE,
                     file_name text,
                     line integer,
-                    description text,
                     exception_text text
         )""")
 
@@ -131,14 +105,14 @@ def init_table(c):
         )""")
 
 
-def insert_exception(c, excep):
-    c.execute("""INSERT INTO Exception (
+def insert_exception(c, nodeid, text, mark):
+    c.execute("""INSERT OR REPLACE INTO Exception (
+                nodeid,
                 file_name,
                 line,
-                description,
                 exception_text
                 )
-                VALUES (:path, :line, :description, :exception_text)""", excep)
+                VALUES (:nodeid, :file_name, :line, :exception_text)""", [nodeid, mark["path"], mark["line"], text])
 
     return c.lastrowid
 
@@ -155,7 +129,6 @@ def insert_file_mark(c, mark_list, exception_id):
         }
 
         for mark_type in ["RedUnderLineDecoration", "Suffix"]:
-
             param_list.append(dict(
                 common_params,
                 **{
