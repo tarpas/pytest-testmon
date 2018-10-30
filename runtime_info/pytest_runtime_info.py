@@ -2,17 +2,24 @@
 
 from collections import defaultdict
 import os
-import tempfile
 import sqlite3
 
 marks = list()
 
 
 def pytest_sessionstart(session):
-    conn = sqlite3.connect(os.path.join(str(session.config.rootdir), ".runtime_info"))
+    datafile = os.path.join(session.config.rootdir.strpath, ".runtime_info")
+    print("datafile", datafile)
+    new_db = not os.path.exists(datafile)
+
+    conn = sqlite3.connect(datafile)
+
+    if new_db:
+        init_tables(conn)
+
     conn.execute("PRAGMA recursive_triggers = TRUE ")
     conn.execute("PRAGMA foreign_keys=on")
-    init_table(conn.cursor())
+
     session.config.conn = conn
 
 
@@ -72,37 +79,11 @@ def remove_exception_by_nodeid(c, nodeid):
     """, {"nodeid": nodeid})
 
 
-def init_table(c):
+def init_tables(conn):
     # check if there is a table named FileMark in the database, if not: create
-    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='FileMark'")
 
-    if c.fetchone() is None:
-        c.execute("""CREATE TABLE Exception (
-                    exception_id INTEGER PRIMARY KEY,
-                    nodeid text UNIQUE,
-                    file_name text,
-                    line integer,
-                    exception_text text
-        )""")
-
-        c.execute("""CREATE TABLE FileMark (
-                    file_mark_id INTEGER PRIMARY KEY,
-                    type text,
-                    text text,
-                    file_name text,
-                    begin_line integer,
-                    begin_character integer,
-                    end_line integer,
-                    end_character integer,
-                    check_content text,
-                    target_path text,
-                    target_line integer,
-                    target_character integer,
-                    gutterLinkType text,
-                    exception_id integer NOT NULL,
-                        FOREIGN KEY (exception_id) REFERENCES exception(exception_id)
-                        ON DELETE CASCADE
-        )""")
+    for statement in CREATE_STATEMENTS:
+        conn.execute(statement)
 
 
 def insert_exception(c, nodeid, text, mark):
@@ -167,3 +148,37 @@ def insert_file_mark(c, mark_list, exception_id):
                                 :end_line, :end_character, :check_output, :target_path,
                                 :target_line, :target_character, :gutterLinkType, :exception_id)""",
                       defaultdict(lambda: None, params))
+
+
+# These constitute the protocol towards front-end, don't forget to change front-end when changing this.
+CREATE_STATEMENTS = [
+    """        
+    CREATE TABLE Exception (
+    exception_id INTEGER PRIMARY KEY,
+    nodeid text UNIQUE, -- any "test/nodeid" can have at most one exception 
+    file_name text, -- file_name:line is used in a list of exceptions. It's the most sensible place where user 
+                    -- should be navigated when double-clicking the exception.  (Not implemented yet)  
+    line integer, -- see above
+    exception_text text) -- eg "ZeroDivisionError: division by zero"
+    """
+    ,
+    """
+    CREATE TABLE FileMark (
+        file_mark_id INTEGER PRIMARY KEY,
+        type text,
+        text text,
+        file_name text,
+        begin_line integer,
+        begin_character integer,
+        end_line integer,
+        end_character integer,
+        check_content text,
+        target_path text,
+        target_line integer,
+        target_character integer,
+        gutterLinkType text,
+        exception_id integer NOT NULL,
+            FOREIGN KEY (exception_id) REFERENCES exception(exception_id)
+            ON DELETE CASCADE)
+    """
+]

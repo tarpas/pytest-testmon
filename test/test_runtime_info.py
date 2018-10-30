@@ -34,24 +34,15 @@ def b_py(testdir):
             assert True
     """)
 
-@pytest.fixture
-def conn(testdir):
-    return sqlite3.connect('.runtime_info')
 
+def test_plugin(testdir, lib_py, a_py, b_py):
 
-def test_plugin(testdir, conn, lib_py, a_py, b_py):
-
-    c = conn.cursor()
-
-    try:
-        file_modified = os.stat('.runtime_info').st_mtime
-    except Exception:
-        file_modified = 0
     test_result = testdir.runpytest()
     # test if failed
     test_result.assert_outcomes(failed=2, passed=1)
     # test if result file was modified
-    assert file_modified != os.stat(".runtime_info").st_mtime
+
+    c = sqlite3.connect('.runtime_info').cursor()
 
     a_file = os.path.join(str(testdir.tmpdir), "test_a.py")
     b_file = os.path.join(str(testdir.tmpdir), "test_b.py")
@@ -85,7 +76,7 @@ def test_plugin(testdir, conn, lib_py, a_py, b_py):
     assert len([x for x in gutterMarks if x[9] == lib_file]) == 2
     assert len([x for x in gutterMarks if x[9] == a_file]) == 1
 
-def test_remove(testdir, conn):
+def test_remove(testdir):
     testdir.makepyfile(test_a="""
         def test_1():
             assert False
@@ -93,6 +84,7 @@ def test_remove(testdir, conn):
 
     testdir.runpytest()
 
+    conn = sqlite3.connect('.runtime_info')
     c = conn.cursor()
     c.execute("SELECT count(*) as count FROM FileMark")
     result = c.fetchone()[0]
