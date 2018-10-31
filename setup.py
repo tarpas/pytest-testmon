@@ -1,26 +1,22 @@
 from setuptools import setup
 
 setup(
-    name='pytest-testmon',
-    description='take TDD to a new level with py.test and testmon',
-    long_description=''.join(open('README.rst').readlines()),
-    version='0.10.0',
+    name='runtime-info',
+    description='TODO',
+    long_description='TODO',
+    version='0.15.0',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
-    packages=['testmon', 'runtime_info'],
-    url='https://github.com/tarpas/pytest-testmon/',
+    packages=['runtime_info'],
+    #url='https://github.com/tarpas/pytest-testmon/',
     author_email='tibor.arpas@infinit.sk',
-    author='Tibor Arpas, Jozef Knaperek, Martin Riesz, Daniel Hahler',
+    author='Tibor Arpas',
     entry_points={
         'pytest11': [
-            'testmon = testmon.pytest_testmon',
             'runtime_info = runtime_info.pytest_runtime_info'
         ],
-        'tox': [
-            'testmon = testmon.tox_testmon',
-        ],
     },
-    install_requires=['pytest>=3.3.0,<4', 'coverage>=4'],
+    install_requires=['pytest>=3.3.0,<4'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
