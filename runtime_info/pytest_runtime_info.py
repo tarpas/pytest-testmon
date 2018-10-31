@@ -9,7 +9,6 @@ marks = list()
 
 def pytest_sessionstart(session):
     datafile = os.path.join(session.config.rootdir.strpath, ".runtime_info")
-    print("datafile", datafile)
     new_db = not os.path.exists(datafile)
 
     conn = sqlite3.connect(datafile)
