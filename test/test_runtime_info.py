@@ -2,6 +2,7 @@ import os
 import pytest
 import sqlite3
 
+pytest_plugins = "pytester",
 
 @pytest.fixture
 def lib_py(testdir):
