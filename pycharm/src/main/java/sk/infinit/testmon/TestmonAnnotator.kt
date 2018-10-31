@@ -48,7 +48,7 @@ class TestmonAnnotator : Annotator {
 
                     val annotation = annotationHolder.createErrorAnnotation(range, pyException?.exceptionText)
 
-                    annotation.tooltip = pyException?.description
+                    annotation.tooltip = pyException?.exceptionText
                 } catch (exception: Exception) {
                     logErrorMessage(exception.message!!)
                 }

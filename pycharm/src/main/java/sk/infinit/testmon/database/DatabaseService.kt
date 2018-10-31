@@ -263,10 +263,9 @@ class DatabaseService(private val sqlLiteFilePath: String) {
         val exceptionId = resultSet.getInt("exception_id")
         val fileName = resultSet.getString("file_name")
         val line = resultSet.getInt("line")
-        val description = resultSet.getString("description")
         val exceptionText = resultSet.getString("exception_text")
 
-        val fileMarkException = PyException(exceptionId, fileName, line, description, exceptionText)
+        val fileMarkException = PyException(exceptionId, fileName, line, exceptionText)
         return fileMarkException
     }
 

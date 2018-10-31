@@ -1,6 +1,4 @@
-from runtime_info import pytest_runtime_info
 import os
-import json
 import pytest
 import sqlite3
 
@@ -36,22 +34,24 @@ def b_py(testdir):
             assert True
     """)
 
+@pytest.fixture
+def conn(testdir):
+    return sqlite3.connect('.runtime_info')
 
-def test_plugin(testdir, lib_py, a_py, b_py):
-    db_file = os.path.join(os.getcwd(), ".runtime_info")
-    conn = sqlite3.connect(db_file)
+
+def test_plugin(testdir, conn, lib_py, a_py, b_py):
 
     c = conn.cursor()
 
     try:
-        file_modified = os.stat(db_file).st_mtime
+        file_modified = os.stat('.runtime_info').st_mtime
     except Exception:
         file_modified = 0
     test_result = testdir.runpytest()
     # test if failed
     test_result.assert_outcomes(failed=2, passed=1)
     # test if result file was modified
-    assert file_modified != os.stat(db_file).st_mtime
+    assert file_modified != os.stat(".runtime_info").st_mtime
 
     a_file = os.path.join(str(testdir.tmpdir), "test_a.py")
     b_file = os.path.join(str(testdir.tmpdir), "test_b.py")
@@ -65,8 +65,8 @@ def test_plugin(testdir, lib_py, a_py, b_py):
     assert len(result) == 2
 
     # test the exception paths
-    assert len([x for x in result if x[1] == lib_file]) == 1
-    assert len([x for x in result if x[1] == b_file]) == 1
+    assert len([x for x in result if x[2] == lib_file]) == 1
+    assert len([x for x in result if x[2] == b_file]) == 1
 
     # FileMark Table
     c.execute("SELECT * FROM FileMark")
@@ -84,3 +84,32 @@ def test_plugin(testdir, lib_py, a_py, b_py):
     # test the target paths for the gutterMarks above
     assert len([x for x in gutterMarks if x[9] == lib_file]) == 2
     assert len([x for x in gutterMarks if x[9] == a_file]) == 1
+
+def test_remove(testdir, conn):
+    testdir.makepyfile(test_a="""
+        def test_1():
+            assert False
+    """)
+
+    testdir.runpytest()
+
+    c = conn.cursor()
+    c.execute("SELECT count(*) as count FROM FileMark")
+    result = c.fetchone()[0]
+    assert result == 2
+
+    testdir.makepyfile(test_a="""
+        def test_1():
+            assert True
+    """)
+
+    testdir.runpytest()
+
+    c = conn.cursor()
+    c.execute("SELECT count(*) as count FROM FileMark")
+    result = c.fetchone()[0]
+    assert result == 0
+
+
+
+
