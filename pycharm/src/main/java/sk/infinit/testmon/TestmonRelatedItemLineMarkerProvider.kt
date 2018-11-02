@@ -32,12 +32,13 @@ class TestmonRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() {
             val offsetToLogicalPosition = editor.offsetToLogicalPosition(psiElement.textOffset)
 
             val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
+                    ?: return
 
-            val databaseService = DatabaseService.getInstance(projectRootVirtualFile?.path)
+            val databaseService = DatabaseService.getInstance(projectRootVirtualFile.path)
 
             val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
 
-            val pyFileFullPath = projectRootVirtualFile?.path + File.separator + virtualFileRelativePath
+            val pyFileFullPath = projectRootVirtualFile.path + File.separator + virtualFileRelativePath
 
             val fileMarks = databaseService.getGutterLinkFileMarks(pyFileFullPath, offsetToLogicalPosition.line)
 
@@ -45,14 +46,16 @@ class TestmonRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() {
                 if (fileMark.checkContent == psiElement.text) {
                     val targetVirtualFile = findVirtualFile(fileMark.targetPath)
 
-                    val targetPsiElement = findTargetPsiElement(fileMark, project, targetVirtualFile!!)
+                    if (targetVirtualFile != null) {
+                        val targetPsiElement = findTargetPsiElement(fileMark, project, targetVirtualFile)
 
-                    val navigationGutterIconBuilder = NavigationGutterIconBuilder
-                            .create(AllIcons.General.Error)
-                            .setTarget(targetPsiElement)
-                            .setTooltipText("File ${targetVirtualFile.name}, Line ${fileMark.targetLine}")
+                        val navigationGutterIconBuilder = NavigationGutterIconBuilder
+                                .create(AllIcons.General.Error)
+                                .setTarget(targetPsiElement)
+                                .setTooltipText("File ${targetVirtualFile.name}, Line ${fileMark.targetLine}")
 
-                    resultCollection.add(navigationGutterIconBuilder.createLineMarkerInfo(psiElement))
+                        resultCollection.add(navigationGutterIconBuilder.createLineMarkerInfo(psiElement))
+                    }
                 }
             }
         }

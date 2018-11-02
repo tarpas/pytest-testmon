@@ -21,16 +21,17 @@ class TestmonEditorLinePainter : EditorLinePainter() {
      * @return MutableCollection<LineExtensionInfo>
      */
     override fun getLineExtensions(project: Project, virtualFile: VirtualFile, lineNumber: Int): MutableCollection<LineExtensionInfo> {
-        val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
+        val lineExtensionInfos = mutableListOf<LineExtensionInfo>()
 
-        val databaseService = DatabaseService.getInstance(projectRootVirtualFile?.path)
+        val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
+                ?: return lineExtensionInfos
+
+        val databaseService = DatabaseService.getInstance(projectRootVirtualFile.path)
 
         val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
-        val pyFileFullPath = projectRootVirtualFile?.path + File.separator + virtualFileRelativePath
+        val pyFileFullPath = projectRootVirtualFile.path + File.separator + virtualFileRelativePath
 
         val fileMarks = databaseService.getRedUnderlineDecorationFileMarks(pyFileFullPath, lineNumber)
-
-        val lineExtensionInfos = mutableListOf<LineExtensionInfo>()
 
         for (fileMark in fileMarks) {
             val lineExtensionInfo = LineExtensionInfo(
