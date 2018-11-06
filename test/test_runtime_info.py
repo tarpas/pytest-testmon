@@ -38,7 +38,7 @@ def b_py(testdir):
 
 def test_plugin(testdir, lib_py, a_py, b_py):
 
-    test_result = testdir.runpytest()
+    test_result = testdir.runpytest('--runtime-info')
     # test if failed
     test_result.assert_outcomes(failed=2, passed=1)
     # test if result file was modified
@@ -83,7 +83,7 @@ def test_remove(testdir):
             assert False
     """)
 
-    testdir.runpytest()
+    testdir.runpytest('--runtime-info')
 
     conn = sqlite3.connect('.runtime_info')
     c = conn.cursor()
@@ -102,6 +102,20 @@ def test_remove(testdir):
     c.execute("SELECT count(*) as count FROM FileMark")
     result = c.fetchone()[0]
     assert result == 0
+
+
+def test_start_without_plugin_option(testdir):
+    """
+    Run plugin without '--runtime-info' option. So DB wont be created and query should cause exception.
+    """
+    testdir.runpytest()
+
+    c = sqlite3.connect('.runtime_info').cursor()
+
+    # Exception Table
+    with pytest.raises(sqlite3.OperationalError):
+        c.execute("SELECT * FROM Exception")
+
 
 
 

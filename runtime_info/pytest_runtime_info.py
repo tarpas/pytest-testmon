@@ -7,56 +7,76 @@ import sqlite3
 marks = list()
 
 
-def pytest_sessionstart(session):
-    datafile = os.path.join(session.config.rootdir.strpath, ".runtime_info")
-    new_db = not os.path.exists(datafile)
-
-    conn = sqlite3.connect(datafile)
-
-    if new_db:
-        init_tables(conn)
-
-    conn.execute("PRAGMA recursive_triggers = TRUE ")
-    conn.execute("PRAGMA foreign_keys=on")
-
-    session.config.conn = conn
+def get_db_path(config):
+    return os.path.join(config.rootdir.strpath, ".runtime_info")
 
 
-def pytest_runtest_makereport(call, item):
-    conn = item.config.conn
-    c = conn.cursor()
+def should_run(config):
+    return config.getoption('--runtime-info') or os.path.exists(get_db_path(config))
 
-    with conn:
-        if call.excinfo:
-            last_mark_info = None
-            exception_text = get_exception_text(call.excinfo)
-            for traceback_entry in call.excinfo.traceback:
-                if not is_project_path(traceback_entry.path, item.config.rootdir):
-                    continue  # skiping files outside of project path
-                striped_statement = str(traceback_entry.statement).lstrip()
-                start = len(str(traceback_entry.statement)) - len(striped_statement)
-                mark_info = {
-                    "exception_text": exception_text,
-                    "path": str(traceback_entry.path),
-                    "line": traceback_entry.lineno,
-                    "start": start,
-                    "end": len(str(traceback_entry.statement)),
-                    "check_output": striped_statement
-                }
+
+def pytest_configure(config):
+    if should_run(config):
+        config.pluginmanager.register(RuntimeInfo(), "RuntimeInfo")
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--runtime-info", action="store_true", default=False, help="Run with runtime-info plugin."
+    )
+
+
+class RuntimeInfo(object):
+
+    def pytest_sessionstart(self, session):
+        db_path = get_db_path(session.config)
+        db_exists = os.path.exists(db_path)
+
+        conn = sqlite3.connect(db_path)
+
+        if not db_exists:
+            init_tables(conn)
+
+        conn.execute("PRAGMA recursive_triggers = TRUE ")
+        conn.execute("PRAGMA foreign_keys=on")
+
+        session.config.conn = conn
+
+    def pytest_runtest_makereport(self, call, item):
+        conn = item.config.conn
+        c = conn.cursor()
+
+        with conn:
+            if call.excinfo:
+                last_mark_info = None
+                exception_text = get_exception_text(call.excinfo)
+                for traceback_entry in call.excinfo.traceback:
+                    if not is_project_path(traceback_entry.path, item.config.rootdir):
+                        continue  # skiping files outside of project path
+                    striped_statement = str(traceback_entry.statement).lstrip()
+                    start = len(str(traceback_entry.statement)) - len(striped_statement)
+                    mark_info = {
+                        "exception_text": exception_text,
+                        "path": str(traceback_entry.path),
+                        "line": traceback_entry.lineno,
+                        "start": start,
+                        "end": len(str(traceback_entry.statement)),
+                        "check_output": striped_statement
+                    }
+                    if last_mark_info:
+                        mark_info["prev"] = last_mark_info
+                        last_mark_info["next"] = mark_info
+                    marks.append(mark_info)
+                    last_mark_info = mark_info
                 if last_mark_info:
-                    mark_info["prev"] = last_mark_info
-                    last_mark_info["next"] = mark_info
-                marks.append(mark_info)
-                last_mark_info = mark_info
-            if last_mark_info:
-                exception_id = insert_exception(c,
-                                                item.nodeid,
-                                                exception_text,
-                                                last_mark_info)
-                insert_file_mark(c, marks, exception_id)
-        elif call.when == 'setup':
-            remove_exception_by_nodeid(c, item.nodeid)
-    marks.clear()
+                    exception_id = insert_exception(c,
+                                                    item.nodeid,
+                                                    exception_text,
+                                                    last_mark_info)
+                    insert_file_mark(c, marks, exception_id)
+            elif call.when == 'setup':
+                remove_exception_by_nodeid(c, item.nodeid)
+        marks.clear()
 
 
 def is_project_path(path, cwd):
