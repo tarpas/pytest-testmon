@@ -21,7 +21,7 @@ import java.lang.Exception
  * @param message - source message to log as Error message
  */
 fun logErrorMessage(message: String) {
-    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Testmon message", message, NotificationType.INFORMATION))
+    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Testmon message", message, NotificationType.ERROR))
 }
 
 /**
@@ -30,7 +30,7 @@ fun logErrorMessage(message: String) {
  * @param exception - source exception to log as Error message
  */
 fun logErrorMessage(exception: Exception) {
-    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Testmon message", exception.message.toString(), NotificationType.INFORMATION))
+    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Testmon message", exception.message.toString(), NotificationType.ERROR))
 }
 
 /**

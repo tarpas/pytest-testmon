@@ -26,7 +26,7 @@ class TestmonEditorLinePainter : EditorLinePainter() {
         val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
                 ?: return lineExtensionInfos
 
-        val databaseService = DatabaseService.getInstance(projectRootVirtualFile.path)
+        val databaseService = DatabaseService.getInstance()
 
         val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
         val pyFileFullPath = projectRootVirtualFile.path + File.separator + virtualFileRelativePath

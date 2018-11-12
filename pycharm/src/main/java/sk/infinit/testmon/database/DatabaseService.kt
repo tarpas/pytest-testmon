@@ -1,73 +1,44 @@
-package sk.infinit.testmon.database
+ package sk.infinit.testmon.database
 
 import sk.infinit.testmon.logErrorMessage
 import java.io.File
 import java.sql.*
-
+import java.sql.SQLException
+import java.sql.ResultSet
+import java.util.*
 
 /**
  * Database service to wokr with Sqlite project files.
  */
-class DatabaseService(private val sqlLiteFilePath: String) {
+class DatabaseService private constructor() {
+
+    /**
+     * Connection instance for current project.
+     */
+    private var connection: Connection? = null
+
+    /**
+     * Path to Sqlite database file
+     */
+    private var databaseFilePath: String? = null
 
     /**
      * Companion object for 'static' initialization of Sqlite JDBC driver.
      */
     companion object {
+        const val FILE_MARK_TABLE_NAME = "FileMark"
+        const val EXCEPTION_TABLE_NAME = "Exception"
+
         init {
             Class.forName("org.sqlite.JDBC")
         }
 
-        /**
-         * Create new instance of DatabaseService.
-         */
-        fun getInstance(projectRootDirectoryPath: String?): DatabaseService {
-            val databaseFilePath = getProjectDatabaseFilePath(projectRootDirectoryPath)
+        private val databaseServiceInstance: DatabaseService = DatabaseService()
 
-            return DatabaseService(databaseFilePath)
+        @Synchronized
+        fun getInstance(): DatabaseService {
+            return databaseServiceInstance
         }
-
-        /**
-         * Get project Sqlite database file path.
-         */
-        private fun getProjectDatabaseFilePath(projectRootDirectoryPath: String?) = projectRootDirectoryPath + File.separator + ".runtime_info"
-    }
-
-    /**
-     * Get PyFileMark's list for PyException.
-     *
-     * @return List<PyFileMark>
-     */
-    fun getExceptionFileMarks(exception: PyException): List<PyFileMark> {
-        val pyFileMarks: MutableList<PyFileMark> = ArrayList()
-
-        var connection: Connection? = null
-        var statement: PreparedStatement? = null
-        var resultSet: ResultSet? = null
-
-        try {
-            try {
-                connection = openConnection()
-
-                statement = connection?.prepareStatement("select * from FileMark where exception_id = ?")
-
-                statement?.setInt(1, exception.id)
-
-                resultSet = statement?.executeQuery()
-
-                while (resultSet!!.next()) {
-                    pyFileMarks.add(mapResultSetToPyFileMark(resultSet))
-                }
-            } catch (sqlException: SQLException) {
-                logErrorMessage(sqlException)
-            }
-        } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException)
-        } finally {
-            closeAll(connection, statement, resultSet)
-        }
-
-        return pyFileMarks
     }
 
     /**
@@ -91,7 +62,7 @@ class DatabaseService(private val sqlLiteFilePath: String) {
             try {
                 connection = openConnection()
 
-                statement = connection?.prepareStatement("select * from FileMark where file_name = ? and type = ?")
+                statement = connection?.prepareStatement("select * from $FILE_MARK_TABLE_NAME where file_name = ? and type = ?")
 
                 statement?.setString(1, fileName)
                 statement?.setString(2, FileMarkType.RED_UNDERLINE_DECORATION.value)
@@ -127,7 +98,7 @@ class DatabaseService(private val sqlLiteFilePath: String) {
             try {
                 connection = openConnection()
 
-                statement = connection?.prepareStatement("select * from FileMark where file_name = ? and begin_line = ? and type = ?")
+                statement = connection?.prepareStatement("select * from $FILE_MARK_TABLE_NAME where file_name = ? and begin_line = ? and type = ?")
 
                 statement?.setString(1, fileName)
                 statement?.setInt(2, lineNumber)
@@ -166,7 +137,7 @@ class DatabaseService(private val sqlLiteFilePath: String) {
             try {
                 connection = openConnection()
 
-                statement = connection?.prepareStatement("select * from FileMark where file_name = ? and begin_line = ? and type = ?")
+                statement = connection?.prepareStatement("select * from $FILE_MARK_TABLE_NAME where file_name = ? and begin_line = ? and type = ?")
 
                 statement?.setString(1, fileName)
                 statement?.setInt(2, beginLine)
@@ -190,40 +161,6 @@ class DatabaseService(private val sqlLiteFilePath: String) {
     }
 
     /**
-     * Get PyException objects from database file.
-     *
-     * @return List<PyException>
-     */
-    fun getPyExceptions(): List<PyException> {
-        val pyExceptions: MutableList<PyException> = ArrayList()
-
-        var connection: Connection? = null
-        var statement: Statement? = null
-        var resultSet: ResultSet? = null
-
-        try {
-            try {
-                connection = openConnection()
-
-                statement = connection?.createStatement()
-                resultSet = statement?.executeQuery("SELECT * FROM Exception")
-
-                while (resultSet!!.next()) {
-                    pyExceptions.add(mapResultSetToPyException(resultSet))
-                }
-            } catch (sqlException: SQLException) {
-                logErrorMessage(sqlException)
-            }
-        } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException)
-        } finally {
-            closeAll(connection, statement, resultSet)
-        }
-
-        return pyExceptions
-    }
-
-    /**
      * Get PyException object by id.
      */
     fun getPyException(exceptionId: Int): PyException? {
@@ -235,7 +172,7 @@ class DatabaseService(private val sqlLiteFilePath: String) {
             try {
                 connection = openConnection()
 
-                statement = connection?.prepareStatement("SELECT * FROM Exception where exception_id = ?")
+                statement = connection?.prepareStatement("SELECT * FROM $EXCEPTION_TABLE_NAME where exception_id = ?")
 
                 statement?.setInt(1, exceptionId)
 
@@ -265,8 +202,7 @@ class DatabaseService(private val sqlLiteFilePath: String) {
         val line = resultSet.getInt("line")
         val exceptionText = resultSet.getString("exception_text")
 
-        val fileMarkException = PyException(exceptionId, fileName, line, exceptionText)
-        return fileMarkException
+        return PyException(exceptionId, fileName, line, exceptionText)
     }
 
     /**
@@ -293,12 +229,69 @@ class DatabaseService(private val sqlLiteFilePath: String) {
     }
 
     /**
-     * Open Sqlite connection.
-     *
-     * @return Connection?
+     * Initialize Database Service: open one connection for instance.
+     */
+    fun initialize(projectRootDirectoryPath: String) {
+        databaseFilePath = getProjectDatabaseFilePath(projectRootDirectoryPath)
+
+        val isDatabaseFileExists = checkIsDatabaseFileExists()
+
+        if (!isDatabaseFileExists) {
+            throw Exception("Sqlite database file '.runtime_file' not exists.")
+        }
+
+        val isFileMarkTableExists = checkIsTableExists(FILE_MARK_TABLE_NAME)
+
+        if (!isFileMarkTableExists) {
+            throw Exception("Database table '$FILE_MARK_TABLE_NAME' not exists.")
+        }
+
+        val isExceptionTableExists = checkIsTableExists(EXCEPTION_TABLE_NAME)
+
+        if (!isExceptionTableExists) {
+            throw Exception("Database table '$EXCEPTION_TABLE_NAME' not exists.")
+        }
+    }
+
+    /**
+     * Close connection
+     */
+    fun dispose() {
+        closeConnection(connection)
+    }
+
+    /**
+     * Check is table exists in database.
+     */
+    private fun checkIsTableExists(tableName: String): Boolean {
+        connection = openConnection()
+
+        val metaData = connection?.metaData
+
+        val resultSet = metaData?.getTables(null, null, tableName, null)
+
+        val isTableExists = resultSet != null && resultSet.next()
+
+        closeResultSet(resultSet)
+        closeConnection(connection)
+
+        return isTableExists
+    }
+
+    /**
+     * Check is Sqlite database file exists.
+     */
+    private fun checkIsDatabaseFileExists(): Boolean {
+        val runtimeInfoFile = File(databaseFilePath)
+
+        return runtimeInfoFile.exists()
+    }
+
+    /**
+     * Open Sqlite database connection by full file path.
      */
     private fun openConnection(): Connection? {
-        return DriverManager.getConnection("jdbc:sqlite:$sqlLiteFilePath")
+        return DriverManager.getConnection("jdbc:sqlite:$databaseFilePath")
     }
 
     /**
@@ -314,7 +307,6 @@ class DatabaseService(private val sqlLiteFilePath: String) {
         } catch (sqlException: SQLException) {
             logErrorMessage(sqlException.message!!)
         }
-
     }
 
     /**
@@ -324,9 +316,7 @@ class DatabaseService(private val sqlLiteFilePath: String) {
      */
     private fun closeStatement(statement: Statement?) {
         try {
-            if (statement != null) {
-                statement.close()
-            }
+            statement?.close()
         } catch (sqlException: SQLException) {
             logErrorMessage(sqlException.message!!)
         }
@@ -370,4 +360,9 @@ class DatabaseService(private val sqlLiteFilePath: String) {
         closeStatement(statement)
         closeConnection(connection)
     }
+
+    /**
+     * Get project Sqlite database file path.
+     */
+    private fun getProjectDatabaseFilePath(projectRootDirectoryPath: String?) = projectRootDirectoryPath + File.separator + ".runtime_info"
 }

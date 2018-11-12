@@ -27,7 +27,7 @@ class TestmonAnnotator : Annotator {
             val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
                     ?: return
 
-            val databaseService = DatabaseService.getInstance(projectRootVirtualFile.path)
+            val databaseService = DatabaseService.getInstance()
 
             val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
 
