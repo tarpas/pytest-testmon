@@ -1,4 +1,4 @@
-package sk.infinit.testmon
+package sk.infinit.testmon.extensions
 
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider
@@ -13,6 +13,10 @@ import com.jetbrains.python.psi.PyStatement
 import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
+import sk.infinit.testmon.findVirtualFile
+import sk.infinit.testmon.getEditor
+import sk.infinit.testmon.getProjectRootDirectoryVirtualFile
+import sk.infinit.testmon.getVirtualFileRelativePath
 import java.io.File
 
 /**
@@ -28,7 +32,8 @@ class TestmonRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() {
             val project = psiElement.project
             val virtualFile = psiElement.containingFile.virtualFile
 
-            val editor = getEditor(project, psiElement.containingFile) ?: return
+            val editor = getEditor(project, psiElement.containingFile)
+                    ?: return
 
             val offsetToLogicalPosition = editor.offsetToLogicalPosition(psiElement.textOffset)
 

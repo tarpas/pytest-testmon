@@ -12,6 +12,9 @@ import com.intellij.openapi.extensions.ExtensionsArea
 import com.intellij.openapi.project.Project
 import com.intellij.util.containers.stream
 import sk.infinit.testmon.database.DatabaseService
+import sk.infinit.testmon.extensions.TestmonAnnotator
+import sk.infinit.testmon.extensions.TestmonEditorLinePainter
+import sk.infinit.testmon.extensions.TestmonRelatedItemLineMarkerProvider
 
 /**
  * Project component implementation for Testmon plugin.

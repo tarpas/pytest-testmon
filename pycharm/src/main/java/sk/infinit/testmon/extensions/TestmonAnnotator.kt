@@ -1,4 +1,4 @@
-package sk.infinit.testmon
+package sk.infinit.testmon.extensions
 
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.Annotator
@@ -10,6 +10,9 @@ import java.io.File
 import com.intellij.psi.PsiManager
 import com.jetbrains.python.psi.PyStatement
 import sk.infinit.testmon.database.FileMarkType
+import sk.infinit.testmon.getProjectRootDirectoryVirtualFile
+import sk.infinit.testmon.getVirtualFileRelativePath
+import sk.infinit.testmon.logErrorMessage
 
 /**
  * Testmon Annotator implementation.

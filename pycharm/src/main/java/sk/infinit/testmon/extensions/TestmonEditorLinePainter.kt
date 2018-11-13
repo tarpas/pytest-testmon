@@ -1,4 +1,4 @@
-package sk.infinit.testmon
+package sk.infinit.testmon.extensions
 
 import com.intellij.openapi.editor.EditorLinePainter
 import com.intellij.openapi.editor.LineExtensionInfo
@@ -11,6 +11,8 @@ import com.intellij.psi.PsiManager
 import com.jetbrains.python.psi.PyStatement
 import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.FileMarkType
+import sk.infinit.testmon.getProjectRootDirectoryVirtualFile
+import sk.infinit.testmon.getVirtualFileRelativePath
 import java.awt.Color
 import java.awt.Font
 import java.io.File

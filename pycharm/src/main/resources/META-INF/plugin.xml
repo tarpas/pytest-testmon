@@ -31,11 +31,11 @@
     </project-components>
 
     <extensions defaultExtensionNs="com.intellij">
-        <annotator language="Python" implementationClass="sk.infinit.testmon.TestmonAnnotator"/>
+        <annotator language="Python" implementationClass="sk.infinit.testmon.extensions.TestmonAnnotator"/>
 
-        <editor.linePainter implementation="sk.infinit.testmon.TestmonEditorLinePainter"/>
+        <editor.linePainter implementation="sk.infinit.testmon.extensions.TestmonEditorLinePainter"/>
 
-        <codeInsight.lineMarkerProvider language="Python" implementationClass="sk.infinit.testmon.TestmonRelatedItemLineMarkerProvider"/>
+        <codeInsight.lineMarkerProvider language="Python" implementationClass="sk.infinit.testmon.extensions.TestmonRelatedItemLineMarkerProvider"/>
     </extensions>
 
     <actions>
