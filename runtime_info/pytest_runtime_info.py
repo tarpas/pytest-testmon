@@ -36,11 +36,18 @@ class RuntimeInfo(object):
 
         if not db_exists:
             init_tables(conn)
+            session.config.db_created = True
 
         conn.execute("PRAGMA recursive_triggers = TRUE ")
         conn.execute("PRAGMA foreign_keys=on")
 
         session.config.conn = conn
+
+    def pytest_report_header(self, config, startdir):
+        if hasattr(config, 'db_created'):
+            return ['Database for runtime-info plugin created']
+        else:
+            return []
 
     def pytest_collection_modifyitems(self, session, config, items):
         conn = config.conn
