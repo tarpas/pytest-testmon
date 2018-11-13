@@ -6,6 +6,7 @@ import com.intellij.openapi.editor.markup.EffectType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import sk.infinit.testmon.database.DatabaseService
+import sk.infinit.testmon.database.FileMarkType
 import java.awt.Color
 import java.awt.Font
 import java.io.File
@@ -31,7 +32,8 @@ class TestmonEditorLinePainter : EditorLinePainter() {
         val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
         val pyFileFullPath = projectRootVirtualFile.path + File.separator + virtualFileRelativePath
 
-        val fileMarks = databaseService.getRedUnderlineDecorationFileMarks(pyFileFullPath, lineNumber)
+        val fileMarks = databaseService
+                .getFileMarks(pyFileFullPath, lineNumber, FileMarkType.RED_UNDERLINE_DECORATION.value)
 
         for (fileMark in fileMarks) {
             val lineExtensionInfo = LineExtensionInfo(

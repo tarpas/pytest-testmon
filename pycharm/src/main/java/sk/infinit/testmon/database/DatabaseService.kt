@@ -1,4 +1,4 @@
- package sk.infinit.testmon.database
+package sk.infinit.testmon.database
 
 import sk.infinit.testmon.logErrorMessage
 import java.io.File
@@ -6,6 +6,7 @@ import java.sql.*
 import java.sql.SQLException
 import java.sql.ResultSet
 import java.util.*
+import java.util.stream.Collectors
 
 /**
  * Database service to wokr with Sqlite project files.
@@ -42,91 +43,11 @@ class DatabaseService private constructor() {
     }
 
     /**
-     * Get PyFileMark's where type is FileMarkType.GUTTER_LINK.
-     */
-    fun getGutterLinkFileMarks(fileName: String, beginLine: Int): List<PyFileMark> {
-        return getFileMarks(fileName, beginLine, FileMarkType.GUTTER_LINK.value)
-    }
-
-    /**
-     * Get PyFileMark's list by file name (path) and with type FileMarkType.RED_UNDERLINE_DECORATION.
-     */
-    fun getRedUnderlineDecorationFileMarks(fileName: String): List<PyFileMark> {
-        val pyFileMarks: MutableList<PyFileMark> = ArrayList()
-
-        var connection: Connection? = null
-        var statement: PreparedStatement? = null
-        var resultSet: ResultSet? = null
-
-        try {
-            try {
-                connection = openConnection()
-
-                statement = connection?.prepareStatement("select * from $FILE_MARK_TABLE_NAME where file_name = ? and type = ?")
-
-                statement?.setString(1, fileName)
-                statement?.setString(2, FileMarkType.RED_UNDERLINE_DECORATION.value)
-
-                resultSet = statement?.executeQuery()
-
-                while (resultSet!!.next()) {
-                    pyFileMarks.add(mapResultSetToPyFileMark(resultSet))
-                }
-            } catch (sqlException: SQLException) {
-                logErrorMessage(sqlException)
-            }
-        } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException)
-        } finally {
-            closeAll(connection, statement, resultSet)
-        }
-
-        return pyFileMarks
-    }
-
-    /**
-     * Get PyFileMark's list by file name (path) and begin line number and with type FileMarkType.RED_UNDERLINE_DECORATION.
-     */
-    fun getRedUnderlineDecorationFileMarks(fileName: String, lineNumber: Int): List<PyFileMark> {
-        val pyFileMarks: MutableList<PyFileMark> = ArrayList()
-
-        var connection: Connection? = null
-        var statement: PreparedStatement? = null
-        var resultSet: ResultSet? = null
-
-        try {
-            try {
-                connection = openConnection()
-
-                statement = connection?.prepareStatement("select * from $FILE_MARK_TABLE_NAME where file_name = ? and begin_line = ? and type = ?")
-
-                statement?.setString(1, fileName)
-                statement?.setInt(2, lineNumber)
-                statement?.setString(3, FileMarkType.RED_UNDERLINE_DECORATION.value)
-
-                resultSet = statement?.executeQuery()
-
-                while (resultSet!!.next()) {
-                    pyFileMarks.add(mapResultSetToPyFileMark(resultSet))
-                }
-            } catch (sqlException: SQLException) {
-                logErrorMessage(sqlException)
-            }
-        } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException)
-        } finally {
-            closeAll(connection, statement, resultSet)
-        }
-
-        return pyFileMarks
-    }
-
-    /**
      * Get PyFileMark's list for PyException.
      *
      * @return List<PyFileMark>
      */
-    fun getFileMarks(fileName: String, beginLine: Int, type: String): List<PyFileMark> {
+    fun getFileMarks(fileName: String, beginLine: Int?, type: String): List<PyFileMark> {
         val pyFileMarks: MutableList<PyFileMark> = ArrayList()
 
         var connection: Connection? = null
@@ -134,22 +55,17 @@ class DatabaseService private constructor() {
         var resultSet: ResultSet? = null
 
         try {
-            try {
-                connection = openConnection()
+            connection = openConnection()
 
-                statement = connection?.prepareStatement("select * from $FILE_MARK_TABLE_NAME where file_name = ? and begin_line = ? and type = ?")
+            statement = connection?.prepareStatement("select * from $FILE_MARK_TABLE_NAME where file_name = ? and type = ?")
 
-                statement?.setString(1, fileName)
-                statement?.setInt(2, beginLine)
-                statement?.setString(3, type)
+            statement?.setString(1, fileName)
+            statement?.setString(2, type)
 
-                resultSet = statement?.executeQuery()
+            resultSet = statement?.executeQuery()
 
-                while (resultSet!!.next()) {
-                    pyFileMarks.add(mapResultSetToPyFileMark(resultSet))
-                }
-            } catch (sqlException: SQLException) {
-                logErrorMessage(sqlException)
+            while (resultSet!!.next()) {
+                pyFileMarks.add(mapResultSetToPyFileMark(resultSet))
             }
         } catch (sqlException: SQLException) {
             logErrorMessage(sqlException)
@@ -157,7 +73,7 @@ class DatabaseService private constructor() {
             closeAll(connection, statement, resultSet)
         }
 
-        return pyFileMarks
+        return filterByBeginLineNumber(pyFileMarks, beginLine)
     }
 
     /**
@@ -169,20 +85,16 @@ class DatabaseService private constructor() {
         var resultSet: ResultSet? = null
 
         try {
-            try {
-                connection = openConnection()
+            connection = openConnection()
 
-                statement = connection?.prepareStatement("SELECT * FROM $EXCEPTION_TABLE_NAME where exception_id = ?")
+            statement = connection?.prepareStatement("SELECT * FROM $EXCEPTION_TABLE_NAME where exception_id = ?")
 
-                statement?.setInt(1, exceptionId)
+            statement?.setInt(1, exceptionId)
 
-                resultSet = statement?.executeQuery()
+            resultSet = statement?.executeQuery()
 
-                if (resultSet!!.next()) {
-                    return mapResultSetToPyException(resultSet)
-                }
-            } catch (sqlException: SQLException) {
-                logErrorMessage(sqlException)
+            if (resultSet!!.next()) {
+                return mapResultSetToPyException(resultSet)
             }
         } catch (sqlException: SQLException) {
             logErrorMessage(sqlException)
@@ -231,26 +143,10 @@ class DatabaseService private constructor() {
     /**
      * Initialize Database Service: open one connection for instance.
      */
-    fun initialize(projectRootDirectoryPath: String) {
+    fun initialize(projectRootDirectoryPath: String): Boolean {
         databaseFilePath = getProjectDatabaseFilePath(projectRootDirectoryPath)
 
-        val isDatabaseFileExists = checkIsDatabaseFileExists()
-
-        if (!isDatabaseFileExists) {
-            throw Exception("Sqlite database file '.runtime_file' not exists.")
-        }
-
-        val isFileMarkTableExists = checkIsTableExists(FILE_MARK_TABLE_NAME)
-
-        if (!isFileMarkTableExists) {
-            throw Exception("Database table '$FILE_MARK_TABLE_NAME' not exists.")
-        }
-
-        val isExceptionTableExists = checkIsTableExists(EXCEPTION_TABLE_NAME)
-
-        if (!isExceptionTableExists) {
-            throw Exception("Database table '$EXCEPTION_TABLE_NAME' not exists.")
-        }
+        return File(databaseFilePath).exists()
     }
 
     /**
@@ -258,33 +154,6 @@ class DatabaseService private constructor() {
      */
     fun dispose() {
         closeConnection(connection)
-    }
-
-    /**
-     * Check is table exists in database.
-     */
-    private fun checkIsTableExists(tableName: String): Boolean {
-        connection = openConnection()
-
-        val metaData = connection?.metaData
-
-        val resultSet = metaData?.getTables(null, null, tableName, null)
-
-        val isTableExists = resultSet != null && resultSet.next()
-
-        closeResultSet(resultSet)
-        closeConnection(connection)
-
-        return isTableExists
-    }
-
-    /**
-     * Check is Sqlite database file exists.
-     */
-    private fun checkIsDatabaseFileExists(): Boolean {
-        val runtimeInfoFile = File(databaseFilePath)
-
-        return runtimeInfoFile.exists()
     }
 
     /**
@@ -305,7 +174,7 @@ class DatabaseService private constructor() {
                 connection.close()
             }
         } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException.message!!)
+            logErrorMessage(sqlException)
         }
     }
 
@@ -318,7 +187,7 @@ class DatabaseService private constructor() {
         try {
             statement?.close()
         } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException.message!!)
+            logErrorMessage(sqlException)
         }
 
     }
@@ -332,20 +201,9 @@ class DatabaseService private constructor() {
         try {
             resultSet?.close()
         } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException.message!!)
+            logErrorMessage(sqlException)
         }
 
-    }
-
-    /**
-     * Close connection, statement and resultSet.
-     *
-     * @param statement  to close.
-     * @param resultSet  to close.
-     */
-    private fun closeAll(statement: Statement?, resultSet: ResultSet?) {
-        closeResultSet(resultSet)
-        closeStatement(statement)
     }
 
     /**
@@ -365,4 +223,17 @@ class DatabaseService private constructor() {
      * Get project Sqlite database file path.
      */
     private fun getProjectDatabaseFilePath(projectRootDirectoryPath: String?) = projectRootDirectoryPath + File.separator + ".runtime_info"
+
+    /**
+     * Filter list of PyFileMark's by begin line if begin line not null
+     */
+    private fun filterByBeginLineNumber(pyFileMarks: List<PyFileMark>, beginLine: Int?): List<PyFileMark> {
+        return if (beginLine != null) {
+            pyFileMarks.stream()
+                    .filter { it.beginLine == beginLine }
+                    .collect(Collectors.toList())
+        } else {
+            pyFileMarks
+        }
+    }
 }

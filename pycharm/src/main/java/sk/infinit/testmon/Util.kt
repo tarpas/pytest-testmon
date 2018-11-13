@@ -13,6 +13,8 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import java.io.File
+import java.io.PrintWriter
+import java.io.StringWriter
 import java.lang.Exception
 
 /**
@@ -21,7 +23,7 @@ import java.lang.Exception
  * @param message - source message to log as Error message
  */
 fun logErrorMessage(message: String) {
-    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Testmon message", message, NotificationType.ERROR))
+    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Testmon plugin", message, NotificationType.ERROR))
 }
 
 /**
@@ -30,7 +32,13 @@ fun logErrorMessage(message: String) {
  * @param exception - source exception to log as Error message
  */
 fun logErrorMessage(exception: Exception) {
-    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Testmon message", exception.message.toString(), NotificationType.ERROR))
+    val message = if (exception.message != null) {
+        exception.message
+    } else {
+        getStackTrace(exception)
+    }
+
+    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Testmon plugin", message!!, NotificationType.ERROR))
 }
 
 /**
@@ -65,4 +73,16 @@ fun getEditor(project: Project, psiFile: PsiFile): Editor? {
     }
 
     return null
+}
+
+/**
+ * Convert Throwable object to string
+ */
+fun getStackTrace(throwable: Throwable): String {
+    val stringWriter = StringWriter()
+    val printWriter = PrintWriter(stringWriter, true)
+
+    throwable.printStackTrace(printWriter)
+
+    return stringWriter.buffer.toString()
 }

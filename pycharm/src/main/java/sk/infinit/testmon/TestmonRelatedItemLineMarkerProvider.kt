@@ -11,6 +11,7 @@ import com.jetbrains.extensions.python.toPsi
 import com.jetbrains.python.psi.PyFile
 import com.jetbrains.python.psi.PyStatement
 import sk.infinit.testmon.database.DatabaseService
+import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
 import java.io.File
 
@@ -40,7 +41,8 @@ class TestmonRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() {
 
             val pyFileFullPath = projectRootVirtualFile.path + File.separator + virtualFileRelativePath
 
-            val fileMarks = databaseService.getGutterLinkFileMarks(pyFileFullPath, offsetToLogicalPosition.line)
+            val fileMarks = databaseService
+                    .getFileMarks(pyFileFullPath, offsetToLogicalPosition.line, FileMarkType.GUTTER_LINK.value)
 
             for (fileMark in fileMarks) {
                 if (fileMark.checkContent == psiElement.text) {

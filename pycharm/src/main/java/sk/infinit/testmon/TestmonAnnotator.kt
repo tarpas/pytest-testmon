@@ -8,6 +8,7 @@ import com.intellij.openapi.util.TextRange
 import sk.infinit.testmon.database.DatabaseService
 import java.io.File
 import com.intellij.psi.PsiFile
+import sk.infinit.testmon.database.FileMarkType
 
 /**
  * Testmon Annotator implementation.
@@ -33,7 +34,8 @@ class TestmonAnnotator : Annotator {
 
             val pyFileFullPath = projectRootVirtualFile.path + File.separator + virtualFileRelativePath
 
-            val fileMarks = databaseService.getRedUnderlineDecorationFileMarks(pyFileFullPath)
+            val fileMarks = databaseService
+                    .getFileMarks(pyFileFullPath, null, FileMarkType.RED_UNDERLINE_DECORATION.value)
 
             for (fileMark in fileMarks) {
                 try {
@@ -51,7 +53,7 @@ class TestmonAnnotator : Annotator {
 
                     annotation.tooltip = pyException?.exceptionText
                 } catch (exception: Exception) {
-                    logErrorMessage(exception.message!!)
+                    logErrorMessage(exception)
                 }
             }
         }

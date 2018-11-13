@@ -41,13 +41,13 @@ class TestmonProjectComponent(private val project: Project) : ProjectComponent {
     override fun projectOpened() {
         val databaseService = DatabaseService.getInstance()
 
-        try {
-            databaseService.initialize(project.baseDir.path)
-        } catch (exception: Exception) {
+        val isInitialized = databaseService.initialize(project.baseDir.path)
+
+        if (!isInitialized) {
             DatabaseService.getInstance().dispose()
             unregisterExtensions()
 
-            logErrorMessage(exception.message!!)
+            logErrorMessage("Not initialized.")
         }
     }
 
