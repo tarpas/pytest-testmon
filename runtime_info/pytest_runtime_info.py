@@ -42,6 +42,12 @@ class RuntimeInfo(object):
 
         session.config.conn = conn
 
+    def pytest_collection_modifyitems(self, session, config, items):
+        conn = config.conn
+        c = conn.cursor()
+        nodeids = get_all_nodeids(c)
+        config.nodeids = nodeids
+
     def pytest_runtest_makereport(self, call, item):
         conn = item.config.conn
         c = conn.cursor()
@@ -74,9 +80,14 @@ class RuntimeInfo(object):
                                                     exception_text,
                                                     last_mark_info)
                     insert_file_mark(c, marks, exception_id)
-            elif call.when == 'setup':
+            elif call.when == 'setup' and item.nodeid in item.config.nodeids:
                 remove_exception_by_nodeid(c, item.nodeid)
         marks.clear()
+
+
+def get_all_nodeids(c):
+    c.execute("SELECT nodeid FROM Exception")
+    return [nodeid[0] for nodeid in c.fetchall()]
 
 
 def is_project_path(path, cwd):
