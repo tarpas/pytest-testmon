@@ -10,14 +10,8 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.jetbrains.extensions.python.toPsi
 import com.jetbrains.python.psi.PyFile
 import com.jetbrains.python.psi.PyStatement
-import sk.infinit.testmon.database.DatabaseService
-import sk.infinit.testmon.database.FileMarkType
+import sk.infinit.testmon.*
 import sk.infinit.testmon.database.PyFileMark
-import sk.infinit.testmon.findVirtualFile
-import sk.infinit.testmon.getEditor
-import sk.infinit.testmon.getProjectRootDirectoryVirtualFile
-import sk.infinit.testmon.getVirtualFileRelativePath
-import java.io.File
 
 /**
  * Testmon RelatedItemLineMarkerProvider fod display gutter icons.
@@ -30,39 +24,23 @@ class TestmonRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() {
     override fun collectNavigationMarkers(psiElement: PsiElement, resultCollection: MutableCollection<in RelatedItemLineMarkerInfo<PsiElement>>) {
         if (psiElement is PyStatement) {
             val project = psiElement.project
-            val virtualFile = psiElement.containingFile.virtualFile
 
-            val editor = getEditor(project, psiElement.containingFile)
-                    ?: return
+            val testmonErrorProvider = PsiElementErrorProvider()
 
-            val offsetToLogicalPosition = editor.offsetToLogicalPosition(psiElement.textOffset)
+            val pyFileMarks = testmonErrorProvider.getPyFileMarks(psiElement)
 
-            val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
-                    ?: return
+            for (fileMark in pyFileMarks) {
+                val targetVirtualFile = findVirtualFile(fileMark.targetPath)
 
-            val databaseService = DatabaseService.getInstance()
+                if (targetVirtualFile != null) {
+                    val targetPsiElement = findTargetPsiElement(fileMark, project, targetVirtualFile)
 
-            val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
+                    val navigationGutterIconBuilder = NavigationGutterIconBuilder
+                            .create(AllIcons.General.Error)
+                            .setTarget(targetPsiElement)
+                            .setTooltipText("File ${targetVirtualFile.name}, Line ${fileMark.targetLine}")
 
-            val pyFileFullPath = projectRootVirtualFile.path + File.separator + virtualFileRelativePath
-
-            val fileMarks = databaseService
-                    .getFileMarks(pyFileFullPath, offsetToLogicalPosition.line, FileMarkType.GUTTER_LINK.value)
-
-            for (fileMark in fileMarks) {
-                if (fileMark.checkContent == psiElement.text) {
-                    val targetVirtualFile = findVirtualFile(fileMark.targetPath)
-
-                    if (targetVirtualFile != null) {
-                        val targetPsiElement = findTargetPsiElement(fileMark, project, targetVirtualFile)
-
-                        val navigationGutterIconBuilder = NavigationGutterIconBuilder
-                                .create(AllIcons.General.Error)
-                                .setTarget(targetPsiElement)
-                                .setTooltipText("File ${targetVirtualFile.name}, Line ${fileMark.targetLine}")
-
-                        resultCollection.add(navigationGutterIconBuilder.createLineMarkerInfo(psiElement))
-                    }
+                    resultCollection.add(navigationGutterIconBuilder.createLineMarkerInfo(psiElement))
                 }
             }
         }

@@ -58,7 +58,13 @@ fun getProjectRootDirectoryVirtualFile(project: Project, virtualFile: VirtualFil
 /**
  * Return VirtualFile by full real path to file.
  */
-fun findVirtualFile(filePath: String?) = VfsUtil.findFileByIoFile(File(filePath), false)
+fun findVirtualFile(filePath: String?): VirtualFile? {
+    return if (filePath != null) {
+        VfsUtil.findFileByIoFile(File(filePath), false)
+    } else {
+        null
+    }
+}
 
 /**
  * Get Editor object for PsiFile.

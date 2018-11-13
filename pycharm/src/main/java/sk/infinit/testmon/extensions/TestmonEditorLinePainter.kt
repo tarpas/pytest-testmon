@@ -9,13 +9,8 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
 import com.jetbrains.python.psi.PyStatement
-import sk.infinit.testmon.database.DatabaseService
-import sk.infinit.testmon.database.FileMarkType
-import sk.infinit.testmon.getProjectRootDirectoryVirtualFile
-import sk.infinit.testmon.getVirtualFileRelativePath
 import java.awt.Color
 import java.awt.Font
-import java.io.File
 
 /**
  * Testmon EditorLinePainter implementation.
@@ -31,30 +26,19 @@ class TestmonEditorLinePainter : EditorLinePainter() {
             : MutableCollection<LineExtensionInfo> {
         val lineExtensionInfos = mutableListOf<LineExtensionInfo>()
 
-        val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
-                ?: return lineExtensionInfos
-
-        val databaseService = DatabaseService.getInstance()
-
-        val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
-        val pyFileFullPath = projectRootVirtualFile.path + File.separator + virtualFileRelativePath
-
-        val fileMarks = databaseService
-                .getFileMarks(pyFileFullPath, lineNumber, FileMarkType.RED_UNDERLINE_DECORATION.value)
-
         val psiElement = getPsiElementAtLine(project, virtualFile, lineNumber)
 
         if (psiElement is PyStatement) {
-            for (fileMark in fileMarks) {
-                if (fileMark.checkContent == psiElement.text) {
-                    val lineExtensionInfo = LineExtensionInfo(
-                            "     ${fileMark.text}",
-                            Color.RED,
-                            EffectType.ROUNDED_BOX,
-                            null, Font.PLAIN)
+            val testmonErrorProvider = PsiElementErrorProvider()
 
-                    lineExtensionInfos.add(lineExtensionInfo)
-                }
+            val pyFileMarks = testmonErrorProvider.getPyFileMarks(psiElement)
+
+            for (fileMark in pyFileMarks) {
+                lineExtensionInfos.add(LineExtensionInfo(
+                        "     ${fileMark.text}",
+                        Color.RED,
+                        EffectType.ROUNDED_BOX,
+                        null, Font.PLAIN))
             }
         }
 
