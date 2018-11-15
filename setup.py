@@ -4,7 +4,7 @@ setup(
     name='pytest-testmon',
     description='take TDD to a new level with py.test and testmon',
     long_description=''.join(open('README.rst').readlines()),
-    version='0.9.13',
+    version='0.9.14',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
     packages=['testmon'],
@@ -19,7 +19,7 @@ setup(
             'testmon = testmon.tox_testmon',
         ],
     },
-    install_requires=['pytest>=2.8.0,<4', 'coverage>=4'],
+    install_requires=['pytest>=2.8.0,<5', 'coverage>=4,<5'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
