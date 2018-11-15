@@ -44,12 +44,6 @@ class PsiElementErrorProvider {
         val fileMarks = databaseService
                 .getFileMarks(pyFileFullPath, lineNumber, FileMarkType.RED_UNDERLINE_DECORATION.value)
 
-        for (fileMark in fileMarks) {
-            if (fileMark.checkContent == psiElement.text) {
-
-            }
-        }
-
         return fileMarks.stream()
                 .filter { it.checkContent == psiElement.text }
                 .collect(Collectors.toList())
