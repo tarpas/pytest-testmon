@@ -27,6 +27,7 @@ class TestmonEditorLinePainter : EditorLinePainter() {
         val lineExtensionInfos = mutableListOf<LineExtensionInfo>()
 
         val psiElement = getPsiElementAtLine(project, virtualFile, lineNumber)
+                ?: return lineExtensionInfos
 
         if (psiElement is PyStatement) {
             val testmonErrorProvider = PsiElementErrorProvider()
@@ -49,15 +50,17 @@ class TestmonEditorLinePainter : EditorLinePainter() {
      * Get PsiElement by line number.
      */
     private fun getPsiElementAtLine(project: Project, virtualFile: VirtualFile, lineNumber: Int)
-            : PsiElement {
+            : PsiElement? {
         val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
+                ?: return null
 
-        val document = PsiDocumentManager.getInstance(project).getDocument(psiFile!!)
+        val document = PsiDocumentManager.getInstance(project).getDocument(psiFile)
         val offset = document?.getLineStartOffset(lineNumber)
 
         val psiElement = psiFile.viewProvider.findElementAt(offset!!)
+            ?: return null
 
-        return if (document.getLineNumber(psiElement!!.textOffset) != lineNumber) {
+        return if (document.getLineNumber(psiElement.textOffset) != lineNumber) {
             psiElement.nextSibling
         } else {
             psiElement
