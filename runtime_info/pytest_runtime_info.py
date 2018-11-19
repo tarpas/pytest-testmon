@@ -94,7 +94,7 @@ class RuntimeInfo(object):
 
 def get_all_nodeids(c):
     c.execute("SELECT nodeid FROM Exception")
-    return [nodeid[0] for nodeid in c.fetchall()]
+    return {nodeid[0] for nodeid in c.fetchall()}
 
 
 def is_project_path(path, cwd):
