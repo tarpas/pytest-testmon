@@ -11,6 +11,7 @@ import com.jetbrains.extensions.python.toPsi
 import com.jetbrains.python.psi.PyFile
 import com.jetbrains.python.psi.PyStatement
 import sk.infinit.testmon.*
+import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
 
 /**
@@ -27,7 +28,8 @@ class TestmonRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() {
 
             val testmonErrorProvider = PsiElementErrorProvider()
 
-            val pyFileMarks = testmonErrorProvider.getPyFileMarks(psiElement)
+            val pyFileMarks = testmonErrorProvider
+                    .getFilteredPyFileMarks(psiElement, FileMarkType.GUTTER_LINK, null)
 
             for (fileMark in pyFileMarks) {
                 val targetVirtualFile = findVirtualFile(fileMark.targetPath)

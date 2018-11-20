@@ -9,6 +9,7 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
 import com.jetbrains.python.psi.PyStatement
+import sk.infinit.testmon.database.FileMarkType
 import java.awt.Color
 import java.awt.Font
 
@@ -32,7 +33,8 @@ class TestmonEditorLinePainter : EditorLinePainter() {
         if (psiElement is PyStatement) {
             val testmonErrorProvider = PsiElementErrorProvider()
 
-            val pyFileMarks = testmonErrorProvider.getPyFileMarks(psiElement)
+            val pyFileMarks = testmonErrorProvider
+                    .getFilteredPyFileMarks(psiElement, FileMarkType.SUFFIX, lineNumber)
 
             for (fileMark in pyFileMarks) {
                 lineExtensionInfos.add(LineExtensionInfo(

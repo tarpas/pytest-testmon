@@ -12,8 +12,8 @@ import com.intellij.openapi.extensions.ExtensionsArea
 import com.intellij.openapi.project.Project
 import com.intellij.util.containers.stream
 import sk.infinit.testmon.database.DatabaseService
-import sk.infinit.testmon.extensions.TestmonAnnotator
 import sk.infinit.testmon.extensions.TestmonEditorLinePainter
+import sk.infinit.testmon.extensions.TestmonExternalAnnotator
 import sk.infinit.testmon.extensions.TestmonRelatedItemLineMarkerProvider
 
 /**
@@ -92,7 +92,7 @@ class TestmonProjectComponent(private val project: Project) : ProjectComponent {
 
         val testmonAnnotator = annotatorExtensionPoint.extensions
                 .stream()
-                .filter { it.implementationClass == TestmonAnnotator::class.qualifiedName }
+                .filter { it.implementationClass == TestmonExternalAnnotator::class.qualifiedName }
                 .findAny()
                 .orElse(null)
 

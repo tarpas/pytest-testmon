@@ -6,10 +6,11 @@ import java.sql.*
 import java.sql.SQLException
 import java.sql.ResultSet
 import java.util.*
-import java.util.stream.Collectors
 
 /**
  * Database service to wokr with Sqlite project files.
+ *
+ * Low level database API.
  */
 class DatabaseService private constructor() {
 
@@ -47,7 +48,7 @@ class DatabaseService private constructor() {
      *
      * @return List<PyFileMark>
      */
-    fun getFileMarks(fileName: String, beginLine: Int?, type: String): List<PyFileMark> {
+    fun getFileMarks(fileName: String, type: String): List<PyFileMark> {
         val pyFileMarks: MutableList<PyFileMark> = ArrayList()
 
         var connection: Connection? = null
@@ -73,7 +74,7 @@ class DatabaseService private constructor() {
             closeAll(connection, statement, resultSet)
         }
 
-        return filterByBeginLineNumber(pyFileMarks, beginLine)
+        return pyFileMarks
     }
 
     /**
@@ -223,17 +224,4 @@ class DatabaseService private constructor() {
      * Get project Sqlite database file path.
      */
     private fun getProjectDatabaseFilePath(projectRootDirectoryPath: String?) = projectRootDirectoryPath + File.separator + ".runtime_info"
-
-    /**
-     * Filter list of PyFileMark's by begin line if begin line not null
-     */
-    private fun filterByBeginLineNumber(pyFileMarks: List<PyFileMark>, beginLine: Int?): List<PyFileMark> {
-        return if (beginLine != null) {
-            pyFileMarks.stream()
-                    .filter { it.beginLine == beginLine }
-                    .collect(Collectors.toList())
-        } else {
-            pyFileMarks
-        }
-    }
 }

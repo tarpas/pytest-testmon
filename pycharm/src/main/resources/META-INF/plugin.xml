@@ -31,7 +31,7 @@
     </project-components>
 
     <extensions defaultExtensionNs="com.intellij">
-        <annotator language="Python" implementationClass="sk.infinit.testmon.extensions.TestmonAnnotator"/>
+        <externalAnnotator language="Python" implementationClass="sk.infinit.testmon.extensions.TestmonExternalAnnotator"/>
 
         <editor.linePainter implementation="sk.infinit.testmon.extensions.TestmonEditorLinePainter"/>
 
