@@ -2,7 +2,9 @@ package sk.infinit.testmon.extensions
 
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -58,8 +60,11 @@ class RedUnderlineDecorationExternalAnnotator
             val elementOffset = StringUtil
                     .indexOf(document?.immutableCharSequence!!, fileMarkContent as CharSequence)
 
-            val psiElement = PsiTreeUtil.findElementOfClassAtRange(psiFile, elementOffset,
-                    elementOffset + fileMarkContent.length, PsiElement::class.java)
+            val psiElement = ApplicationManager.getApplication()
+                    .runReadAction(Computable<PsiElement> {
+                        PsiTreeUtil.findElementOfClassAtRange(psiFile, elementOffset,
+                                elementOffset + fileMarkContent.length, PsiElement::class.java)
+                    })
 
             val lineNumber = document.getLineNumber(elementOffset)
 
