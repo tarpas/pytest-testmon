@@ -60,6 +60,10 @@ class RedUnderlineDecorationExternalAnnotator
             val elementOffset = StringUtil
                     .indexOf(document?.immutableCharSequence!!, fileMarkContent as CharSequence)
 
+            if (elementOffset < 0) {
+                continue
+            }
+
             val psiElement = ApplicationManager.getApplication()
                     .runReadAction(Computable<PsiElement> {
                         PsiTreeUtil.findElementOfClassAtRange(psiFile, elementOffset,
