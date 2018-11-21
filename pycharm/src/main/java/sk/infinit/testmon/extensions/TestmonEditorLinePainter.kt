@@ -8,7 +8,6 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
-import com.jetbrains.python.psi.PyStatement
 import sk.infinit.testmon.database.FileMarkType
 import java.awt.Color
 import java.awt.Font
@@ -30,19 +29,19 @@ class TestmonEditorLinePainter : EditorLinePainter() {
         val psiElement = getPsiElementAtLine(project, virtualFile, lineNumber)
                 ?: return lineExtensionInfos
 
-        if (psiElement is PyStatement) {
-            val testmonErrorProvider = PsiElementErrorProvider()
+        val psiElementErrorProvider = PsiElementErrorProvider()
 
-            val pyFileMarks = testmonErrorProvider
-                    .getFilteredPyFileMarks(psiElement, FileMarkType.SUFFIX, lineNumber)
+        val psiElementLineNumber = getPsiElementLineNumber(project, virtualFile, psiElement)
 
-            for (fileMark in pyFileMarks) {
-                lineExtensionInfos.add(LineExtensionInfo(
-                        "     ${fileMark.text}",
-                        Color.RED,
-                        EffectType.ROUNDED_BOX,
-                        null, Font.PLAIN))
-            }
+        val pyFileMarks = psiElementErrorProvider
+                .getFilteredPyFileMarks(psiElement, FileMarkType.SUFFIX, psiElementLineNumber)
+
+        for (fileMark in pyFileMarks) {
+            lineExtensionInfos.add(LineExtensionInfo(
+                    "     ${fileMark.text}",
+                    Color.RED,
+                    EffectType.ROUNDED_BOX,
+                    null, Font.PLAIN))
         }
 
         return lineExtensionInfos
@@ -60,12 +59,26 @@ class TestmonEditorLinePainter : EditorLinePainter() {
         val offset = document?.getLineStartOffset(lineNumber)
 
         val psiElement = psiFile.viewProvider.findElementAt(offset!!)
-            ?: return null
+                ?: return null
 
         return if (document.getLineNumber(psiElement.textOffset) != lineNumber) {
             psiElement.nextSibling
         } else {
             psiElement
         }
+    }
+
+    /**
+     * Get PsiElement line number. This line number can differ from
+     * override fun getLineExtensions(project: Project, virtualFile: VirtualFile, lineNumber: Int)
+     *
+     * and contains real line number including new line symbols ('\n').
+     */
+    private fun getPsiElementLineNumber(project: Project, virtualFile: VirtualFile,
+                                        psiElement: PsiElement): Int? {
+        val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
+        val document = PsiDocumentManager.getInstance(project).getDocument(psiFile!!)
+
+        return document?.getLineNumber(psiElement.textOffset)
     }
 }
