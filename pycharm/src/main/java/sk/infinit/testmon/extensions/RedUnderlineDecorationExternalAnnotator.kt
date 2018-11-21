@@ -12,7 +12,8 @@ import sk.infinit.testmon.database.FileMarkType
 /**
  * Testmon external annotator.
  */
-class TestmonExternalAnnotator : ExternalAnnotator<PsiFile, List<RedUnderlineDecorationAnnotation>>() {
+class RedUnderlineDecorationExternalAnnotator
+    : ExternalAnnotator<PsiFile, List<RedUnderlineDecorationAnnotation>>() {
 
     /**
      * Create annotations by #redUnderlineAnnotations list.

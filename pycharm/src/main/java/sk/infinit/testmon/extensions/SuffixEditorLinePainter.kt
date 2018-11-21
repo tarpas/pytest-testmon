@@ -15,7 +15,7 @@ import java.awt.Font
 /**
  * Testmon EditorLinePainter implementation.
  */
-class TestmonEditorLinePainter : EditorLinePainter() {
+class SuffixEditorLinePainter : EditorLinePainter() {
 
     /**
      * Get list of LineExtensionInfo's by Testmon database data. Draw exception description text.

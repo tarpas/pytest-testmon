@@ -12,9 +12,9 @@ import com.intellij.openapi.extensions.ExtensionsArea
 import com.intellij.openapi.project.Project
 import com.intellij.util.containers.stream
 import sk.infinit.testmon.database.DatabaseService
-import sk.infinit.testmon.extensions.TestmonEditorLinePainter
-import sk.infinit.testmon.extensions.TestmonExternalAnnotator
-import sk.infinit.testmon.extensions.TestmonRelatedItemLineMarkerProvider
+import sk.infinit.testmon.extensions.SuffixEditorLinePainter
+import sk.infinit.testmon.extensions.RedUnderlineDecorationExternalAnnotator
+import sk.infinit.testmon.extensions.GutterIconRelatedItemLineMarkerProvider
 
 /**
  * Project component implementation for Testmon plugin.
@@ -66,7 +66,7 @@ class TestmonProjectComponent(private val project: Project) : ProjectComponent {
     }
 
     /**
-     * Unregister TestmonEditorLinePainter extension.
+     * Unregister SuffixEditorLinePainter extension.
      */
     private fun unregisterEditorLinePainter(extensionsRootArea: ExtensionsArea) {
         val editorLinePainterExtensionPoint = extensionsRootArea
@@ -74,7 +74,7 @@ class TestmonProjectComponent(private val project: Project) : ProjectComponent {
 
         val testmonEditorLinePainter = editorLinePainterExtensionPoint.extensions
                 .stream()
-                .filter { it is TestmonEditorLinePainter }
+                .filter { it is SuffixEditorLinePainter }
                 .findAny()
                 .orElse(null)
 
@@ -92,7 +92,7 @@ class TestmonProjectComponent(private val project: Project) : ProjectComponent {
 
         val testmonAnnotator = annotatorExtensionPoint.extensions
                 .stream()
-                .filter { it.implementationClass == TestmonExternalAnnotator::class.qualifiedName }
+                .filter { it.implementationClass == RedUnderlineDecorationExternalAnnotator::class.qualifiedName }
                 .findAny()
                 .orElse(null)
 
@@ -102,7 +102,7 @@ class TestmonProjectComponent(private val project: Project) : ProjectComponent {
     }
 
     /**
-     * Unregister TestmonRelatedItemLineMarkerProvider extension.
+     * Unregister GutterIconRelatedItemLineMarkerProvider extension.
      */
     private fun unregisterLineMarkerProvider(extensionsRootArea: ExtensionsArea) {
         val lineMarkerProviderExtensionPoint = extensionsRootArea
@@ -110,7 +110,7 @@ class TestmonProjectComponent(private val project: Project) : ProjectComponent {
 
         val testmonLineMarkerProvider = lineMarkerProviderExtensionPoint.extensions
                 .stream()
-                .filter { it.implementationClass == TestmonRelatedItemLineMarkerProvider::class.qualifiedName }
+                .filter { it.implementationClass == GutterIconRelatedItemLineMarkerProvider::class.qualifiedName }
                 .findAny()
                 .orElse(null)
 

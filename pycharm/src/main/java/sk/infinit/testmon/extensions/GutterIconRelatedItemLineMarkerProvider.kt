@@ -17,7 +17,7 @@ import sk.infinit.testmon.database.PyFileMark
 /**
  * Testmon RelatedItemLineMarkerProvider fod display gutter icons.
  */
-class TestmonRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() {
+class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() {
 
     /**
      * Add Line Marker Information to Gutter area.
