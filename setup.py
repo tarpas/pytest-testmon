@@ -16,7 +16,7 @@ setup(
             'runtime_info = runtime_info.pytest_runtime_info'
         ],
     },
-    install_requires=['pytest>=3.3.0,<4'],
+    install_requires=['pytest>=3.3.0,<5'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',

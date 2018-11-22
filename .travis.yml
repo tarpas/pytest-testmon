@@ -10,7 +10,7 @@ cache:
 matrix:
   include:
     - env: TOXENV=py37-pytest38
-    - env: TOXEND=py37-pytest39
+    - env: TOXENV=py37-pytest40
 
 install:
   - pip install tox
