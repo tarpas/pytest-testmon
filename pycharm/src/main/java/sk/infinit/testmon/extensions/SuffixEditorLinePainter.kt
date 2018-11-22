@@ -38,7 +38,7 @@ class SuffixEditorLinePainter : EditorLinePainter() {
 
         for (fileMark in pyFileMarks) {
             lineExtensionInfos.add(LineExtensionInfo(
-                    "     ${fileMark.text}",
+                    "   ${fileMark.text}",
                     Color.RED,
                     EffectType.ROUNDED_BOX,
                     null, Font.PLAIN))
