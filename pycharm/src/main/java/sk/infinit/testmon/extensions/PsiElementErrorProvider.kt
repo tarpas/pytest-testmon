@@ -9,6 +9,7 @@ import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.getProjectRootDirectoryVirtualFile
 import sk.infinit.testmon.getVirtualFileRelativePath
 import java.io.File
+import java.util.ArrayList
 import java.util.stream.Collectors
 
 /**
@@ -38,6 +39,7 @@ class PsiElementErrorProvider {
      */
     fun getPyFileMarks(psiElement: PsiElement, fileMarkType: FileMarkType): List<PyFileMark> {
         val pyFileFullPath = getPsiFileFullPath(psiElement.project, psiElement.containingFile.virtualFile)
+                ?: return ArrayList()
 
         return DatabaseService.getInstance().getFileMarks(pyFileFullPath, fileMarkType.value)
     }
@@ -54,12 +56,13 @@ class PsiElementErrorProvider {
     /**
      * Get full path of PsiFile.
      */
-    private fun getPsiFileFullPath(project: Project, virtualFile: VirtualFile): String {
+    private fun getPsiFileFullPath(project: Project, virtualFile: VirtualFile): String? {
         val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
+                ?: return null
 
         val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
 
-        return projectRootVirtualFile?.path + File.separator + virtualFileRelativePath
+        return projectRootVirtualFile.path + File.separator + virtualFileRelativePath
     }
 
     /**

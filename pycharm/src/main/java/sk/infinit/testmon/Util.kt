@@ -46,7 +46,7 @@ fun logErrorMessage(exception: Exception) {
  *
  * @return String
  */
-fun getVirtualFileRelativePath(virtualFile: VirtualFile, projectRootVirtualFile: VirtualFile?): String? = VfsUtilCore.getRelativePath(virtualFile, projectRootVirtualFile!!)
+fun getVirtualFileRelativePath(virtualFile: VirtualFile, projectRootVirtualFile: VirtualFile): String? = VfsUtilCore.getRelativePath(virtualFile, projectRootVirtualFile)
 
 /**
  * Get Project root directory VirtualFile
