@@ -7,13 +7,13 @@ setup(
     version='0.15.0',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
-    packages=['runtime_info'],
+    packages=['runtime_info0'],
     #url='https://github.com/tarpas/pytest-testmon/',
     author_email='tibor.arpas@infinit.sk',
     author='Tibor Arpas',
     entry_points={
         'pytest11': [
-            'runtime_info = runtime_info.pytest_runtime_info'
+            'runtime_info0 = runtime_info0.pytest_runtime_info'
         ],
     },
     install_requires=['pytest>=3.3.0,<5'],

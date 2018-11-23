@@ -8,7 +8,7 @@ marks = list()
 
 
 def get_db_path(config):
-    return os.path.join(config.rootdir.strpath, ".runtime_info")
+    return os.path.join(config.rootdir.strpath, ".runtime_info0")
 
 
 def should_run(config):
@@ -45,7 +45,7 @@ class RuntimeInfo(object):
 
     def pytest_report_header(self, config, startdir):
         if hasattr(config, 'db_created'):
-            return ['Database for runtime-info plugin created (.runtime_info)']
+            return ['Database for runtime-info plugin created']
         else:
             return []
 

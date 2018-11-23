@@ -223,5 +223,5 @@ class DatabaseService private constructor() {
     /**
      * Get project Sqlite database file path.
      */
-    private fun getProjectDatabaseFilePath(projectRootDirectoryPath: String?) = projectRootDirectoryPath + File.separator + ".runtime_info"
+    private fun getProjectDatabaseFilePath(projectRootDirectoryPath: String?) = projectRootDirectoryPath + File.separator + ".runtime_info0"
 }

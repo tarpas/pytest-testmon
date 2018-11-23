@@ -43,7 +43,7 @@ def test_plugin(testdir, lib_py, a_py, b_py):
     test_result.assert_outcomes(failed=2, passed=1)
     # test if result file was modified
 
-    c = sqlite3.connect('.runtime_info').cursor()
+    c = sqlite3.connect('.runtime_info0').cursor()
 
     a_file = os.path.join(str(testdir.tmpdir), "test_a.py")
     b_file = os.path.join(str(testdir.tmpdir), "test_b.py")
@@ -85,7 +85,7 @@ def test_remove(testdir):
 
     testdir.runpytest('--runtime-info')
 
-    conn = sqlite3.connect('.runtime_info')
+    conn = sqlite3.connect('.runtime_info0')
     c = conn.cursor()
     c.execute("SELECT count(*) as count FROM FileMark")
     result = c.fetchone()[0]
@@ -110,7 +110,7 @@ def test_start_without_plugin_option(testdir):
     """
     testdir.runpytest()
 
-    c = sqlite3.connect('.runtime_info').cursor()
+    c = sqlite3.connect('.runtime_info0').cursor()
 
     # Exception Table
     with pytest.raises(sqlite3.OperationalError):
