@@ -45,7 +45,7 @@ class RuntimeInfo(object):
 
     def pytest_report_header(self, config, startdir):
         if hasattr(config, 'db_created'):
-            return ['Database for runtime-info plugin created']
+            return ['Database for runtime-info plugin created (.runtime_info)']
         else:
             return []
 
