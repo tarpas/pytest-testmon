@@ -1,17 +1,15 @@
 <idea-plugin>
     <id>sk.infinit.testmon</id>
-    <name>Testmon</name>
+    <name>runtime-info-alpha</name>
     <version>1.0</version>
-    <vendor email="support@yourcompany.com" url="http://www.infinit.sk/">infinit.sk</vendor>
+    <vendor email="tibor.arpas@infinit.sk" url="http://www.infinit.sk/">Infinit</vendor>
 
     <description><![CDATA[
-      Enter short description for your plugin here.<br>
-      <em>most HTML tags may be used</em>
+      runtime-info annotates your source code with exceptions for your pytest executions.
     ]]></description>
 
     <change-notes><![CDATA[
-      Add change notes here.<br>
-      <em>most HTML tags may be used</em>
+      Support for display Red Underline Decoration, Gutter Icon, Suffix.
     ]]>
     </change-notes>
 

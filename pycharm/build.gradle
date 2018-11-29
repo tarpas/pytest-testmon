@@ -23,13 +23,18 @@ dependencies {
 
 intellij {
     localPath '.gradle/ide/pycharm-community-2018.2.4'
-    pluginName 'Testmon'
+    pluginName 'runtime-info-alpha'
+}
+
+publishPlugin {
+    username ''
+    password ''
+    channels 'eap', 'nightly', 'default'
 }
 
 patchPluginXml {
     changeNotes """
-      Add change notes here.<br>
-      <em>most HTML tags may be used</em>"""
+      Support for display Red Underline Decoration, Gutter Icon, Suffix"""
 }
 
 task setupPycharm() {
