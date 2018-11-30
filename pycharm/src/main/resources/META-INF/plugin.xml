@@ -1,16 +1,15 @@
 <idea-plugin>
     <id>sk.infinit.testmon</id>
-    <name>runtime-info-alpha</name>
-    <version>1.0</version>
+    <name>Runtime info alpha</name>
+    <version></version>
     <vendor email="tibor.arpas@infinit.sk" url="http://www.infinit.sk/">Infinit</vendor>
 
-    <description><![CDATA[
-      runtime-info annotates your source code with exceptions for your pytest executions.
-    ]]></description>
+    <description>
+        <![CDATA[We add description of the project in build.gradle file]]>
+    </description>
 
-    <change-notes><![CDATA[
-      Support for display Red Underline Decoration, Gutter Icon, Suffix.
-    ]]>
+    <change-notes>
+        <![CDATA[We add change notes of the project in build.gradle file]]>
     </change-notes>
 
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
