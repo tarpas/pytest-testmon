@@ -23,7 +23,7 @@ import java.lang.Exception
  * @param message - source message to log as Error message
  */
 fun logErrorMessage(message: String) {
-    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Testmon plugin", message, NotificationType.ERROR))
+    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Runtime-info plugin", message, NotificationType.ERROR))
 }
 
 /**
@@ -38,7 +38,7 @@ fun logErrorMessage(exception: Exception) {
         getStackTrace(exception)
     }
 
-    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Testmon plugin", message!!, NotificationType.ERROR))
+    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Runtime-info plugin", message!!, NotificationType.ERROR))
 }
 
 /**
