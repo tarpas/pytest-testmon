@@ -38,7 +38,7 @@ patchPluginXml {
     tests directly in the editor by annotating your tests source code with exceptions.
     <br><br>
     <b>Installation:</b><br>
-    pip install pytest-runtime-info
+    pip install runtime-info
     <br><br>
     <b>Usage:</b>
     To start using the plugin run:<br>
