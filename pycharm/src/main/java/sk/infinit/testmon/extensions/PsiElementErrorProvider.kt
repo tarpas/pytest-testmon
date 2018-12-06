@@ -27,11 +27,7 @@ class PsiElementErrorProvider {
     fun getFilteredPyFileMarks(psiElement: PsiElement, fileMarkType: FileMarkType, lineNumber: Int?): List<PyFileMark> {
         val fileMarks = getPyFileMarks(psiElement, fileMarkType)
 
-        val filteredByTextFileMarks = fileMarks.stream()
-                .filter { it.checkContent == psiElement.text }
-                .collect(Collectors.toList())
-
-        return filterByBeginLineNumber(filteredByTextFileMarks, lineNumber)
+        return filterPyFileMarks(fileMarks.toMutableList(), psiElement, lineNumber)
     }
 
     /**
@@ -42,6 +38,15 @@ class PsiElementErrorProvider {
                 ?: return ArrayList()
 
         return DatabaseService.getInstance().getFileMarks(pyFileFullPath, fileMarkType.value)
+    }
+
+
+    fun filterPyFileMarks(fileMarks: MutableList<PyFileMark>, psiElement: PsiElement, lineNumber: Int?): List<PyFileMark> {
+        val filteredByTextFileMarks = fileMarks.stream()
+                .filter { it.checkContent == psiElement.text }
+                .collect(Collectors.toList())
+
+        return filterByBeginLineNumber(filteredByTextFileMarks, lineNumber)
     }
 
     /**

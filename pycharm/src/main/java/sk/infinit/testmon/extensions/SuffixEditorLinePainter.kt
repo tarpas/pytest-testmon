@@ -9,6 +9,7 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
 import sk.infinit.testmon.database.FileMarkType
+import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.isExtensionsDisabled
 import java.awt.Color
 import java.awt.Font
@@ -17,6 +18,7 @@ import java.awt.Font
  * Testmon EditorLinePainter implementation.
  */
 class SuffixEditorLinePainter : EditorLinePainter() {
+    private var cachedPyFileMarks = mutableListOf<PyFileMark>()
 
     /**
      * Get list of LineExtensionInfo's by Testmon database data. Draw exception description text.
@@ -34,12 +36,7 @@ class SuffixEditorLinePainter : EditorLinePainter() {
         val psiElement = getPsiElementAtLine(project, virtualFile, lineNumber)
                 ?: return lineExtensionInfos
 
-        val psiElementErrorProvider = PsiElementErrorProvider()
-
-        val psiElementLineNumber = getPsiElementLineNumber(project, virtualFile, psiElement)
-
-        val pyFileMarks = psiElementErrorProvider
-                .getFilteredPyFileMarks(psiElement, FileMarkType.SUFFIX, psiElementLineNumber)
+        val pyFileMarks = getPyFileMarks(lineNumber, project, virtualFile, psiElement)
 
         for (fileMark in pyFileMarks) {
             lineExtensionInfos.add(LineExtensionInfo(
@@ -50,6 +47,25 @@ class SuffixEditorLinePainter : EditorLinePainter() {
         }
 
         return lineExtensionInfos
+    }
+
+
+    /**
+     * Get file marks from cache or from DB
+     */
+    private fun getPyFileMarks(lineNumber: Int, project: Project, virtualFile: VirtualFile, psiElement: PsiElement):
+            List<PyFileMark> {
+        val psiElementErrorProvider = PsiElementErrorProvider()
+
+        val psiElementLineNumber = getPsiElementLineNumber(project, virtualFile, psiElement)
+
+        // Update cache
+        if (lineNumber == 0) {
+            cachedPyFileMarks = psiElementErrorProvider.getPyFileMarks(psiElement, FileMarkType.SUFFIX) as MutableList<PyFileMark>
+        }
+
+        return psiElementErrorProvider
+                .filterPyFileMarks(cachedPyFileMarks, psiElement, psiElementLineNumber)
     }
 
     /**
