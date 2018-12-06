@@ -2,9 +2,8 @@ package sk.infinit.testmon
 
 import com.intellij.codeInsight.daemon.LineMarkerProvider
 import com.intellij.codeInsight.daemon.LineMarkerProviders
-import com.intellij.lang.LanguageAnnotators
+import com.intellij.lang.ExternalLanguageAnnotators
 import com.intellij.lang.LanguageExtensionPoint
-import com.intellij.lang.annotation.Annotator
 import com.intellij.openapi.components.ProjectComponent
 import com.intellij.openapi.editor.EditorLinePainter
 import com.intellij.openapi.extensions.Extensions
@@ -87,17 +86,17 @@ class TestmonProjectComponent(private val project: Project) : ProjectComponent {
      * Unregister TestmonAnnotator extension.
      */
     private fun unregisterAnnotator(extensionsRootArea: ExtensionsArea) {
-        val annotatorExtensionPoint = extensionsRootArea
-                .getExtensionPoint<LanguageExtensionPoint<out Annotator>>(LanguageAnnotators.EP_NAME)
+        val externalAnnotatorExtensionPoint = extensionsRootArea
+                .getExtensionPoint(ExternalLanguageAnnotators.EP_NAME)
 
-        val testmonAnnotator = annotatorExtensionPoint.extensions
+        val testmonAnnotator = externalAnnotatorExtensionPoint.extensions
                 .stream()
                 .filter { it.implementationClass == RedUnderlineDecorationExternalAnnotator::class.qualifiedName }
                 .findAny()
                 .orElse(null)
 
         if (testmonAnnotator != null) {
-            annotatorExtensionPoint.unregisterExtension(testmonAnnotator)
+            externalAnnotatorExtensionPoint.unregisterExtension(testmonAnnotator)
         }
     }
 
