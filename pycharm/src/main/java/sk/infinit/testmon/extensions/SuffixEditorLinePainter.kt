@@ -9,6 +9,7 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
 import sk.infinit.testmon.database.FileMarkType
+import sk.infinit.testmon.isExtensionsDisabled
 import java.awt.Color
 import java.awt.Font
 
@@ -25,6 +26,10 @@ class SuffixEditorLinePainter : EditorLinePainter() {
     override fun getLineExtensions(project: Project, virtualFile: VirtualFile, lineNumber: Int)
             : MutableCollection<LineExtensionInfo> {
         val lineExtensionInfos = mutableListOf<LineExtensionInfo>()
+
+        if (isExtensionsDisabled(project)) {
+            return lineExtensionInfos
+        }
 
         val psiElement = getPsiElementAtLine(project, virtualFile, lineNumber)
                 ?: return lineExtensionInfos

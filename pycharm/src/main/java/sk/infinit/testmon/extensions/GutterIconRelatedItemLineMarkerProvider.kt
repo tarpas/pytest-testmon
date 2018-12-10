@@ -26,6 +26,10 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
         if (psiElement is PyStatement) {
             val project = psiElement.project
 
+            if (isExtensionsDisabled(project)) {
+                return
+            }
+
             val testmonErrorProvider = PsiElementErrorProvider()
 
             val pyFileMarks = testmonErrorProvider

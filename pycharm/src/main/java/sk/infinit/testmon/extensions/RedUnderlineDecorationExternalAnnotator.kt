@@ -10,6 +10,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import sk.infinit.testmon.database.FileMarkType
+import sk.infinit.testmon.isExtensionsDisabled
 
 /**
  * Testmon external annotator.
@@ -47,10 +48,16 @@ class RedUnderlineDecorationExternalAnnotator
     override fun doAnnotate(psiFile: PsiFile?): List<RedUnderlineDecorationAnnotation>? {
         val redUnderlineAnnotations = mutableListOf<RedUnderlineDecorationAnnotation>()
 
+        val project = psiFile?.project ?: return redUnderlineAnnotations
+
+        if (isExtensionsDisabled(project)) {
+            return redUnderlineAnnotations
+        }
+
         val psiElementErrorProvider = PsiElementErrorProvider()
 
         val fileMarks = psiElementErrorProvider
-                .getPyFileMarks(psiFile!!, FileMarkType.RED_UNDERLINE_DECORATION)
+                .getPyFileMarks(psiFile, FileMarkType.RED_UNDERLINE_DECORATION)
 
         for (fileMark in fileMarks) {
             val document = psiFile.viewProvider.document

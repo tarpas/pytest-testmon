@@ -23,7 +23,8 @@ import java.lang.Exception
  * @param message - source message to log as Error message
  */
 fun logErrorMessage(message: String) {
-    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Runtime-info plugin", message, NotificationType.ERROR))
+    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID,
+            "Runtime-info plugin", message, NotificationType.ERROR))
 }
 
 /**
@@ -38,7 +39,8 @@ fun logErrorMessage(exception: Exception) {
         getStackTrace(exception)
     }
 
-    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID, "Runtime-info plugin", message!!, NotificationType.ERROR))
+    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID,
+            "Runtime-info plugin", message!!, NotificationType.ERROR))
 }
 
 /**
@@ -46,14 +48,16 @@ fun logErrorMessage(exception: Exception) {
  *
  * @return String
  */
-fun getVirtualFileRelativePath(virtualFile: VirtualFile, projectRootVirtualFile: VirtualFile): String? = VfsUtilCore.getRelativePath(virtualFile, projectRootVirtualFile)
+fun getVirtualFileRelativePath(virtualFile: VirtualFile, projectRootVirtualFile: VirtualFile): String?
+        = VfsUtilCore.getRelativePath(virtualFile, projectRootVirtualFile)
 
 /**
  * Get Project root directory VirtualFile
  *
  * @return VirtualFile?
  */
-fun getProjectRootDirectoryVirtualFile(project: Project, virtualFile: VirtualFile): VirtualFile? = ProjectFileIndex.SERVICE.getInstance(project).getContentRootForFile(virtualFile)
+fun getProjectRootDirectoryVirtualFile(project: Project, virtualFile: VirtualFile): VirtualFile?
+        = ProjectFileIndex.SERVICE.getInstance(project).getContentRootForFile(virtualFile)
 
 /**
  * Return VirtualFile by full real path to file.
@@ -92,3 +96,14 @@ fun getStackTrace(throwable: Throwable): String {
 
     return stringWriter.buffer.toString()
 }
+
+/**
+ * Get RuntimeInfo project component (TestmonProjectComponent instance)
+ */
+fun getProjectComponent(project: Project)
+        = project.getComponent(TestmonProjectComponent::class.java) as TestmonProjectComponent
+
+/**
+ * Check is plugin extensions disabled or enabled.
+ */
+fun isExtensionsDisabled(project: Project) = !getProjectComponent(project).enabled
