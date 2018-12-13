@@ -68,7 +68,7 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
 
             getDatabaseServiceProjectComponent(project).dispose()
 
-            logErrorMessage("Not initialized.")
+//            logErrorMessage("Not initialized.")
         } else {
 
             enabled = true
