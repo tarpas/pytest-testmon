@@ -80,7 +80,7 @@ class RedUnderlineDecorationExternalAnnotator
             val lineNumber = document.getLineNumber(elementOffset)
 
             if (lineNumber == fileMark.beginLine) {
-                val exceptionText = psiElementErrorProvider.getExceptionText(fileMark)
+                val exceptionText = psiElementErrorProvider.getExceptionText(fileMark, project)
 
                 redUnderlineAnnotations.add(RedUnderlineDecorationAnnotation(exceptionText!!, psiElement))
             }

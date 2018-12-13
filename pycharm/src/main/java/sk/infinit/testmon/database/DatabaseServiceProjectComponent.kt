@@ -1,5 +1,8 @@
 package sk.infinit.testmon.database
 
+import com.intellij.openapi.components.ProjectComponent
+import com.intellij.openapi.project.Project
+import sk.infinit.testmon.getDatabaseServiceProjectComponent
 import sk.infinit.testmon.logErrorMessage
 import java.io.File
 import java.sql.*
@@ -12,7 +15,7 @@ import java.util.*
  *
  * Low level database API.
  */
-class DatabaseService private constructor() {
+class DatabaseServiceProjectComponent(private val project: Project) : ProjectComponent {
 
     /**
      * Connection instance for current project.
@@ -25,9 +28,15 @@ class DatabaseService private constructor() {
     private var databaseFilePath: String? = null
 
     /**
+     * Contains state of plugin extensions for current project.
+     */
+    var enabled: Boolean = true
+
+    /**
      * Companion object for 'static' initialization of Sqlite JDBC driver.
      */
     companion object {
+        const val COMPONENT_NAME = "RuntimeInfoProjectComponent"
         const val FILE_MARK_TABLE_NAME = "FileMark"
         const val EXCEPTION_TABLE_NAME = "Exception"
 
@@ -35,13 +44,37 @@ class DatabaseService private constructor() {
             Class.forName("org.sqlite.JDBC")
         }
 
-        private val databaseServiceInstance: DatabaseService = DatabaseService()
+    }
 
-        @Synchronized
-        fun getInstance(): DatabaseService {
-            return databaseServiceInstance
+    override fun getComponentName(): String {
+        return COMPONENT_NAME
+    }
+
+    /**
+     * Dispose DatabaseServiceProjectComponent on project closed.
+     */
+    override fun projectClosed() {
+        this.dispose()
+    }
+
+    /**
+     * Initialize DatabaseServiceProjectComponent on project open.
+     */
+    override fun projectOpened() {
+        val isInitialized = this.initialize(project.baseDir.path)
+
+        if (!isInitialized) {
+            enabled = false
+
+            getDatabaseServiceProjectComponent(project).dispose()
+
+            logErrorMessage("Not initialized.")
+        } else {
+
+            enabled = true
         }
     }
+
 
     /**
      * Get PyFileMark's list for PyException.

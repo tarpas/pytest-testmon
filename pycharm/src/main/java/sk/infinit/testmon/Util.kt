@@ -12,6 +12,7 @@ import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
+import sk.infinit.testmon.database.DatabaseServiceProjectComponent
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -98,12 +99,13 @@ fun getStackTrace(throwable: Throwable): String {
 }
 
 /**
- * Get RuntimeInfo project component (TestmonProjectComponent instance)
+ * Get DatabaseServiceProjectComponent instance
  */
-fun getProjectComponent(project: Project)
-        = project.getComponent(TestmonProjectComponent::class.java) as TestmonProjectComponent
+fun getDatabaseServiceProjectComponent(project: Project)
+        = project.getComponent(DatabaseServiceProjectComponent::class.java) as DatabaseServiceProjectComponent
+
 
 /**
  * Check is plugin extensions disabled or enabled.
  */
-fun isExtensionsDisabled(project: Project) = !getProjectComponent(project).enabled
+fun isExtensionsDisabled(project: Project) = !getDatabaseServiceProjectComponent(project).enabled

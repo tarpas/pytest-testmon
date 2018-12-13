@@ -23,7 +23,7 @@
 
     <project-components>
         <component>
-            <implementation-class>sk.infinit.testmon.TestmonProjectComponent</implementation-class>
+            <implementation-class>sk.infinit.testmon.database.DatabaseServiceProjectComponent</implementation-class>
         </component>
     </project-components>
 

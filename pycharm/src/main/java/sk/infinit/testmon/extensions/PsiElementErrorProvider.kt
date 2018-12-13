@@ -3,9 +3,9 @@ package sk.infinit.testmon.extensions
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiElement
-import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
+import sk.infinit.testmon.getDatabaseServiceProjectComponent
 import sk.infinit.testmon.getProjectRootDirectoryVirtualFile
 import sk.infinit.testmon.getVirtualFileRelativePath
 import java.io.File
@@ -37,7 +37,7 @@ class PsiElementErrorProvider {
         val pyFileFullPath = getPsiFileFullPath(psiElement.project, psiElement.containingFile.virtualFile)
                 ?: return ArrayList()
 
-        return DatabaseService.getInstance().getFileMarks(pyFileFullPath, fileMarkType.value)
+        return getDatabaseServiceProjectComponent(psiElement.project).getFileMarks(pyFileFullPath, fileMarkType.value)
     }
 
 
@@ -52,8 +52,8 @@ class PsiElementErrorProvider {
     /**
      * Get exception text for file mark.
      */
-    fun getExceptionText(fileMark: PyFileMark): String? {
-        val pyException = DatabaseService.getInstance().getPyException(fileMark.exceptionId)
+    fun getExceptionText(fileMark: PyFileMark, project: Project): String? {
+        val pyException = getDatabaseServiceProjectComponent(project).getPyException(fileMark.exceptionId)
 
         return pyException?.exceptionText
     }
