@@ -16,12 +16,6 @@ import java.util.*
  * Low level database API.
  */
 class DatabaseServiceProjectComponent(private val project: Project) : ProjectComponent {
-
-    /**
-     * Connection instance for current project.
-     */
-    private var connection: Connection? = null
-
     /**
      * Path to Sqlite database file
      */
@@ -51,13 +45,6 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
     }
 
     /**
-     * Dispose DatabaseServiceProjectComponent on project closed.
-     */
-    override fun projectClosed() {
-        this.dispose()
-    }
-
-    /**
      * Initialize DatabaseServiceProjectComponent on project open.
      */
     override fun projectOpened() {
@@ -65,16 +52,11 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
 
         if (!isInitialized) {
             enabled = false
-
-            getDatabaseServiceProjectComponent(project).dispose()
-
 //            logErrorMessage("Not initialized.")
         } else {
-
             enabled = true
         }
     }
-
 
     /**
      * Get PyFileMark's list for PyException.
@@ -181,13 +163,6 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
         databaseFilePath = getProjectDatabaseFilePath(projectRootDirectoryPath)
 
         return File(databaseFilePath).exists()
-    }
-
-    /**
-     * Close connection
-     */
-    fun dispose() {
-        closeConnection(connection)
     }
 
     /**
