@@ -8,8 +8,7 @@ plugins {
 }
 
 group 'sk.infinit'
-version '0.15.5'
-
+version '0.15.6'
 sourceCompatibility = 1.8
 
 repositories {
@@ -22,7 +21,7 @@ dependencies {
 }
 
 intellij {
-    localPath '.gradle/ide/pycharm-community-2018.2.4'
+    localPath '.gradle/ide/pycharm-community-2018.3'
     pluginName 'runtime-info'
 }
 
@@ -57,7 +56,7 @@ task setupPycharm() {
     if (!new File('.gradle/ide').exists()) {
         if (Os.isFamily(Os.FAMILY_WINDOWS)) {
             download {
-                src 'https://download.jetbrains.com/python/pycharm-community-2018.2.4.zip'
+                src 'https://download.jetbrains.com/python/pycharm-community-2018.3.zip'
                 dest '.gradle/downloads/pycharm.zip'
             }
             copy {
@@ -66,7 +65,7 @@ task setupPycharm() {
             }
         } else if (Os.isFamily(Os.FAMILY_UNIX) || Os.isFamily(Os.FAMILY_MAC)) {
             download {
-                src 'https://download.jetbrains.com/python/pycharm-community-2018.2.4.tar.gz'
+                src 'https://download.jetbrains.com/python/pycharm-community-2018.3.tar.gz'
                 dest '.gradle/downloads/pycharm.tar.gz'
                 overwrite false
             }
