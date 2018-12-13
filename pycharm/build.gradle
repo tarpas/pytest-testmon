@@ -8,7 +8,7 @@ plugins {
 }
 
 group 'sk.infinit'
-version '0.15.4'
+version '0.15.5'
 
 sourceCompatibility = 1.8
 
