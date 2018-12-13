@@ -8,7 +8,7 @@ plugins {
 }
 
 group 'sk.infinit'
-version '0.15.0'
+version '0.15.4'
 
 sourceCompatibility = 1.8
 
@@ -23,7 +23,7 @@ dependencies {
 
 intellij {
     localPath '.gradle/ide/pycharm-community-2018.2.4'
-    pluginName 'runtime-info-alpha'
+    pluginName 'runtime-info'
 }
 
 publishPlugin {
@@ -34,7 +34,7 @@ publishPlugin {
 
 patchPluginXml {
     pluginDescription """
-    Plugin for pytest testing tool. Runtime-info plugin provides you information about failing
+    Plugin for pytest testing framework. runtime-info plugin provides information about failing
     tests directly in the editor by annotating your tests source code with exceptions.
     <br><br>
     <b>Installation:</b><br>

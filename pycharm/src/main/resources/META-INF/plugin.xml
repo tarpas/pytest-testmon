@@ -1,6 +1,6 @@
 <idea-plugin>
     <id>sk.infinit.testmon</id>
-    <name>Runtime info alpha</name>
+    <name>runtime-info</name>
     <version></version>
     <vendor email="tibor.arpas@infinit.sk" url="http://www.infinit.sk/">Infinit</vendor>
 
