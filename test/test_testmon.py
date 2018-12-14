@@ -301,6 +301,30 @@ def test_add():
         # interrupted run shouldn't save .testmondata
         assert 1800000000 == os.path.getmtime(datafilename)
 
+    def test_outcomes_exit(self, testdir):
+        testdir.makepyfile(test_a="""
+             def test_1():
+                 1
+
+             def test_2():
+                 2
+         """)
+        testdir.runpytest("--testmon")
+
+        tf = testdir.makepyfile(test_a="""
+             def test_1():
+                 import pytest
+                 pytest.exit("pytest_exit")
+
+             def test_2():
+                 3
+         """)
+        os.utime(datafilename, (1800000000, 1800000000))
+        tf.setmtime(1800000000)
+        testdir.runpytest("--testmon", )
+        # interrupted run shouldn't save .testmondata
+        assert 1800000000 == os.path.getmtime(datafilename)
+
     def test_nonfunc_class(self, testdir, monkeypatch):
         """"
         """
