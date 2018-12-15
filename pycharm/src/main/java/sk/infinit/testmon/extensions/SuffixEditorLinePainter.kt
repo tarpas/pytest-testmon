@@ -2,12 +2,10 @@ package sk.infinit.testmon.extensions
 
 import com.intellij.openapi.editor.EditorLinePainter
 import com.intellij.openapi.editor.LineExtensionInfo
-import com.intellij.openapi.editor.markup.EffectType
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiManager
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.isExtensionsDisabled
@@ -33,16 +31,19 @@ class SuffixEditorLinePainter : EditorLinePainter() {
             return lineExtensionInfos
         }
 
-        val psiElement = getPsiElementAtLine(project, virtualFile, lineNumber)
-                ?: return lineExtensionInfos
+        val document = FileDocumentManager.getInstance().getDocument(virtualFile) ?: return lineExtensionInfos
 
-        val pyFileMarks = getPyFileMarks(lineNumber, project, virtualFile, psiElement)
+        val line = document.getText(TextRange(
+                document.getLineStartOffset(lineNumber),
+                document.getLineEndOffset(lineNumber)))
+
+        val pyFileMarks = getPyFileMarks(project, virtualFile, lineNumber, line)
 
         for (fileMark in pyFileMarks) {
             lineExtensionInfos.add(LineExtensionInfo(
                     "   ${fileMark.text}",
                     Color.RED,
-                    EffectType.ROUNDED_BOX,
+                    null,
                     null, Font.PLAIN))
         }
 
@@ -53,53 +54,17 @@ class SuffixEditorLinePainter : EditorLinePainter() {
     /**
      * Get file marks from cache or from DB
      */
-    private fun getPyFileMarks(lineNumber: Int, project: Project, virtualFile: VirtualFile, psiElement: PsiElement):
+    private fun getPyFileMarks(project: Project, virtualFile: VirtualFile, lineNumber: Int, line: String):
             List<PyFileMark> {
         val psiElementErrorProvider = PsiElementErrorProvider()
 
-        val psiElementLineNumber = getPsiElementLineNumber(project, virtualFile, psiElement)
-
         // Update cache
         if (lineNumber == 0) {
-            cachedPyFileMarks = psiElementErrorProvider.getPyFileMarks(psiElement, FileMarkType.SUFFIX) as MutableList<PyFileMark>
+            cachedPyFileMarks = psiElementErrorProvider.getPyFileMarks(project, virtualFile, FileMarkType.SUFFIX) as MutableList<PyFileMark>
         }
 
         return psiElementErrorProvider
-                .filterPyFileMarks(cachedPyFileMarks, psiElement, psiElementLineNumber)
+                .filterPyFileMarks(cachedPyFileMarks, line, lineNumber)
     }
 
-    /**
-     * Get PsiElement by line number.
-     */
-    private fun getPsiElementAtLine(project: Project, virtualFile: VirtualFile, lineNumber: Int)
-            : PsiElement? {
-        val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
-                ?: return null
-
-        val document = PsiDocumentManager.getInstance(project).getDocument(psiFile)
-        val offset = document?.getLineStartOffset(lineNumber)
-
-        val psiElement = psiFile.viewProvider.findElementAt(offset!!)
-                ?: return null
-
-        return if (document.getLineNumber(psiElement.textOffset) != lineNumber) {
-            psiElement.nextSibling
-        } else {
-            psiElement
-        }
-    }
-
-    /**
-     * Get PsiElement line number. This line number can differ from
-     * override fun getLineExtensions(project: Project, virtualFile: VirtualFile, lineNumber: Int)
-     *
-     * and contains real line number including new line symbols ('\n').
-     */
-    private fun getPsiElementLineNumber(project: Project, virtualFile: VirtualFile,
-                                        psiElement: PsiElement): Int? {
-        val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
-        val document = PsiDocumentManager.getInstance(project).getDocument(psiFile!!)
-
-        return document?.getLineNumber(psiElement.textOffset)
-    }
 }

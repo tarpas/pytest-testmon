@@ -25,25 +25,25 @@ class PsiElementErrorProvider {
      * Line number can be null. In this case it don't filter by line number and return result list.
      */
     fun getFilteredPyFileMarks(psiElement: PsiElement, fileMarkType: FileMarkType, lineNumber: Int?): List<PyFileMark> {
-        val fileMarks = getPyFileMarks(psiElement, fileMarkType)
+        val fileMarks = getPyFileMarks(psiElement.project, psiElement.containingFile.virtualFile, fileMarkType)
 
-        return filterPyFileMarks(fileMarks.toMutableList(), psiElement, lineNumber)
+        return filterPyFileMarks(fileMarks.toMutableList(), psiElement.text, lineNumber)
     }
 
     /**
      * Get PyFileMark's by PsiElement py file full path.
      */
-    fun getPyFileMarks(psiElement: PsiElement, fileMarkType: FileMarkType): List<PyFileMark> {
-        val pyFileFullPath = getPsiFileFullPath(psiElement.project, psiElement.containingFile.virtualFile)
+    fun getPyFileMarks(project: Project, virtualFile: VirtualFile, fileMarkType: FileMarkType): List<PyFileMark> {
+        val pyFileFullPath = getPsiFileFullPath(project, virtualFile)
                 ?: return ArrayList()
 
-        return getDatabaseServiceProjectComponent(psiElement.project).getFileMarks(pyFileFullPath, fileMarkType.value)
+        return getDatabaseServiceProjectComponent(project).getFileMarks(pyFileFullPath, fileMarkType.value)
     }
 
 
-    fun filterPyFileMarks(fileMarks: MutableList<PyFileMark>, psiElement: PsiElement, lineNumber: Int?): List<PyFileMark> {
+    fun filterPyFileMarks(fileMarks: MutableList<PyFileMark>, text: String, lineNumber: Int?): List<PyFileMark> {
         val filteredByTextFileMarks = fileMarks.stream()
-                .filter { it.checkContent == psiElement.text }
+                .filter { it.checkContent == text.trim() }
                 .collect(Collectors.toList())
 
         return filterByBeginLineNumber(filteredByTextFileMarks, lineNumber)

@@ -57,7 +57,7 @@ class RedUnderlineDecorationExternalAnnotator
         val psiElementErrorProvider = PsiElementErrorProvider()
 
         val fileMarks = psiElementErrorProvider
-                .getPyFileMarks(psiFile, FileMarkType.RED_UNDERLINE_DECORATION)
+                .getPyFileMarks(project, psiFile.containingFile.virtualFile, FileMarkType.RED_UNDERLINE_DECORATION)
 
         for (fileMark in fileMarks) {
             val document = psiFile.viewProvider.document
