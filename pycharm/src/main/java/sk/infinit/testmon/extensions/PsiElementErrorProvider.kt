@@ -43,7 +43,7 @@ class PsiElementErrorProvider {
 
     fun filterPyFileMarks(fileMarks: MutableList<PyFileMark>, text: String, lineNumber: Int?): List<PyFileMark> {
         val filteredByTextFileMarks = fileMarks.stream()
-                .filter { it.checkContent == text.trim() }
+                .filter { it.checkContent == text }
                 .collect(Collectors.toList())
 
         return filterByBeginLineNumber(filteredByTextFileMarks, lineNumber)

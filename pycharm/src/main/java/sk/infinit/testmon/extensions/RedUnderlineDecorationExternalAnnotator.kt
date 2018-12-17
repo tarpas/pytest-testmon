@@ -62,7 +62,7 @@ class RedUnderlineDecorationExternalAnnotator
         for (fileMark in fileMarks) {
             val document = psiFile.viewProvider.document
 
-            val fileMarkContent = fileMark.checkContent
+            val fileMarkContent = fileMark.checkContent.trim()
 
             val elementOffset = StringUtil
                     .indexOf(document?.immutableCharSequence!!, fileMarkContent as CharSequence)
