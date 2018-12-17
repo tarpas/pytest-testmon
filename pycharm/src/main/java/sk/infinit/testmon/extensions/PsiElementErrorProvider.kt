@@ -2,7 +2,6 @@ package sk.infinit.testmon.extensions
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.PsiElement
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.getDatabaseServiceProjectComponent
@@ -18,20 +17,22 @@ import java.util.stream.Collectors
 class PsiElementErrorProvider {
 
     /**
-     * Get PyFileMark's list by PsiElement. Common method for extensions
+     * Get PyFileMark's list. Common method for extensions.
      *
      * This method will filter file marks by text and line number.
      *
      * Line number can be null. In this case it don't filter by line number and return result list.
      */
-    fun getFilteredPyFileMarks(psiElement: PsiElement, fileMarkType: FileMarkType, lineNumber: Int?): List<PyFileMark> {
-        val fileMarks = getPyFileMarks(psiElement.project, psiElement.containingFile.virtualFile, fileMarkType)
+    fun getFilteredPyFileMarks(project: Project, virtualFile: VirtualFile,
+                               elementText: String, fileMarkType: FileMarkType,
+                               lineNumber: Int?): List<PyFileMark> {
+        val fileMarks = getPyFileMarks(project, virtualFile, fileMarkType)
 
-        return filterPyFileMarks(fileMarks.toMutableList(), psiElement.text, lineNumber)
+        return filterPyFileMarks(fileMarks.toMutableList(), elementText, lineNumber)
     }
 
     /**
-     * Get PyFileMark's by PsiElement py file full path.
+     * Get PyFileMark's by py file full path.
      */
     fun getPyFileMarks(project: Project, virtualFile: VirtualFile, fileMarkType: FileMarkType): List<PyFileMark> {
         val pyFileFullPath = getPsiFileFullPath(project, virtualFile)
@@ -40,7 +41,9 @@ class PsiElementErrorProvider {
         return getDatabaseServiceProjectComponent(project).getFileMarks(pyFileFullPath, fileMarkType.value)
     }
 
-
+    /**
+     * Filter file marks by element text and line number (if provided).
+     */
     fun filterPyFileMarks(fileMarks: MutableList<PyFileMark>, text: String, lineNumber: Int?): List<PyFileMark> {
         val filteredByTextFileMarks = fileMarks.stream()
                 .filter { it.checkContent == text }
