@@ -30,7 +30,7 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
                 return
             }
 
-            val testmonErrorProvider = PsiElementErrorProvider()
+            val testmonErrorProvider = FileMarkProvider()
 
             val pyFileMarks = testmonErrorProvider
                     .getFilteredPyFileMarks(psiElement.project, psiElement.containingFile.virtualFile, psiElement.text, FileMarkType.GUTTER_LINK, null)

@@ -12,9 +12,9 @@ import java.util.ArrayList
 import java.util.stream.Collectors
 
 /**
- * PsiElement error provider. Middle layer between database API and IntelliJ UI extensions.
+ * File mark provider. Middle layer between database API and IntelliJ UI extensions.
  */
-class PsiElementErrorProvider {
+class FileMarkProvider {
 
     /**
      * Get PyFileMark's list. Common method for extensions.

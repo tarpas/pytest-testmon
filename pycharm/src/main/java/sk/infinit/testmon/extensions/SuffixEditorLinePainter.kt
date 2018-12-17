@@ -56,7 +56,7 @@ class SuffixEditorLinePainter : EditorLinePainter() {
      */
     private fun getPyFileMarks(project: Project, virtualFile: VirtualFile, lineNumber: Int, line: String):
             List<PyFileMark> {
-        val psiElementErrorProvider = PsiElementErrorProvider()
+        val psiElementErrorProvider = FileMarkProvider()
 
         // Update cache
         if (lineNumber == 0) {
