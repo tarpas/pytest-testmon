@@ -2,7 +2,6 @@ package sk.infinit.testmon.database
 
 import com.intellij.openapi.components.ProjectComponent
 import com.intellij.openapi.project.Project
-import sk.infinit.testmon.getDatabaseServiceProjectComponent
 import sk.infinit.testmon.logErrorMessage
 import java.io.File
 import java.sql.*
