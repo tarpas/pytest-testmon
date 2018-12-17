@@ -19,16 +19,13 @@ class FileMarkProvider {
     /**
      * Get PyFileMark's list. Common method for extensions.
      *
-     * This method will filter file marks by text and line number.
-     *
-     * Line number can be null. In this case it don't filter by line number and return result list.
+     * This method will filter file marks by text.
      */
     fun getFilteredPyFileMarks(project: Project, virtualFile: VirtualFile,
-                               elementText: String, fileMarkType: FileMarkType,
-                               lineNumber: Int?): List<PyFileMark> {
+                               elementText: String, fileMarkType: FileMarkType): List<PyFileMark> {
         val fileMarks = getPyFileMarks(project, virtualFile, fileMarkType)
 
-        return filterPyFileMarks(fileMarks.toMutableList(), elementText, lineNumber)
+        return filterPyFileMarks(fileMarks.toMutableList(), elementText, null)
     }
 
     /**
