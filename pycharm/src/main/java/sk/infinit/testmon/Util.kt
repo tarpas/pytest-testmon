@@ -3,30 +3,16 @@ package sk.infinit.testmon
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.Notifications
-import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiFile
 import sk.infinit.testmon.database.DatabaseServiceProjectComponent
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.lang.Exception
-
-/**
- * Log error message to Notifications Bus.
- *
- * @param message - source message to log as Error message
- */
-fun logErrorMessage(message: String) {
-    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID,
-            "Runtime-info plugin", message, NotificationType.ERROR))
-}
 
 /**
  * Log exception message to Notifications Bus.
@@ -72,21 +58,6 @@ fun findVirtualFile(filePath: String?): VirtualFile? {
 }
 
 /**
- * Get Editor object for PsiFile.
- */
-fun getEditor(project: Project, psiFile: PsiFile): Editor? {
-    val document = PsiDocumentManager.getInstance(project).getDocument(psiFile)
-
-    val editors = EditorFactory.getInstance().getEditors(document!!)
-
-    if (editors.isNotEmpty()) {
-        return editors[0]
-    }
-
-    return null
-}
-
-/**
  * Convert Throwable object to string
  */
 fun getStackTrace(throwable: Throwable): String {
@@ -109,3 +80,15 @@ fun getDatabaseServiceProjectComponent(project: Project)
  * Check is plugin extensions disabled or enabled.
  */
 fun isExtensionsDisabled(project: Project) = !getDatabaseServiceProjectComponent(project).enabled
+
+/**
+ * Get full path of PsiFile.
+ */
+fun getFileFullPath(project: Project, virtualFile: VirtualFile): String? {
+    val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
+            ?: return null
+
+    val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
+
+    return projectRootVirtualFile.path + File.separator + virtualFileRelativePath
+}

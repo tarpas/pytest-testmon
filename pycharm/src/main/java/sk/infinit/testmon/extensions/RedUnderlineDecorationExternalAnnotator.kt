@@ -10,6 +10,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import sk.infinit.testmon.database.FileMarkType
+import sk.infinit.testmon.getFileFullPath
 import sk.infinit.testmon.isExtensionsDisabled
 
 /**
@@ -56,8 +57,11 @@ class RedUnderlineDecorationExternalAnnotator
 
         val psiElementErrorProvider = FileMarkProvider()
 
+        val fileFullPath = getFileFullPath(project, psiFile.virtualFile)
+                ?: return redUnderlineAnnotations
+
         val fileMarks = psiElementErrorProvider
-                .getPyFileMarks(project, psiFile.containingFile.virtualFile, FileMarkType.RED_UNDERLINE_DECORATION)
+                .getPyFileMarks(project, fileFullPath, FileMarkType.RED_UNDERLINE_DECORATION)
 
         for (fileMark in fileMarks) {
             val document = psiFile.viewProvider.document

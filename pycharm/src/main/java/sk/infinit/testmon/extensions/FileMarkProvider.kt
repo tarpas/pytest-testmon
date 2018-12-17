@@ -1,14 +1,9 @@
 package sk.infinit.testmon.extensions
 
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFile
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.getDatabaseServiceProjectComponent
-import sk.infinit.testmon.getProjectRootDirectoryVirtualFile
-import sk.infinit.testmon.getVirtualFileRelativePath
-import java.io.File
-import java.util.ArrayList
 import java.util.stream.Collectors
 
 /**
@@ -17,24 +12,9 @@ import java.util.stream.Collectors
 class FileMarkProvider {
 
     /**
-     * Get PyFileMark's list. Common method for extensions.
-     *
-     * This method will filter file marks by text.
-     */
-    fun getFilteredPyFileMarks(project: Project, virtualFile: VirtualFile,
-                               elementText: String, fileMarkType: FileMarkType): List<PyFileMark> {
-        val fileMarks = getPyFileMarks(project, virtualFile, fileMarkType)
-
-        return filterPyFileMarks(fileMarks.toMutableList(), elementText, null)
-    }
-
-    /**
      * Get PyFileMark's by py file full path.
      */
-    fun getPyFileMarks(project: Project, virtualFile: VirtualFile, fileMarkType: FileMarkType): List<PyFileMark> {
-        val pyFileFullPath = getPsiFileFullPath(project, virtualFile)
-                ?: return ArrayList()
-
+    fun getPyFileMarks(project: Project, pyFileFullPath: String, fileMarkType: FileMarkType): List<PyFileMark> {
         return getDatabaseServiceProjectComponent(project).getFileMarks(pyFileFullPath, fileMarkType.value)
     }
 
@@ -56,18 +36,6 @@ class FileMarkProvider {
         val pyException = getDatabaseServiceProjectComponent(project).getPyException(fileMark.exceptionId)
 
         return pyException?.exceptionText
-    }
-
-    /**
-     * Get full path of PsiFile.
-     */
-    private fun getPsiFileFullPath(project: Project, virtualFile: VirtualFile): String? {
-        val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
-                ?: return null
-
-        val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
-
-        return projectRootVirtualFile.path + File.separator + virtualFileRelativePath
     }
 
     /**

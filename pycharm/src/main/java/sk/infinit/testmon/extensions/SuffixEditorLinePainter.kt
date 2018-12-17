@@ -8,6 +8,7 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
+import sk.infinit.testmon.getFileFullPath
 import sk.infinit.testmon.isExtensionsDisabled
 import java.awt.Color
 import java.awt.Font
@@ -60,7 +61,10 @@ class SuffixEditorLinePainter : EditorLinePainter() {
 
         // Update cache
         if (lineNumber == 0) {
-            cachedPyFileMarks = psiElementErrorProvider.getPyFileMarks(project, virtualFile, FileMarkType.SUFFIX) as MutableList<PyFileMark>
+            val fileFullPath = getFileFullPath(project, virtualFile) ?: return ArrayList()
+
+            cachedPyFileMarks = psiElementErrorProvider
+                    .getPyFileMarks(project, fileFullPath, FileMarkType.SUFFIX) as MutableList<PyFileMark>
         }
 
         return psiElementErrorProvider
