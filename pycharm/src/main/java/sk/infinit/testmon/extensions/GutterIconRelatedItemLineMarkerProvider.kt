@@ -30,13 +30,12 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
                 return
             }
 
-            val testmonErrorProvider = FileMarkProvider()
+            val testmonErrorProvider = FileMarkProvider(getDatabaseServiceProjectComponent(project))
 
             val fileFullPath = getFileFullPath(project, psiElement.containingFile.virtualFile)
                     ?: return
 
-            val pyFileMarks = testmonErrorProvider
-                    .getPyFileMarks(psiElement.project, fileFullPath, FileMarkType.GUTTER_LINK)
+            val pyFileMarks = testmonErrorProvider.getPyFileMarks(fileFullPath, FileMarkType.GUTTER_LINK)
 
             for (fileMark in pyFileMarks) {
                 val targetVirtualFile = findVirtualFile(fileMark.targetPath)

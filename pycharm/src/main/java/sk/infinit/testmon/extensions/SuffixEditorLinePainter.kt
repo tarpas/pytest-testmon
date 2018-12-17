@@ -8,6 +8,7 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
+import sk.infinit.testmon.getDatabaseServiceProjectComponent
 import sk.infinit.testmon.getFileFullPath
 import sk.infinit.testmon.isExtensionsDisabled
 import java.awt.Color
@@ -57,14 +58,14 @@ class SuffixEditorLinePainter : EditorLinePainter() {
      */
     private fun getPyFileMarks(project: Project, virtualFile: VirtualFile, lineNumber: Int, line: String):
             List<PyFileMark> {
-        val psiElementErrorProvider = FileMarkProvider()
+        val psiElementErrorProvider = FileMarkProvider(getDatabaseServiceProjectComponent(project))
 
         // Update cache
         if (lineNumber == 0) {
             val fileFullPath = getFileFullPath(project, virtualFile) ?: return ArrayList()
 
             cachedPyFileMarks = psiElementErrorProvider
-                    .getPyFileMarks(project, fileFullPath, FileMarkType.SUFFIX) as MutableList<PyFileMark>
+                    .getPyFileMarks(fileFullPath, FileMarkType.SUFFIX) as MutableList<PyFileMark>
         }
 
         return psiElementErrorProvider

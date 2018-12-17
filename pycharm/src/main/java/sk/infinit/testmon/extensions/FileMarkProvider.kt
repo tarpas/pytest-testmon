@@ -1,21 +1,20 @@
 package sk.infinit.testmon.extensions
 
-import com.intellij.openapi.project.Project
+import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
-import sk.infinit.testmon.getDatabaseServiceProjectComponent
 import java.util.stream.Collectors
 
 /**
  * File mark provider. Middle layer between database API and IntelliJ UI extensions.
  */
-class FileMarkProvider {
+class FileMarkProvider(private val databaseService: DatabaseService) {
 
     /**
      * Get PyFileMark's by py file full path.
      */
-    fun getPyFileMarks(project: Project, pyFileFullPath: String, fileMarkType: FileMarkType): List<PyFileMark> {
-        return getDatabaseServiceProjectComponent(project).getFileMarks(pyFileFullPath, fileMarkType.value)
+    fun getPyFileMarks(pyFileFullPath: String, fileMarkType: FileMarkType): List<PyFileMark> {
+        return databaseService.getFileMarks(pyFileFullPath, fileMarkType.value)
     }
 
     /**
@@ -32,8 +31,8 @@ class FileMarkProvider {
     /**
      * Get exception text for file mark.
      */
-    fun getExceptionText(fileMark: PyFileMark, project: Project): String? {
-        val pyException = getDatabaseServiceProjectComponent(project).getPyException(fileMark.exceptionId)
+    fun getExceptionText(fileMark: PyFileMark): String? {
+        val pyException = databaseService.getPyException(fileMark.exceptionId)
 
         return pyException?.exceptionText
     }

@@ -10,6 +10,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import sk.infinit.testmon.database.FileMarkType
+import sk.infinit.testmon.getDatabaseServiceProjectComponent
 import sk.infinit.testmon.getFileFullPath
 import sk.infinit.testmon.isExtensionsDisabled
 
@@ -55,13 +56,12 @@ class RedUnderlineDecorationExternalAnnotator
             return redUnderlineAnnotations
         }
 
-        val psiElementErrorProvider = FileMarkProvider()
+        val psiElementErrorProvider = FileMarkProvider(getDatabaseServiceProjectComponent(project))
 
         val fileFullPath = getFileFullPath(project, psiFile.virtualFile)
                 ?: return redUnderlineAnnotations
 
-        val fileMarks = psiElementErrorProvider
-                .getPyFileMarks(project, fileFullPath, FileMarkType.RED_UNDERLINE_DECORATION)
+        val fileMarks = psiElementErrorProvider.getPyFileMarks(fileFullPath, FileMarkType.RED_UNDERLINE_DECORATION)
 
         for (fileMark in fileMarks) {
             val document = psiFile.viewProvider.document
@@ -84,7 +84,7 @@ class RedUnderlineDecorationExternalAnnotator
             val lineNumber = document.getLineNumber(elementOffset)
 
             if (lineNumber == fileMark.beginLine) {
-                val exceptionText = psiElementErrorProvider.getExceptionText(fileMark, project)
+                val exceptionText = psiElementErrorProvider.getExceptionText(fileMark)
 
                 redUnderlineAnnotations.add(RedUnderlineDecorationAnnotation(exceptionText!!, psiElement))
             }
