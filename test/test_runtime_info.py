@@ -4,6 +4,7 @@ import sqlite3
 
 pytest_plugins = "pytester",
 
+
 @pytest.fixture
 def lib_py(testdir):
     return testdir.makepyfile(lib="""
@@ -37,7 +38,6 @@ def b_py(testdir):
 
 
 def test_plugin(testdir, lib_py, a_py, b_py):
-
     test_result = testdir.runpytest('--runtime-info')
     # test if failed
     test_result.assert_outcomes(failed=2, passed=1)
@@ -76,6 +76,7 @@ def test_plugin(testdir, lib_py, a_py, b_py):
     # test the target paths for the gutterMarks above
     assert len([x for x in gutterMarks if x[9] == lib_file]) == 2
     assert len([x for x in gutterMarks if x[9] == a_file]) == 1
+
 
 def test_remove(testdir):
     testdir.makepyfile(test_a="""
@@ -117,6 +118,33 @@ def test_start_without_plugin_option(testdir):
         c.execute("SELECT * FROM Exception")
 
 
+def test_performance(testdir):
+    def silent_remove(filename):
+        try:
+            os.remove(filename)
+        except OSError:
+            pass
 
+    testdir.makepyfile(test_perf="""
+            import pytest
 
+            @pytest.mark.parametrize("test_input", range(100))
+            def test_eval(test_input):
+                assert True
+        """)
 
+    min_with = 1000
+    min_without = 1000
+    for i in range(20):
+        silent_remove(os.path.join('.runtime_info'))
+
+        result = testdir.runpytest()
+        min_without = min(min_without, result.duration)
+        result = testdir.runpytest('--runtime-info')
+        min_with = min(min_with, result.duration)
+        if i > 4 and (min_with / min_without) < 1.1:
+            return
+
+    pytest.fail(
+        "There were not enough runs with acceptable duration difference between plugin and non-plugin run."
+        " min with plugin: {}, min without plugin: {}".format(min_with, min_without))
