@@ -23,9 +23,9 @@ import java.lang.Exception
  *
  * @param message - source message to log as Error message
  */
-fun logErrorMessage(message: String) {
+fun logErrorMessage(message: String, project: Project) {
     Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID,
-            "Runtime-info plugin", message, NotificationType.ERROR))
+            "Runtime-info plugin", message, NotificationType.ERROR), project)
 }
 
 /**
@@ -33,7 +33,7 @@ fun logErrorMessage(message: String) {
  *
  * @param exception - source exception to log as Error message
  */
-fun logErrorMessage(exception: Exception) {
+fun logErrorMessage(exception: Exception, project: Project) {
     val message = if (exception.message != null) {
         exception.message
     } else {
@@ -41,7 +41,7 @@ fun logErrorMessage(exception: Exception) {
     }
 
     Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID,
-            "Runtime-info plugin", message!!, NotificationType.ERROR))
+            "Runtime-info plugin", message!!, NotificationType.ERROR), project)
 }
 
 /**
