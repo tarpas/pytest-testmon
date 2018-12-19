@@ -2,7 +2,6 @@ package sk.infinit.testmon.database
 
 import com.intellij.openapi.components.ProjectComponent
 import com.intellij.openapi.project.Project
-import sk.infinit.testmon.getDatabaseServiceProjectComponent
 import sk.infinit.testmon.logErrorMessage
 import java.io.File
 import java.sql.*
@@ -31,6 +30,8 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
      */
     companion object {
         const val COMPONENT_NAME = "RuntimeInfoProjectComponent"
+        const val DATABASE_FILE_NAME = ".runtime_info0"
+
         const val FILE_MARK_TABLE_NAME = "FileMark"
         const val EXCEPTION_TABLE_NAME = "Exception"
 
@@ -59,7 +60,7 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
     }
 
     /**
-     * Get PyFileMark's list for PyException.
+      * Get PyFileMark's list for PyException.
      *
      * @return List<PyFileMark>
      */
@@ -231,5 +232,5 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
     /**
      * Get project Sqlite database file path.
      */
-    private fun getProjectDatabaseFilePath(projectRootDirectoryPath: String?) = projectRootDirectoryPath + File.separator + ".runtime_info0"
+    private fun getProjectDatabaseFilePath(projectRootDirectoryPath: String?) = projectRootDirectoryPath + File.separator + DATABASE_FILE_NAME
 }
