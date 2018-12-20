@@ -1,9 +1,10 @@
-package sk.infinit.testmon
+package sk.infinit.testmon.toolWindow
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.components.JBList
+import sk.infinit.testmon.RuntimeInfoProjectComponent
 import java.awt.BorderLayout
 import javax.swing.JPanel
 import javax.swing.DefaultListModel

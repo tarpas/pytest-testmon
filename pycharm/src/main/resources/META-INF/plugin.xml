@@ -38,7 +38,7 @@
 
         <codeInsight.lineMarkerProvider language="Python" implementationClass="sk.infinit.testmon.extensions.GutterIconRelatedItemLineMarkerProvider"/>
 
-        <toolWindow id="Runtime Info" anchor="right" factoryClass="sk.infinit.testmon.RuntimeInfoToolWindowFactory"/>
+        <toolWindow id="Runtime Info" anchor="right" factoryClass="sk.infinit.testmon.toolWindow.RuntimeInfoToolWindowFactory"/>
     </extensions>
 
     <actions>
