@@ -3,15 +3,11 @@ package sk.infinit.testmon
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.Notifications
-import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiFile
 import sk.infinit.testmon.database.DatabaseServiceProjectComponent
 import java.io.File
 import java.io.PrintWriter
@@ -69,21 +65,6 @@ fun findVirtualFile(filePath: String?): VirtualFile? {
     } else {
         null
     }
-}
-
-/**
- * Get Editor object for PsiFile.
- */
-fun getEditor(project: Project, psiFile: PsiFile): Editor? {
-    val document = PsiDocumentManager.getInstance(project).getDocument(psiFile)
-
-    val editors = EditorFactory.getInstance().getEditors(document!!)
-
-    if (editors.isNotEmpty()) {
-        return editors[0]
-    }
-
-    return null
 }
 
 /**

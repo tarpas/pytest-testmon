@@ -29,7 +29,7 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
      * Companion object for 'static' initialization of Sqlite JDBC driver.
      */
     companion object {
-        const val COMPONENT_NAME = "RuntimeInfoProjectComponent"
+        const val COMPONENT_NAME = "DatabaseServiceProjectComponent"
         const val DATABASE_FILE_NAME = ".runtime_info0"
 
         const val FILE_MARK_TABLE_NAME = "FileMark"
