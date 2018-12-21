@@ -51,7 +51,7 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
 
         if (!isInitialized) {
             enabled = false
-//            logErrorMessage("Not initialized.")
+            logErrorMessage("Not initialized.", project)
         } else {
             enabled = true
         }
@@ -83,7 +83,7 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
                 pyFileMarks.add(mapResultSetToPyFileMark(resultSet))
             }
         } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException)
+            logErrorMessage(sqlException, project)
         } finally {
             closeAll(connection, statement, resultSet)
         }
@@ -112,7 +112,7 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
                 return mapResultSetToPyException(resultSet)
             }
         } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException)
+            logErrorMessage(sqlException, project)
         } finally {
             closeAll(connection, statement, resultSet)
         }
@@ -182,7 +182,7 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
                 connection.close()
             }
         } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException)
+            logErrorMessage(sqlException, project)
         }
     }
 
@@ -195,7 +195,7 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
         try {
             statement?.close()
         } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException)
+            logErrorMessage(sqlException, project)
         }
 
     }
@@ -209,7 +209,7 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
         try {
             resultSet?.close()
         } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException)
+            logErrorMessage(sqlException, project)
         }
 
     }
