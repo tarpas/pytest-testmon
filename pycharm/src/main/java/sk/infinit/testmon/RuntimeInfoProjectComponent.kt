@@ -38,39 +38,30 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         val contentRoots = ProjectRootManager.getInstance(project).contentRoots
 
         for (contentRoot in contentRoots) {
-            VfsUtilCore.iterateChildrenRecursively(contentRoot, null)
-            {
-                if (it.name == DATABASE_FILE_NAME) {
-                    runtimeInfoFiles.add(it.path)
+            VfsUtilCore.iterateChildrenRecursively(contentRoot, null, processFile(object: ProcessRuntimeInfoFile {
+                override fun process(virtualFile: VirtualFile) {
+                    runtimeInfoFiles.add(virtualFile.path)
                 }
-
-                true
-            }
+            }))
         }
 
         VirtualFileManager.getInstance().addVirtualFileListener(object : VirtualFileListener {
             override fun fileCreated(event: VirtualFileEvent) {
-                VfsUtilCore.iterateChildrenRecursively(event.file, null)
-                {
-                    if (it.name == DATABASE_FILE_NAME) {
-                        runtimeInfoFiles.add(it.path)
-                        getRuntimeInfoListPanel().listModel.addElement(it.path)
+                VfsUtilCore.iterateChildrenRecursively(event.file, null, processFile(object: ProcessRuntimeInfoFile {
+                    override fun process(virtualFile: VirtualFile) {
+                        runtimeInfoFiles.add(virtualFile.path)
+                        getRuntimeInfoListPanel().listModel.addElement(virtualFile.path)
                     }
-
-                    true
-                }
+                }))
             }
 
             override fun beforeFileDeletion(event: VirtualFileEvent) {
-                VfsUtilCore.iterateChildrenRecursively(event.file, null)
-                {
-                    if (it.name == DATABASE_FILE_NAME) {
-                        runtimeInfoFiles.remove(it.path)
-                        getRuntimeInfoListPanel().listModel.removeElement(it.path)
+                VfsUtilCore.iterateChildrenRecursively(event.file, null, processFile(object: ProcessRuntimeInfoFile {
+                    override fun process(virtualFile: VirtualFile) {
+                        runtimeInfoFiles.remove(virtualFile.path)
+                        getRuntimeInfoListPanel().listModel.removeElement(virtualFile.path)
                     }
-
-                    true
-                }
+                }))
             }
 
             override fun contentsChanged(event: VirtualFileEvent) {
@@ -78,21 +69,47 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                     // TODO: update.
                 }
             }
-
-            private fun getToolWindow() = ToolWindowManager.getInstance(project).getToolWindow("Runtime Info")
-
-            private fun getRuntimeInfoListPanel(): RuntimeInfoListPanel {
-                val runtimeInfoToolWindow = getToolWindow()
-
-                val content = runtimeInfoToolWindow.contentManager.getContent(0)
-
-                return content?.component as RuntimeInfoListPanel
-            }
         })
+    }
+
+    /**
+     * Common function for process virtual file events.
+     */
+    private fun processFile(processRuntimeInfoFile: ProcessRuntimeInfoFile): (VirtualFile) -> Boolean {
+        return {
+            if (it.name == DATABASE_FILE_NAME) {
+                processRuntimeInfoFile.process(it)
+            }
+
+            true
+        }
     }
 
     /**
      * Return copy of [runtimeInfoFiles] as list.
      */
     fun getRuntimeInfoFiles(): List<String> = runtimeInfoFiles.toList()
+
+    /**
+     * Get Runtime Info ToolWindow.
+     */
+    private fun getToolWindow() = ToolWindowManager.getInstance(project).getToolWindow("Runtime Info")
+
+    /**
+     * Get [RuntimeInfoListPanel] instance.
+     */
+    private fun getRuntimeInfoListPanel(): RuntimeInfoListPanel {
+        val runtimeInfoToolWindow = getToolWindow()
+
+        val content = runtimeInfoToolWindow.contentManager.getContent(0)
+
+        return content?.component as RuntimeInfoListPanel
+    }
+
+    /**
+     * Internal interface to process file operations for different cases (add, delete).
+     */
+    interface ProcessRuntimeInfoFile {
+        fun process(virtualFile: VirtualFile)
+    }
 }
