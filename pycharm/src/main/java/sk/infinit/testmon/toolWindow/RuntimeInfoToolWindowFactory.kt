@@ -3,41 +3,30 @@ package sk.infinit.testmon.toolWindow
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
-import com.intellij.ui.components.JBList
 import sk.infinit.testmon.RuntimeInfoProjectComponent
-import java.awt.BorderLayout
-import javax.swing.JPanel
-import javax.swing.DefaultListModel
 
 /**
- *
+ * Factory for runtime info [ToolWindow].
  */
 class RuntimeInfoToolWindowFactory : ToolWindowFactory {
-
-    /**
-     * List model for runtime info JBList.
-     */
-    val runtimeInfoFilesListModel = DefaultListModel<String>()
 
     /**
      * Create list with registered (exists) runtime-info files.
      */
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val mainPanel = JPanel(BorderLayout())
+        val runtimeInfoListPanel = RuntimeInfoListPanel()
 
         val runtimeInfoProjectComponent = project
                 .getComponent(RuntimeInfoProjectComponent::class.java) as RuntimeInfoProjectComponent
 
         for (runtimeInfoFile in runtimeInfoProjectComponent.getRuntimeInfoFiles()) {
-            runtimeInfoFilesListModel.addElement(runtimeInfoFile)
+            runtimeInfoListPanel.listModel.addElement(runtimeInfoFile)
         }
 
-        val runtimeInfoFilesList = JBList(runtimeInfoFilesListModel)
+        val contentManager = toolWindow.contentManager
 
-        mainPanel.add(runtimeInfoFilesList, BorderLayout.CENTER)
+        val content = contentManager.factory.createContent(runtimeInfoListPanel, null, false)
 
-        val content = toolWindow.contentManager.factory.createContent(mainPanel, null, false)
-
-        toolWindow.contentManager.addContent(content)
+        contentManager.addContent(content)
     }
 }

@@ -2,12 +2,11 @@ package sk.infinit.testmon
 
 import com.intellij.openapi.components.ProjectComponent
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFileEvent
-import com.intellij.openapi.vfs.VirtualFileListener
-import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.psi.search.FilenameIndex
-import com.intellij.psi.search.GlobalSearchScope
-import com.intellij.util.indexing.FileBasedIndex
+import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.vfs.*
+import com.intellij.openapi.wm.ToolWindowManager
+import sk.infinit.testmon.toolWindow.RuntimeInfoListPanel
+
 
 /**
  * RuntimeInfo project component.
@@ -36,25 +35,58 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
      * Initialize RuntimeInfoProjectComponent on project open.
      */
     override fun projectOpened() {
-        val containingFiles = FileBasedIndex.getInstance()
-                .getContainingFiles(FilenameIndex.NAME, DATABASE_FILE_NAME, GlobalSearchScope.allScope(project))
+        val contentRoots = ProjectRootManager.getInstance(project).contentRoots
 
-        for (runtimeInfoVFile in containingFiles) {
-            runtimeInfoFiles.add(runtimeInfoVFile.path)
+        for (contentRoot in contentRoots) {
+            VfsUtilCore.iterateChildrenRecursively(contentRoot, null)
+            {
+                if (it.name == DATABASE_FILE_NAME) {
+                    runtimeInfoFiles.add(it.path)
+                }
+
+                true
+            }
         }
 
         VirtualFileManager.getInstance().addVirtualFileListener(object : VirtualFileListener {
             override fun fileCreated(event: VirtualFileEvent) {
-                runtimeInfoFiles.add(event.file.path)
+                VfsUtilCore.iterateChildrenRecursively(event.file, null)
+                {
+                    if (it.name == DATABASE_FILE_NAME) {
+                        runtimeInfoFiles.add(it.path)
+                        getRuntimeInfoListPanel().listModel.addElement(it.path)
+                    }
+
+                    true
+                }
             }
 
-            override fun fileDeleted(event: VirtualFileEvent) {
-                runtimeInfoFiles.remove(event.file.path)
+            override fun beforeFileDeletion(event: VirtualFileEvent) {
+                VfsUtilCore.iterateChildrenRecursively(event.file, null)
+                {
+                    if (it.name == DATABASE_FILE_NAME) {
+                        runtimeInfoFiles.remove(it.path)
+                        getRuntimeInfoListPanel().listModel.removeElement(it.path)
+                    }
+
+                    true
+                }
             }
 
             override fun contentsChanged(event: VirtualFileEvent) {
-//                val runtimeInfoToolWindow = ToolWindowManager.getInstance(project).getToolWindow("Runtime Info")
-                //JOptionPane.showMessageDialog(null, "contentsChanged ${event.fileName}")
+                if (event.fileName == DATABASE_FILE_NAME) {
+                    // TODO: update.
+                }
+            }
+
+            private fun getToolWindow() = ToolWindowManager.getInstance(project).getToolWindow("Runtime Info")
+
+            private fun getRuntimeInfoListPanel(): RuntimeInfoListPanel {
+                val runtimeInfoToolWindow = getToolWindow()
+
+                val content = runtimeInfoToolWindow.contentManager.getContent(0)
+
+                return content?.component as RuntimeInfoListPanel
             }
         })
     }
