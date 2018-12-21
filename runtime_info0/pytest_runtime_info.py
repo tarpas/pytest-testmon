@@ -66,7 +66,7 @@ class RuntimeInfo(object):
                 for traceback_entry in call.excinfo.traceback:
                     if not is_project_path(traceback_entry.path, item.config.rootdir):
                         continue  # skiping files outside of project path
-                    striped_statement = str(traceback_entry.statement).lstrip()
+                    striped_statement = str(traceback_entry.statement)
                     start = len(str(traceback_entry.statement)) - len(striped_statement)
                     mark_info = {
                         "exception_text": exception_text,
@@ -74,7 +74,7 @@ class RuntimeInfo(object):
                         "line": traceback_entry.lineno,
                         "start": start,
                         "end": len(str(traceback_entry.statement)),
-                        "check_output": striped_statement
+                        "check_content": striped_statement
                     }
                     if last_mark_info:
                         mark_info["prev"] = last_mark_info
@@ -142,7 +142,7 @@ def insert_file_mark(c, mark_list, exception_id):
         common_params = {
             "file_name": mark["path"],
             "begin_line": mark["line"],
-            "check_output": mark["check_output"],
+            "check_content": mark["check_content"],
             "exception_id": exception_id
         }
 
@@ -182,7 +182,7 @@ def insert_file_mark(c, mark_list, exception_id):
         for params in param_list:
             c.execute("""INSERT INTO FileMark
                          VALUES (:id, :type, :text, :file_name, :begin_line, :begin_character,
-                                :end_line, :end_character, :check_output, :target_path,
+                                :end_line, :end_character, :check_content, :target_path,
                                 :target_line, :target_character, :gutterLinkType, :exception_id)""",
                       defaultdict(lambda: None, params))
 
