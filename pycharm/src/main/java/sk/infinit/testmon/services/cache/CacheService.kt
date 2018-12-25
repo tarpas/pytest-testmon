@@ -7,6 +7,7 @@ import com.intellij.openapi.module.Module
 import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.PyException
 import sk.infinit.testmon.getModuleRuntimeInfoFile
+import sk.infinit.testmon.logErrorMessage
 
 /**
  * Service implementation of [Cache].
@@ -28,13 +29,19 @@ class CacheService(private val module: Module) : Cache {
             return this.fileMarkCacheMap[fullPyFilePath]
         }
 
-        val fileMarkProvider = getFileMarkProvider() ?: return null
+        try {
+            val fileMarkProvider = getFileMarkProvider() ?: return null
 
-        val fileMarks = fileMarkProvider.getPyFileMarks(fullPyFilePath, FileMarkType.RED_UNDERLINE_DECORATION)
+            val fileMarks = fileMarkProvider.getPyFileMarks(fullPyFilePath, FileMarkType.RED_UNDERLINE_DECORATION)
 
-        this.fileMarkCacheMap[fullPyFilePath] = fileMarks
+            this.fileMarkCacheMap[fullPyFilePath] = fileMarks
 
-        return fileMarks
+            return fileMarks
+        } catch (exception: Exception) {
+            logErrorMessage(exception, module.project)
+        }
+
+        return null
     }
 
     /**
@@ -45,14 +52,20 @@ class CacheService(private val module: Module) : Cache {
             return this.exceptionCacheMap[exceptionId]
         }
 
-        val fileMarkProvider = getFileMarkProvider() ?: return null
+        try {
+            val fileMarkProvider = getFileMarkProvider() ?: return null
 
-        val exception = fileMarkProvider.getException(exceptionId)
-                ?: return null
+            val exception = fileMarkProvider.getException(exceptionId)
+                    ?: return null
 
-        this.exceptionCacheMap[exceptionId] = exception
+            this.exceptionCacheMap[exceptionId] = exception
 
-        return exception
+            return exception
+        } catch (exception: Exception) {
+            logErrorMessage(exception, module.project)
+        }
+
+        return null
     }
 
     /**
@@ -69,6 +82,6 @@ class CacheService(private val module: Module) : Cache {
     private fun getFileMarkProvider(): FileMarkProvider? {
         val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module) ?: return null
 
-        return FileMarkProvider(DatabaseService(module.project, moduleRuntimeInfoFile))
+        return FileMarkProvider(DatabaseService(moduleRuntimeInfoFile))
     }
 }

@@ -1,10 +1,7 @@
 package sk.infinit.testmon.database
 
-import com.intellij.openapi.project.Project
-import sk.infinit.testmon.logErrorMessage
 import java.io.File
 import java.sql.*
-import java.sql.SQLException
 import java.sql.ResultSet
 import java.util.*
 
@@ -13,7 +10,7 @@ import java.util.*
  *
  * Low level database API.
  */
-class DatabaseService(private val project: Project, private val databaseFilePath: String) {
+class DatabaseService(private val databaseFilePath: String) {
 
     /**
      * Companion object for 'static' initialization of Sqlite JDBC driver.
@@ -54,8 +51,6 @@ class DatabaseService(private val project: Project, private val databaseFilePath
             while (resultSet!!.next()) {
                 pyFileMarks.add(mapResultSetToPyFileMark(resultSet))
             }
-        } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException, project)
         } finally {
             closeAll(connection, statement, resultSet)
         }
@@ -83,8 +78,6 @@ class DatabaseService(private val project: Project, private val databaseFilePath
             if (resultSet!!.next()) {
                 return mapResultSetToPyException(resultSet)
             }
-        } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException, project)
         } finally {
             closeAll(connection, statement, resultSet)
         }
@@ -152,13 +145,7 @@ class DatabaseService(private val project: Project, private val databaseFilePath
      * @param connection to close
      */
     private fun closeConnection(connection: Connection?) {
-        try {
-            if (connection != null && !connection.isClosed) {
-                connection.close()
-            }
-        } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException, project)
-        }
+        connection?.close()
     }
 
     /**
@@ -167,12 +154,7 @@ class DatabaseService(private val project: Project, private val databaseFilePath
      * @param statement to close
      */
     private fun closeStatement(statement: Statement?) {
-        try {
-            statement?.close()
-        } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException, project)
-        }
-
+        statement?.close()
     }
 
     /**
@@ -181,12 +163,7 @@ class DatabaseService(private val project: Project, private val databaseFilePath
      * @param resultSet to close
      */
     private fun closeResultSet(resultSet: ResultSet?) {
-        try {
-            resultSet?.close()
-        } catch (sqlException: SQLException) {
-            logErrorMessage(sqlException, project)
-        }
-
+        resultSet?.close()
     }
 
     /**
