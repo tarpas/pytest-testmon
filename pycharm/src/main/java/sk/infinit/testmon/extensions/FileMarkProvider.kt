@@ -2,6 +2,7 @@ package sk.infinit.testmon.extensions
 
 import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.FileMarkType
+import sk.infinit.testmon.database.PyException
 import sk.infinit.testmon.database.PyFileMark
 import java.util.stream.Collectors
 
@@ -36,6 +37,11 @@ class FileMarkProvider(private val databaseService: DatabaseService) {
 
         return pyException?.exceptionText
     }
+
+    /**
+     * Get exception text for file mark.
+     */
+    fun getException(exceptionId: Int): PyException? = databaseService.getPyException(exceptionId)
 
     /**
      * Filter list of PyFileMark's by begin line if begin line not null

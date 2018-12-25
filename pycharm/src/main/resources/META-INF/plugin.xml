@@ -22,9 +22,9 @@
     <depends>com.intellij.modules.python</depends>
 
     <project-components>
-        <!--<component>-->
-            <!--<implementation-class>sk.infinit.testmon.database.DatabaseServiceProjectComponent</implementation-class>-->
-        <!--</component>-->
+        <component>
+            <implementation-class>sk.infinit.testmon.database.DatabaseServiceProjectComponent</implementation-class>
+        </component>
 
         <component>
             <implementation-class>sk.infinit.testmon.RuntimeInfoProjectComponent</implementation-class>
@@ -32,13 +32,15 @@
     </project-components>
 
     <extensions defaultExtensionNs="com.intellij">
-        <!--<externalAnnotator language="Python" implementationClass="sk.infinit.testmon.extensions.RedUnderlineDecorationExternalAnnotator"/>-->
+        <externalAnnotator language="Python" implementationClass="sk.infinit.testmon.extensions.RedUnderlineDecorationExternalAnnotator"/>
 
         <!--<editor.linePainter implementation="sk.infinit.testmon.extensions.SuffixEditorLinePainter"/>-->
 
         <!--<codeInsight.lineMarkerProvider language="Python" implementationClass="sk.infinit.testmon.extensions.GutterIconRelatedItemLineMarkerProvider"/>-->
 
         <toolWindow id="Runtime Info" anchor="right" factoryClass="sk.infinit.testmon.toolWindow.RuntimeInfoToolWindowFactory"/>
+
+        <moduleService serviceInterface="sk.infinit.testmon.services.cache.Cache" serviceImplementation="sk.infinit.testmon.services.cache.CacheService" />
     </extensions>
 
     <actions>

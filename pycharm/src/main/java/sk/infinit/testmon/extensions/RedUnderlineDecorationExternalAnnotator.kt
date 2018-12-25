@@ -9,13 +9,14 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
-import sk.infinit.testmon.database.FileMarkType
-import sk.infinit.testmon.getDatabaseServiceProjectComponent
 import sk.infinit.testmon.getFileFullPath
 import sk.infinit.testmon.isExtensionsDisabled
+import com.intellij.openapi.module.ModuleServiceManager
+import sk.infinit.testmon.services.cache.Cache
+import com.intellij.openapi.module.ModuleUtil
 
 /**
- * Testmon external annotator.
+ * Runtime info external annotator.
  */
 class RedUnderlineDecorationExternalAnnotator
     : ExternalAnnotator<PsiFile, List<RedUnderlineDecorationAnnotation>>() {
@@ -56,12 +57,16 @@ class RedUnderlineDecorationExternalAnnotator
             return redUnderlineAnnotations
         }
 
-        val psiElementErrorProvider = FileMarkProvider(getDatabaseServiceProjectComponent(project))
+        val module = ModuleUtil.findModuleForFile(psiFile)
+                ?: return redUnderlineAnnotations
+
+        val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
+                ?: return redUnderlineAnnotations
 
         val fileFullPath = getFileFullPath(project, psiFile.virtualFile)
                 ?: return redUnderlineAnnotations
 
-        val fileMarks = psiElementErrorProvider.getPyFileMarks(fileFullPath, FileMarkType.RED_UNDERLINE_DECORATION)
+        val fileMarks = cacheService.getRedUnderlineDecorationFileMarks(fileFullPath) ?: return redUnderlineAnnotations
 
         for (fileMark in fileMarks) {
             val document = psiFile.viewProvider.document
@@ -84,9 +89,11 @@ class RedUnderlineDecorationExternalAnnotator
             val lineNumber = document.getLineNumber(elementOffset)
 
             if (lineNumber == fileMark.beginLine) {
-                val exceptionText = psiElementErrorProvider.getExceptionText(fileMark)
+                val exceptionText = cacheService.getException(fileMark.exceptionId)?.exceptionText
 
-                redUnderlineAnnotations.add(RedUnderlineDecorationAnnotation(exceptionText!!, psiElement))
+                if (exceptionText != null) {
+                    redUnderlineAnnotations.add(RedUnderlineDecorationAnnotation(exceptionText, psiElement))
+                }
             }
         }
 
