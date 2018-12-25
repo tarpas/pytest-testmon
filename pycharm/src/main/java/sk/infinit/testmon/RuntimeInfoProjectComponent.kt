@@ -1,10 +1,13 @@
 package sk.infinit.testmon
 
 import com.intellij.openapi.components.ProjectComponent
+import com.intellij.openapi.module.ModuleServiceManager
+import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.*
 import com.intellij.openapi.wm.ToolWindowManager
+import sk.infinit.testmon.services.cache.Cache
 import sk.infinit.testmon.toolWindow.RuntimeInfoListPanel
 
 
@@ -65,9 +68,17 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
             }
 
             override fun contentsChanged(event: VirtualFileEvent) {
-                if (event.fileName == DATABASE_FILE_NAME) {
-                    // TODO: update.
-                }
+                VfsUtilCore.iterateChildrenRecursively(event.file, null, processFile(object: ProcessRuntimeInfoFile {
+                    override fun process(virtualFile: VirtualFile) {
+                        val module = ModuleUtil.findModuleForFile(virtualFile, project)
+                                ?: return
+
+                        val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
+                                ?: return
+
+                        cacheService.clear()
+                    }
+                }))
             }
         })
     }

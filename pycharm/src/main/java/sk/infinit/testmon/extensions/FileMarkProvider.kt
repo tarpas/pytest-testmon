@@ -4,6 +4,7 @@ import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyException
 import sk.infinit.testmon.database.PyFileMark
+import java.util.*
 import java.util.stream.Collectors
 
 /**
@@ -46,11 +47,25 @@ class FileMarkProvider(private val databaseService: DatabaseService) {
     /**
      * Filter list of PyFileMark's by begin line if begin line not null
      */
-    private fun filterByBeginLineNumber(pyFileMarks: List<PyFileMark>, beginLine: Int?): List<PyFileMark> {
+    fun filterByBeginLineNumber(pyFileMarks: List<PyFileMark>, beginLine: Int?): List<PyFileMark> {
         return if (beginLine != null) {
             pyFileMarks.stream()
                     .filter { it.beginLine == beginLine }
                     .collect(Collectors.toList())
+        } else {
+            pyFileMarks
+        }
+    }
+
+    /**
+     * Filter list of [PyFileMark] by element content if it's not null
+     */
+    fun filterByElementContent(pyFileMarks: List<PyFileMark>, text: String?): List<PyFileMark> {
+        return if (Objects.nonNull(text)) {
+            pyFileMarks.stream()
+                    .filter { it.checkContent == text }
+                    .collect(Collectors.toList())
+
         } else {
             pyFileMarks
         }
