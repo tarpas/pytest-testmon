@@ -23,10 +23,6 @@
 
     <project-components>
         <component>
-            <implementation-class>sk.infinit.testmon.database.DatabaseServiceProjectComponent</implementation-class>
-        </component>
-
-        <component>
             <implementation-class>sk.infinit.testmon.RuntimeInfoProjectComponent</implementation-class>
         </component>
     </project-components>

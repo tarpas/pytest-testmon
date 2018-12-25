@@ -44,6 +44,10 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
             VfsUtilCore.iterateChildrenRecursively(contentRoot, null, processFile(object: ProcessRuntimeInfoFile {
                 override fun process(virtualFile: VirtualFile) {
                     runtimeInfoFiles.add(virtualFile.path)
+
+                    val module = ModuleUtil.findModuleForFile(virtualFile, project) ?: return
+
+                    module.putUserData(MODULE_DATABASE_FILE_KEY, virtualFile.path)
                 }
             }))
         }
@@ -54,6 +58,10 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                     override fun process(virtualFile: VirtualFile) {
                         runtimeInfoFiles.add(virtualFile.path)
                         getRuntimeInfoListPanel().listModel.addElement(virtualFile.path)
+
+                        val module = ModuleUtil.findModuleForFile(virtualFile, project) ?: return
+
+                        module.putUserData(MODULE_DATABASE_FILE_KEY, virtualFile.path)
                     }
                 }))
             }
@@ -63,6 +71,10 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                     override fun process(virtualFile: VirtualFile) {
                         runtimeInfoFiles.remove(virtualFile.path)
                         getRuntimeInfoListPanel().listModel.removeElement(virtualFile.path)
+
+                        val module = ModuleUtil.findModuleForFile(virtualFile, project) ?: return
+
+                        module.putUserData(MODULE_DATABASE_FILE_KEY, null)
                     }
                 }))
             }

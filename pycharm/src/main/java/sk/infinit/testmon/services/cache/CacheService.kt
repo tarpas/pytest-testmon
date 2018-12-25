@@ -4,8 +4,9 @@ import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.extensions.FileMarkProvider
 import com.intellij.openapi.module.Module
+import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.PyException
-import sk.infinit.testmon.getDatabaseServiceProjectComponent
+import sk.infinit.testmon.getModuleRuntimeInfoFile
 
 /**
  * Service implementation of [Cache].
@@ -27,9 +28,9 @@ class CacheService(private val module: Module) : Cache {
             return this.fileMarkCacheMap[fullPyFilePath]
         }
 
-        val psiElementErrorProvider = FileMarkProvider(getDatabaseServiceProjectComponent(module.project))
+        val fileMarkProvider = getFileMarkProvider() ?: return null
 
-        val fileMarks = psiElementErrorProvider.getPyFileMarks(fullPyFilePath, FileMarkType.RED_UNDERLINE_DECORATION)
+        val fileMarks = fileMarkProvider.getPyFileMarks(fullPyFilePath, FileMarkType.RED_UNDERLINE_DECORATION)
 
         this.fileMarkCacheMap[fullPyFilePath] = fileMarks
 
@@ -44,20 +45,15 @@ class CacheService(private val module: Module) : Cache {
             return this.exceptionCacheMap[exceptionId]
         }
 
-        val exception = getFileMarkProvider().getException(exceptionId)
+        val fileMarkProvider = getFileMarkProvider() ?: return null
+
+        val exception = fileMarkProvider.getException(exceptionId)
                 ?: return null
 
         this.exceptionCacheMap[exceptionId] = exception
 
         return exception
     }
-
-    /**
-     * Remove from [fileMarkCacheMap].
-     */
-    /*override fun remove(key: String) {
-        this.fileMarkCacheMap.remove(key)
-    }*/
 
     /**
      * Clear cache's.
@@ -68,7 +64,11 @@ class CacheService(private val module: Module) : Cache {
     }
 
     /**
-     * Get [FileMarkProvider] instance using [getDatabaseServiceProjectComponent] method.
+     * Get [FileMarkProvider] instance from [module] data.
      */
-    private fun getFileMarkProvider() = FileMarkProvider(getDatabaseServiceProjectComponent(module.project))
+    private fun getFileMarkProvider(): FileMarkProvider? {
+        val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module) ?: return null
+
+        return FileMarkProvider(DatabaseService(module.project, moduleRuntimeInfoFile))
+    }
 }

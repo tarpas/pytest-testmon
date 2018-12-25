@@ -3,26 +3,23 @@ package sk.infinit.testmon
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.Notifications
+import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
+import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
-import sk.infinit.testmon.database.DatabaseServiceProjectComponent
+import sk.infinit.testmon.database.DatabaseService
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.lang.Exception
 
 /**
- * Log error message to Notifications Bus.
- *
- * @param message - source message to log as Error message
+ * Key for module database file path.
  */
-fun logErrorMessage(message: String, project: Project) {
-    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID,
-            "Runtime-info plugin", message, NotificationType.ERROR), project)
-}
+val MODULE_DATABASE_FILE_KEY = Key.create<String>(DatabaseService.DATABASE_FILE_NAME)
 
 /**
  * Log exception message to Notifications Bus.
@@ -80,18 +77,6 @@ fun getStackTrace(throwable: Throwable): String {
 }
 
 /**
- * Get DatabaseServiceProjectComponent instance
- */
-fun getDatabaseServiceProjectComponent(project: Project)
-        = project.getComponent(DatabaseServiceProjectComponent::class.java) as DatabaseServiceProjectComponent
-
-
-/**
- * Check is plugin extensions disabled or enabled.
- */
-fun isExtensionsDisabled(project: Project) = !getDatabaseServiceProjectComponent(project).enabled
-
-/**
  * Get full path of PsiFile.
  */
 fun getFileFullPath(project: Project, virtualFile: VirtualFile): String? {
@@ -102,3 +87,8 @@ fun getFileFullPath(project: Project, virtualFile: VirtualFile): String? {
 
     return projectRootVirtualFile.path + File.separator + virtualFileRelativePath
 }
+
+/**
+ * Get runtime info file from module.
+ */
+fun getModuleRuntimeInfoFile(module: Module) = module.getUserData<String>(MODULE_DATABASE_FILE_KEY)

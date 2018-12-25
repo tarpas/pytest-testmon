@@ -10,10 +10,10 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import sk.infinit.testmon.getFileFullPath
-import sk.infinit.testmon.isExtensionsDisabled
 import com.intellij.openapi.module.ModuleServiceManager
 import sk.infinit.testmon.services.cache.Cache
 import com.intellij.openapi.module.ModuleUtil
+import sk.infinit.testmon.getModuleRuntimeInfoFile
 
 /**
  * Runtime info external annotator.
@@ -53,12 +53,15 @@ class RedUnderlineDecorationExternalAnnotator
 
         val project = psiFile?.project ?: return redUnderlineAnnotations
 
-        if (isExtensionsDisabled(project)) {
-            return redUnderlineAnnotations
-        }
-
         val module = ModuleUtil.findModuleForFile(psiFile)
                 ?: return redUnderlineAnnotations
+
+        val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module)
+                ?: return redUnderlineAnnotations
+
+        if (moduleRuntimeInfoFile.isBlank()) {
+            return redUnderlineAnnotations
+        }
 
         val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
                 ?: return redUnderlineAnnotations
