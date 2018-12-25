@@ -90,3 +90,15 @@ fun getDatabaseServiceProjectComponent(project: Project)
  * Check is plugin extensions disabled or enabled.
  */
 fun isExtensionsDisabled(project: Project) = !getDatabaseServiceProjectComponent(project).enabled
+
+/**
+ * Get full path of PsiFile.
+ */
+fun getFileFullPath(project: Project, virtualFile: VirtualFile): String? {
+    val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
+            ?: return null
+
+    val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
+
+    return projectRootVirtualFile.path + File.separator + virtualFileRelativePath
+}

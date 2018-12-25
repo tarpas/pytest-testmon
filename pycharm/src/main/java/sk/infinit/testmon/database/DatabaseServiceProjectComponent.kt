@@ -14,7 +14,7 @@ import java.util.*
  *
  * Low level database API.
  */
-class DatabaseServiceProjectComponent(private val project: Project) : ProjectComponent {
+class DatabaseServiceProjectComponent(private val project: Project) : ProjectComponent, DatabaseService {
     /**
      * Path to Sqlite database file
      */
@@ -64,7 +64,7 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
      *
      * @return List<PyFileMark>
      */
-    fun getFileMarks(fileName: String, type: String): List<PyFileMark> {
+    override fun getFileMarks(fileName: String, type: String): List<PyFileMark> {
         val pyFileMarks: MutableList<PyFileMark> = ArrayList()
 
         var connection: Connection? = null
@@ -96,7 +96,7 @@ class DatabaseServiceProjectComponent(private val project: Project) : ProjectCom
     /**
      * Get PyException object by id.
      */
-    fun getPyException(exceptionId: Int): PyException? {
+    override fun getPyException(exceptionId: Int): PyException? {
         var connection: Connection? = null
         var statement: PreparedStatement? = null
         var resultSet: ResultSet? = null
