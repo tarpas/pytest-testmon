@@ -13,6 +13,7 @@ import com.intellij.openapi.wm.ToolWindowManager
 import sk.infinit.testmon.services.cache.Cache
 import sk.infinit.testmon.toolWindow.RuntimeInfoListPanel
 import com.intellij.openapi.roots.ModuleRootManager
+import com.intellij.openapi.wm.ToolWindow
 
 
 /**
@@ -24,6 +25,8 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
      * Contains set of runtime info files for all projects in current window.
      */
     private val runtimeInfoFiles = HashSet<String>()
+
+    private lateinit var virtualFileListener: VirtualFileListener
 
     companion object {
         const val COMPONENT_NAME = "RuntimeInfoProjectComponent"
@@ -55,20 +58,21 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
             })
         }
 
-        VirtualFileManager.getInstance().addVirtualFileListener(object : VirtualFileListener {
+        virtualFileListener = object : VirtualFileListener {
             override fun fileCreated(event: VirtualFileEvent) {
                 VfsUtilCore.iterateChildrenRecursively(event.file, null, {
                     if (it.name == DATABASE_FILE_NAME) {
                         val runtimeInfoFilePath = it.path
 
                         runtimeInfoFiles.add(runtimeInfoFilePath)
-                        getRuntimeInfoListPanel().listModel.addElement(runtimeInfoFilePath)
 
                         val module = ModuleUtil.findModuleForFile(it, project)
 
                         module?.putUserData(MODULE_DATABASE_FILE_KEY, runtimeInfoFilePath)
 
                         logInfoMessage("Runtime Info: file created: $runtimeInfoFilePath", project)
+
+                        getRuntimeInfoListPanel()?.listModel?.addElement(runtimeInfoFilePath)
                     }
 
                     true
@@ -81,13 +85,14 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                         val runtimeInfoFilePath = it.path
 
                         runtimeInfoFiles.remove(runtimeInfoFilePath)
-                        getRuntimeInfoListPanel().listModel.removeElement(runtimeInfoFilePath)
 
                         val module = ModuleUtil.findModuleForFile(it, project)
 
                         module?.putUserData(MODULE_DATABASE_FILE_KEY, null)
 
                         logInfoMessage("Runtime Info: file deleted: $runtimeInfoFilePath", project)
+
+                        getRuntimeInfoListPanel()?.listModel?.removeElement(runtimeInfoFilePath)
                     }
 
                     true
@@ -109,7 +114,9 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                     true
                 })
             }
-        })
+        }
+
+        VirtualFileManager.getInstance().addVirtualFileListener(virtualFileListener)
 
         project.messageBus.connect().subscribe(ProjectTopics.MODULES,
                 object : ModuleListener {
@@ -133,18 +140,29 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                 })
     }
 
+    override fun projectClosed() {
+        VirtualFileManager.getInstance().removeVirtualFileListener(virtualFileListener)
+
+        project.messageBus.connect().disconnect()
+    }
+
     fun getRuntimeInfoFiles(): List<String> = runtimeInfoFiles.toList()
 
-    private fun getToolWindow() = ToolWindowManager.getInstance(project).getToolWindow("Runtime Info")
+    private fun getToolWindow(): ToolWindow? {
+        val toolWindowManager = ToolWindowManager.getInstance(project) ?: return null
+
+        return toolWindowManager.getToolWindow("Runtime Info")
+    }
 
     /**
      * Get [RuntimeInfoListPanel] instance.
      */
-    private fun getRuntimeInfoListPanel(): RuntimeInfoListPanel {
-        val runtimeInfoToolWindow = getToolWindow()
+    private fun getRuntimeInfoListPanel(): RuntimeInfoListPanel? {
+        val runtimeInfoToolWindow = getToolWindow() ?: return null
 
         val content = runtimeInfoToolWindow.contentManager.getContent(0)
+                ?: return null
 
-        return content?.component as RuntimeInfoListPanel
+        return content.component as RuntimeInfoListPanel
     }
 }

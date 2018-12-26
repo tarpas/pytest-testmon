@@ -45,7 +45,7 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
             val fileFullPath = getFileFullPath(project, psiElement.containingFile.virtualFile)
                     ?: return
 
-            val pyFileMarks = cacheService.getGutterLinkFileMarks(fileFullPath) ?: return
+            val pyFileMarks = cacheService.getPyFileMarks(fileFullPath, FileMarkType.GUTTER_LINK) ?: return
 
             for (fileMark in pyFileMarks) {
                 val targetVirtualFile = findVirtualFile(fileMark.targetPath)

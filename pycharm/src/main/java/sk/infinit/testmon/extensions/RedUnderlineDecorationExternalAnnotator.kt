@@ -13,6 +13,7 @@ import sk.infinit.testmon.getFileFullPath
 import com.intellij.openapi.module.ModuleServiceManager
 import sk.infinit.testmon.services.cache.Cache
 import com.intellij.openapi.module.ModuleUtil
+import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.getModuleRuntimeInfoFile
 
 /**
@@ -69,7 +70,8 @@ class RedUnderlineDecorationExternalAnnotator
         val fileFullPath = getFileFullPath(project, psiFile.virtualFile)
                 ?: return redUnderlineAnnotations
 
-        val fileMarks = cacheService.getRedUnderlineFileMarks(fileFullPath) ?: return redUnderlineAnnotations
+        val fileMarks = cacheService.getPyFileMarks(fileFullPath, FileMarkType.RED_UNDERLINE_DECORATION)
+                ?: return redUnderlineAnnotations
 
         for (fileMark in fileMarks) {
             val document = psiFile.viewProvider.document

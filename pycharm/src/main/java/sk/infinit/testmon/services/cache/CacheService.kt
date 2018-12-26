@@ -14,73 +14,23 @@ import sk.infinit.testmon.logErrorMessage
  */
 class CacheService(private val module: Module) : Cache {
 
-    private val redUnderlineFileMarkCacheMap = HashMap<String, List<PyFileMark>>()
-
-    private val suffixFileMarkCacheMap = HashMap<String, List<PyFileMark>>()
-
-    private val gutterLinkFileMarkCacheMap = HashMap<String, List<PyFileMark>>()
+    private val fileMarkCacheMap = HashMap<Pair<String, FileMarkType>, List<PyFileMark>>()
 
     private val exceptionCacheMap = HashMap<Int, PyException>()
 
-    override val size: Int
-        get() = redUnderlineFileMarkCacheMap.size
-
-    /**
-     * Get [List<PyFileMark] from cache.
-     */
-    override fun getRedUnderlineFileMarks(fullPyFilePath: String): List<PyFileMark>? {
-        if (this.redUnderlineFileMarkCacheMap.containsKey(fullPyFilePath)) {
-            return this.redUnderlineFileMarkCacheMap[fullPyFilePath]
-        }
-
+    override fun getPyFileMarks(fullPyFilePath: String, fileMarkType: FileMarkType): List<PyFileMark>? {
         try {
+            val keyPair = Pair(fullPyFilePath, fileMarkType)
+
+            if (this.fileMarkCacheMap.containsKey(keyPair)) {
+                return this.fileMarkCacheMap[keyPair]
+            }
+
             val fileMarkProvider = getFileMarkProvider() ?: return null
 
-            val fileMarks = fileMarkProvider.getPyFileMarks(fullPyFilePath, FileMarkType.RED_UNDERLINE_DECORATION)
+            this.fileMarkCacheMap[keyPair] = fileMarkProvider.getPyFileMarks(fullPyFilePath, fileMarkType)
 
-            this.redUnderlineFileMarkCacheMap[fullPyFilePath] = fileMarks
-
-            return fileMarks
-        } catch (exception: Exception) {
-            logErrorMessage(exception, module.project)
-        }
-
-        return null
-    }
-
-    override fun getSuffixFileMarks(fullPyFilePath: String): List<PyFileMark>? {
-        if (suffixFileMarkCacheMap.containsKey(fullPyFilePath)) {
-            return suffixFileMarkCacheMap[fullPyFilePath]
-        }
-
-        try {
-            val fileMarkProvider = getFileMarkProvider() ?: return null
-
-            val fileMarks = fileMarkProvider.getPyFileMarks(fullPyFilePath, FileMarkType.SUFFIX)
-
-            this.suffixFileMarkCacheMap[fullPyFilePath] = fileMarks
-
-            return fileMarks
-        } catch (exception: Exception) {
-            logErrorMessage(exception, module.project)
-        }
-
-        return null
-    }
-
-    override fun getGutterLinkFileMarks(fullPyFilePath: String): List<PyFileMark>? {
-        if (gutterLinkFileMarkCacheMap.containsKey(fullPyFilePath)) {
-            return gutterLinkFileMarkCacheMap[fullPyFilePath]
-        }
-
-        try {
-            val fileMarkProvider = getFileMarkProvider() ?: return null
-
-            val fileMarks = fileMarkProvider.getPyFileMarks(fullPyFilePath, FileMarkType.GUTTER_LINK)
-
-            this.gutterLinkFileMarkCacheMap[fullPyFilePath] = fileMarks
-
-            return fileMarks
+            return this.fileMarkCacheMap[keyPair]
         } catch (exception: Exception) {
             logErrorMessage(exception, module.project)
         }
@@ -116,9 +66,7 @@ class CacheService(private val module: Module) : Cache {
      * Clear cache's.
      */
     override fun clear() {
-        this.redUnderlineFileMarkCacheMap.clear()
-        this.suffixFileMarkCacheMap.clear()
-        this.gutterLinkFileMarkCacheMap.clear()
+        this.fileMarkCacheMap.clear()
         this.exceptionCacheMap.clear()
     }
 
@@ -126,7 +74,8 @@ class CacheService(private val module: Module) : Cache {
      * Get [FileMarkProvider] instance from [module] data.
      */
     private fun getFileMarkProvider(): FileMarkProvider? {
-        val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module) ?: return null
+        val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module)
+                ?: return null
 
         return FileMarkProvider(DatabaseService(moduleRuntimeInfoFile))
     }
