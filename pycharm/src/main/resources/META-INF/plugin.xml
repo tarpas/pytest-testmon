@@ -30,7 +30,7 @@
     <extensions defaultExtensionNs="com.intellij">
         <externalAnnotator language="Python" implementationClass="sk.infinit.testmon.extensions.RedUnderlineDecorationExternalAnnotator"/>
 
-        <!--<editor.linePainter implementation="sk.infinit.testmon.extensions.SuffixEditorLinePainter"/>-->
+        <editor.linePainter implementation="sk.infinit.testmon.extensions.SuffixEditorLinePainter"/>
 
         <!--<codeInsight.lineMarkerProvider language="Python" implementationClass="sk.infinit.testmon.extensions.GutterIconRelatedItemLineMarkerProvider"/>-->
 

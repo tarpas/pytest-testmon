@@ -14,19 +14,21 @@ import sk.infinit.testmon.logErrorMessage
  */
 class CacheService(private val module: Module) : Cache {
 
-    private val fileMarkCacheMap = HashMap<String, List<PyFileMark>>()
+    private val redUnderlineFileMarkCacheMap = HashMap<String, List<PyFileMark>>()
+
+    private val suffixFileMarkCacheMap = HashMap<String, List<PyFileMark>>()
 
     private val exceptionCacheMap = HashMap<Int, PyException>()
 
     override val size: Int
-        get() = fileMarkCacheMap.size
+        get() = redUnderlineFileMarkCacheMap.size
 
     /**
      * Get [List<PyFileMark] from cache.
      */
-    override fun getRedUnderlineDecorationFileMarks(fullPyFilePath: String): List<PyFileMark>? {
-        if (this.fileMarkCacheMap.containsKey(fullPyFilePath)) {
-            return this.fileMarkCacheMap[fullPyFilePath]
+    override fun getRedUnderlineFileMarks(fullPyFilePath: String): List<PyFileMark>? {
+        if (this.redUnderlineFileMarkCacheMap.containsKey(fullPyFilePath)) {
+            return this.redUnderlineFileMarkCacheMap[fullPyFilePath]
         }
 
         try {
@@ -34,7 +36,27 @@ class CacheService(private val module: Module) : Cache {
 
             val fileMarks = fileMarkProvider.getPyFileMarks(fullPyFilePath, FileMarkType.RED_UNDERLINE_DECORATION)
 
-            this.fileMarkCacheMap[fullPyFilePath] = fileMarks
+            this.redUnderlineFileMarkCacheMap[fullPyFilePath] = fileMarks
+
+            return fileMarks
+        } catch (exception: Exception) {
+            logErrorMessage(exception, module.project)
+        }
+
+        return null
+    }
+
+    override fun getSuffixFileMarks(fullPyFilePath: String): List<PyFileMark>? {
+        if (suffixFileMarkCacheMap.containsKey(fullPyFilePath)) {
+            return suffixFileMarkCacheMap[fullPyFilePath]
+        }
+
+        try {
+            val fileMarkProvider = getFileMarkProvider() ?: return null
+
+            val fileMarks = fileMarkProvider.getPyFileMarks(fullPyFilePath, FileMarkType.SUFFIX)
+
+            this.suffixFileMarkCacheMap[fullPyFilePath] = fileMarks
 
             return fileMarks
         } catch (exception: Exception) {
@@ -72,7 +94,8 @@ class CacheService(private val module: Module) : Cache {
      * Clear cache's.
      */
     override fun clear() {
-        this.fileMarkCacheMap.clear()
+        this.redUnderlineFileMarkCacheMap.clear()
+        this.suffixFileMarkCacheMap.clear()
         this.exceptionCacheMap.clear()
     }
 

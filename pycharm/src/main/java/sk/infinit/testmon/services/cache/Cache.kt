@@ -9,7 +9,9 @@ import sk.infinit.testmon.database.PyFileMark
 interface Cache {
     val size: Int
 
-    fun getRedUnderlineDecorationFileMarks(fullPyFilePath: String): List<PyFileMark>?
+    fun getRedUnderlineFileMarks(fullPyFilePath: String): List<PyFileMark>?
+
+    fun getSuffixFileMarks(fullPyFilePath: String): List<PyFileMark>?
 
     fun getException(exceptionId: Int): PyException?
 
