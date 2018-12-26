@@ -21,9 +21,6 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
      */
     private val runtimeInfoFiles = HashSet<String>()
 
-    /**
-     * Companion object for constants.
-     */
     companion object {
         const val COMPONENT_NAME = "RuntimeInfoProjectComponent"
 
@@ -111,14 +108,8 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         })
     }
 
-    /**
-     * Return copy of [runtimeInfoFiles] as list.
-     */
     fun getRuntimeInfoFiles(): List<String> = runtimeInfoFiles.toList()
 
-    /**
-     * Get Runtime Info ToolWindow.
-     */
     private fun getToolWindow() = ToolWindowManager.getInstance(project).getToolWindow("Runtime Info")
 
     /**
