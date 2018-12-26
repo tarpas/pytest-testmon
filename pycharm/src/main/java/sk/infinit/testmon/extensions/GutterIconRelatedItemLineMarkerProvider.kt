@@ -5,6 +5,8 @@ import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider
 import com.intellij.psi.PsiElement
 import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.module.ModuleServiceManager
+import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.jetbrains.extensions.python.toPsi
@@ -13,6 +15,7 @@ import com.jetbrains.python.psi.PyStatement
 import sk.infinit.testmon.*
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
+import sk.infinit.testmon.services.cache.Cache
 
 /**
  * Testmon RelatedItemLineMarkerProvider fod display gutter icons.
@@ -26,16 +29,23 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
         if (psiElement is PyStatement) {
             val project = psiElement.project
 
-            if (isExtensionsDisabled(project)) {
+            val module = ModuleUtil.findModuleForFile(psiElement.containingFile)
+                    ?: return
+
+            val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module)
+                    ?: return
+
+            if (moduleRuntimeInfoFile.isBlank()) {
                 return
             }
 
-            val testmonErrorProvider = FileMarkProvider(getDatabaseServiceProjectComponent(project))
+            val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
+                    ?: return
 
             val fileFullPath = getFileFullPath(project, psiElement.containingFile.virtualFile)
                     ?: return
 
-            val pyFileMarks = testmonErrorProvider.getPyFileMarks(fileFullPath, FileMarkType.GUTTER_LINK)
+            val pyFileMarks = cacheService.getGutterLinkFileMarks(fileFullPath) ?: return
 
             for (fileMark in pyFileMarks) {
                 val targetVirtualFile = findVirtualFile(fileMark.targetPath)

@@ -18,6 +18,8 @@ class CacheService(private val module: Module) : Cache {
 
     private val suffixFileMarkCacheMap = HashMap<String, List<PyFileMark>>()
 
+    private val gutterLinkFileMarkCacheMap = HashMap<String, List<PyFileMark>>()
+
     private val exceptionCacheMap = HashMap<Int, PyException>()
 
     override val size: Int
@@ -66,6 +68,26 @@ class CacheService(private val module: Module) : Cache {
         return null
     }
 
+    override fun getGutterLinkFileMarks(fullPyFilePath: String): List<PyFileMark>? {
+        if (gutterLinkFileMarkCacheMap.containsKey(fullPyFilePath)) {
+            return gutterLinkFileMarkCacheMap[fullPyFilePath]
+        }
+
+        try {
+            val fileMarkProvider = getFileMarkProvider() ?: return null
+
+            val fileMarks = fileMarkProvider.getPyFileMarks(fullPyFilePath, FileMarkType.GUTTER_LINK)
+
+            this.gutterLinkFileMarkCacheMap[fullPyFilePath] = fileMarks
+
+            return fileMarks
+        } catch (exception: Exception) {
+            logErrorMessage(exception, module.project)
+        }
+
+        return null
+    }
+
     /**
      * Get [PyException] from cache by id.
      */
@@ -96,6 +118,7 @@ class CacheService(private val module: Module) : Cache {
     override fun clear() {
         this.redUnderlineFileMarkCacheMap.clear()
         this.suffixFileMarkCacheMap.clear()
+        this.gutterLinkFileMarkCacheMap.clear()
         this.exceptionCacheMap.clear()
     }
 

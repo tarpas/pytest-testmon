@@ -13,6 +13,8 @@ interface Cache {
 
     fun getSuffixFileMarks(fullPyFilePath: String): List<PyFileMark>?
 
+    fun getGutterLinkFileMarks(fullPyFilePath: String): List<PyFileMark>?
+
     fun getException(exceptionId: Int): PyException?
 
     //fun remove(key: String)
