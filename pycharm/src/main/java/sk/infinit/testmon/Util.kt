@@ -38,6 +38,14 @@ fun logErrorMessage(exception: Exception, project: Project) {
 }
 
 /**
+ * Log information message.
+ */
+fun logInfoMessage(message: String, project: Project) {
+    Notifications.Bus.notify(Notification(Notifications.SYSTEM_MESSAGES_GROUP_ID,
+            "Runtime-info plugin", message, NotificationType.INFORMATION), project)
+}
+
+/**
  * Get virtual file relative path.
  *
  * @return String

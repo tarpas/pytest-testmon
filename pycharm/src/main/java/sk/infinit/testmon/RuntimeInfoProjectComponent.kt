@@ -58,12 +58,16 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
             override fun fileCreated(event: VirtualFileEvent) {
                 VfsUtilCore.iterateChildrenRecursively(event.file, null, {
                     if (it.name == DATABASE_FILE_NAME) {
-                        runtimeInfoFiles.add(it.path)
-                        getRuntimeInfoListPanel().listModel.addElement(it.path)
+                        val runtimeInfoFilePath = it.path
+
+                        runtimeInfoFiles.add(runtimeInfoFilePath)
+                        getRuntimeInfoListPanel().listModel.addElement(runtimeInfoFilePath)
 
                         val module = ModuleUtil.findModuleForFile(it, project)
 
-                        module?.putUserData(MODULE_DATABASE_FILE_KEY, it.path)
+                        module?.putUserData(MODULE_DATABASE_FILE_KEY, runtimeInfoFilePath)
+
+                        logInfoMessage("Runtime Info: file created: $runtimeInfoFilePath", project)
                     }
 
                     true
@@ -73,12 +77,16 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
             override fun beforeFileDeletion(event: VirtualFileEvent) {
                 VfsUtilCore.iterateChildrenRecursively(event.file, null, {
                     if (it.name == DATABASE_FILE_NAME) {
-                        runtimeInfoFiles.remove(it.path)
-                        getRuntimeInfoListPanel().listModel.removeElement(it.path)
+                        val runtimeInfoFilePath = it.path
+
+                        runtimeInfoFiles.remove(runtimeInfoFilePath)
+                        getRuntimeInfoListPanel().listModel.removeElement(runtimeInfoFilePath)
 
                         val module = ModuleUtil.findModuleForFile(it, project)
 
                         module?.putUserData(MODULE_DATABASE_FILE_KEY, null)
+
+                        logInfoMessage("Runtime Info: file deleted: $runtimeInfoFilePath", project)
                     }
 
                     true
