@@ -1,14 +1,18 @@
 package sk.infinit.testmon
 
+import com.intellij.ProjectTopics
 import com.intellij.openapi.components.ProjectComponent
+import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleServiceManager
 import com.intellij.openapi.module.ModuleUtil
+import com.intellij.openapi.project.ModuleListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.*
 import com.intellij.openapi.wm.ToolWindowManager
 import sk.infinit.testmon.services.cache.Cache
 import sk.infinit.testmon.toolWindow.RuntimeInfoListPanel
+import com.intellij.openapi.roots.ModuleRootManager
 
 
 /**
@@ -106,6 +110,27 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                 })
             }
         })
+
+        project.messageBus.connect().subscribe(ProjectTopics.MODULES,
+                object : ModuleListener {
+                    override fun moduleAdded(project: Project, module: Module) {
+                        val rootManager = ModuleRootManager.getInstance(module)
+
+                        for (rootVirtualFile in rootManager.contentRoots) {
+                            VfsUtilCore.iterateChildrenRecursively(rootVirtualFile, null, {
+                                if (it.name == DATABASE_FILE_NAME) {
+                                    val runtimeInfoFilePath = it.path
+
+                                    runtimeInfoFiles.add(runtimeInfoFilePath)
+
+                                    module.putUserData(MODULE_DATABASE_FILE_KEY, runtimeInfoFilePath)
+                                }
+
+                                true
+                            })
+                        }
+                    }
+                })
     }
 
     fun getRuntimeInfoFiles(): List<String> = runtimeInfoFiles.toList()
