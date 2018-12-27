@@ -10,16 +10,20 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
-import sk.infinit.testmon.database.DatabaseService
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.lang.Exception
 
 /**
+ * File name for Sqlite database files.
+ */
+const val DATABASE_FILE_NAME = ".runtime_info0"
+
+/**
  * Key for module database file path.
  */
-val MODULE_DATABASE_FILE_KEY = Key.create<String>(DatabaseService.DATABASE_FILE_NAME)
+val MODULE_DATABASE_FILE_KEY = Key.create<String>(DATABASE_FILE_NAME)
 
 /**
  * Log exception message to Notifications Bus.

@@ -16,8 +16,6 @@ class DatabaseService(private val databaseFilePath: String) {
      * Companion object for 'static' initialization of Sqlite JDBC driver.
      */
     companion object {
-        const val DATABASE_FILE_NAME = ".runtime_info0"
-
         const val FILE_MARK_TABLE_NAME = "FileMark"
         const val EXCEPTION_TABLE_NAME = "Exception"
 

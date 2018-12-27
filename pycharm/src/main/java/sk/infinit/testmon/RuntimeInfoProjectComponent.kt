@@ -30,8 +30,6 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
 
     companion object {
         const val COMPONENT_NAME = "RuntimeInfoProjectComponent"
-
-        const val DATABASE_FILE_NAME = ".runtime_info0"
     }
 
     override fun getComponentName(): String {
