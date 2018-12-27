@@ -12,7 +12,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.getFileFullPath
-import sk.infinit.testmon.getModuleRuntimeInfoFile
+import sk.infinit.testmon.isRuntimeInfoDisabledForModule
 import sk.infinit.testmon.services.cache.Cache
 import java.awt.Color
 import java.awt.Font
@@ -36,10 +36,7 @@ class SuffixEditorLinePainter : EditorLinePainter() {
         val module = ModuleUtil.findModuleForFile(virtualFile, project)
                 ?: return lineExtensionInfos
 
-        val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module)
-                ?: return lineExtensionInfos
-
-        if (moduleRuntimeInfoFile.isBlank()) {
+        if (isRuntimeInfoDisabledForModule(module)) {
             return lineExtensionInfos
         }
 
@@ -62,7 +59,6 @@ class SuffixEditorLinePainter : EditorLinePainter() {
         return lineExtensionInfos
     }
 
-
     /**
      * Get file marks from cache or from DB
      */
@@ -73,7 +69,9 @@ class SuffixEditorLinePainter : EditorLinePainter() {
 
         val fileFullPath = getFileFullPath(project, virtualFile) ?: return ArrayList()
 
-        val fileMarks = cacheService.getPyFileMarks(fileFullPath, FileMarkType.SUFFIX) as MutableList<PyFileMark>
+        val fileMarksList = cacheService.getPyFileMarks(fileFullPath, FileMarkType.SUFFIX) ?: ArrayList()
+
+        val fileMarks = fileMarksList as MutableList<PyFileMark>
 
         // Filter by text.
         val filteredByTextFileMarks = fileMarks.stream()

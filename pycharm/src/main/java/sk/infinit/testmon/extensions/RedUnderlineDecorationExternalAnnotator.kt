@@ -15,6 +15,7 @@ import sk.infinit.testmon.services.cache.Cache
 import com.intellij.openapi.module.ModuleUtil
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.getModuleRuntimeInfoFile
+import sk.infinit.testmon.isRuntimeInfoDisabledForModule
 
 /**
  * Runtime info external annotator.
@@ -57,10 +58,7 @@ class RedUnderlineDecorationExternalAnnotator
         val module = ModuleUtil.findModuleForFile(psiFile)
                 ?: return redUnderlineAnnotations
 
-        val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module)
-                ?: return redUnderlineAnnotations
-
-        if (moduleRuntimeInfoFile.isBlank()) {
+        if (isRuntimeInfoDisabledForModule(module)) {
             return redUnderlineAnnotations
         }
 

@@ -104,3 +104,12 @@ fun getFileFullPath(project: Project, virtualFile: VirtualFile): String? {
  * Get runtime info file from module.
  */
 fun getModuleRuntimeInfoFile(module: Module) = module.getUserData<String>(MODULE_DATABASE_FILE_KEY)
+
+/**
+ * Check is module contains reference to [DATABASE_FILE_NAME]. If not - module is disabled.
+ */
+fun isRuntimeInfoDisabledForModule(module: Module): Boolean {
+    val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module) ?: return true
+
+    return moduleRuntimeInfoFile.isBlank()
+}

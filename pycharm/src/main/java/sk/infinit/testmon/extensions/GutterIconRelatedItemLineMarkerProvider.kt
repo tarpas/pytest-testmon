@@ -32,10 +32,7 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
             val module = ModuleUtil.findModuleForFile(psiElement.containingFile)
                     ?: return
 
-            val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module)
-                    ?: return
-
-            if (moduleRuntimeInfoFile.isBlank()) {
+            if (isRuntimeInfoDisabledForModule(module)) {
                 return
             }
 
