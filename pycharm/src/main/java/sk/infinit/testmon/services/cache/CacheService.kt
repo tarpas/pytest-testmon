@@ -70,7 +70,7 @@ class CacheService(private val module: Module) : Cache {
     }
 
     /**
-     * Get [FileMarkProvider] instance from [module] data.
+     * Get [DatabaseService] instance from [module] data.
      */
     private fun getDatabaseService(): DatabaseService? {
         val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module)
