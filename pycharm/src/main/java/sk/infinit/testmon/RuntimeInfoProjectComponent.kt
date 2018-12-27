@@ -49,7 +49,30 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
             })
         }
 
-        virtualFileListener = object : VirtualFileListener {
+        virtualFileListener = buildVirtualFileListener()
+
+        VirtualFileManager.getInstance().addVirtualFileListener(virtualFileListener)
+
+        project.messageBus.connect().subscribe(ProjectTopics.MODULES, buildModuleListener())
+    }
+
+    override fun projectClosed() {
+        VirtualFileManager.getInstance().removeVirtualFileListener(virtualFileListener)
+
+        project.messageBus.connect().disconnect()
+    }
+
+    /**
+     * Build [VirtualFileListener] instance with override:
+     *
+     * - [VirtualFileListener.fileCreated]
+     * - [VirtualFileListener.beforeFileDeletion]
+     * - [VirtualFileListener.contentsChanged]
+     *
+     * methods.
+     */
+    private fun buildVirtualFileListener(): VirtualFileListener {
+        return object : VirtualFileListener {
             override fun fileCreated(event: VirtualFileEvent) {
                 VfsUtilCore.iterateChildrenRecursively(event.file, null, {
                     if (it.name == DATABASE_FILE_NAME) {
@@ -102,35 +125,31 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                 })
             }
         }
-
-        VirtualFileManager.getInstance().addVirtualFileListener(virtualFileListener)
-
-        project.messageBus.connect().subscribe(ProjectTopics.MODULES,
-                object : ModuleListener {
-                    override fun moduleAdded(project: Project, module: Module) {
-                        val rootManager = ModuleRootManager.getInstance(module)
-
-                        for (rootVirtualFile in rootManager.contentRoots) {
-                            VfsUtilCore.iterateChildrenRecursively(rootVirtualFile, null, {
-                                if (it.name == DATABASE_FILE_NAME) {
-                                    val runtimeInfoFilePath = it.path
-
-                                    module.putUserData(MODULE_DATABASE_FILE_KEY, runtimeInfoFilePath)
-
-                                    getRuntimeInfoListPanel()?.listModel?.addElement(runtimeInfoFilePath)
-                                }
-
-                                true
-                            })
-                        }
-                    }
-                })
     }
 
-    override fun projectClosed() {
-        VirtualFileManager.getInstance().removeVirtualFileListener(virtualFileListener)
+    /**
+     * Build [ModuleListener] with implementation of [ModuleListener.moduleAdded] method.
+     */
+    private fun buildModuleListener(): ModuleListener {
+        return object : ModuleListener {
+            override fun moduleAdded(project: Project, module: Module) {
+                val rootManager = ModuleRootManager.getInstance(module)
 
-        project.messageBus.connect().disconnect()
+                for (rootVirtualFile in rootManager.contentRoots) {
+                    VfsUtilCore.iterateChildrenRecursively(rootVirtualFile, null, {
+                        if (it.name == DATABASE_FILE_NAME) {
+                            val runtimeInfoFilePath = it.path
+
+                            module.putUserData(MODULE_DATABASE_FILE_KEY, runtimeInfoFilePath)
+
+                            getRuntimeInfoListPanel()?.listModel?.addElement(runtimeInfoFilePath)
+                        }
+
+                        true
+                    })
+                }
+            }
+        }
     }
 
     private fun getToolWindow(): ToolWindow? {
