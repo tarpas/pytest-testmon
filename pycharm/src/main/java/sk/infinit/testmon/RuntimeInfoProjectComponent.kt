@@ -56,6 +56,12 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         project.messageBus.connect().subscribe(ProjectTopics.MODULES, buildModuleListener())
     }
 
+    /**
+     * 1. Remove [virtualFileListener] from [VirtualFileManager] instance.
+     * 2. Disconnect from project message bus.
+     *
+     * This steps needed to prevent handle events on closed project(s).
+     */
     override fun projectClosed() {
         VirtualFileManager.getInstance().removeVirtualFileListener(virtualFileListener)
 
