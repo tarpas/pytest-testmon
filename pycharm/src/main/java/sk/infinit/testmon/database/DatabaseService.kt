@@ -31,7 +31,7 @@ class DatabaseService(private val databaseFilePath: String) {
      *
      * @return List<PyFileMark>
      */
-    fun getFileMarks(fileName: String, type: String): List<PyFileMark> {
+    fun getPyFileMarks(fileName: String, type: String): List<PyFileMark> {
         val pyFileMarks: MutableList<PyFileMark> = ArrayList()
 
         var connection: Connection? = null

@@ -75,20 +75,14 @@ class SuffixEditorLinePainter : EditorLinePainter() {
 
         val fileMarks = cacheService.getPyFileMarks(fileFullPath, FileMarkType.SUFFIX) as MutableList<PyFileMark>
 
+        // Filter by text.
         val filteredByTextFileMarks = fileMarks.stream()
                 .filter { it.checkContent == lineText }
                 .collect(Collectors.toList())
 
-        return filterByBeginLineNumber(filteredByTextFileMarks, lineNumber)
-    }
-
-    private fun filterByBeginLineNumber(pyFileMarks: List<PyFileMark>, beginLine: Int?): List<PyFileMark> {
-        return if (beginLine != null) {
-            pyFileMarks.stream()
-                    .filter { it.beginLine == beginLine }
-                    .collect(Collectors.toList())
-        } else {
-            pyFileMarks
-        }
+        // Filter by line number.
+        return filteredByTextFileMarks.stream()
+                .filter { it.beginLine == lineNumber }
+                .collect(Collectors.toList())
     }
 }

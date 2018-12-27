@@ -2,7 +2,6 @@ package sk.infinit.testmon.services.cache
 
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
-import sk.infinit.testmon.extensions.FileMarkProvider
 import com.intellij.openapi.module.Module
 import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.PyException
@@ -26,9 +25,9 @@ class CacheService(private val module: Module) : Cache {
                 return this.fileMarkCacheMap[keyPair]
             }
 
-            val fileMarkProvider = getFileMarkProvider() ?: return null
+            val fileMarkProvider = getDatabaseService() ?: return null
 
-            this.fileMarkCacheMap[keyPair] = fileMarkProvider.getPyFileMarks(fullPyFilePath, fileMarkType)
+            this.fileMarkCacheMap[keyPair] = fileMarkProvider.getPyFileMarks(fullPyFilePath, fileMarkType.value)
 
             return this.fileMarkCacheMap[keyPair]
         } catch (exception: Exception) {
@@ -41,15 +40,15 @@ class CacheService(private val module: Module) : Cache {
     /**
      * Get [PyException] from cache by id.
      */
-    override fun getException(exceptionId: Int): PyException? {
+    override fun getPyException(exceptionId: Int): PyException? {
         if (this.exceptionCacheMap.containsKey(exceptionId)) {
             return this.exceptionCacheMap[exceptionId]
         }
 
         try {
-            val fileMarkProvider = getFileMarkProvider() ?: return null
+            val fileMarkProvider = getDatabaseService() ?: return null
 
-            val exception = fileMarkProvider.getException(exceptionId)
+            val exception = fileMarkProvider.getPyException(exceptionId)
                     ?: return null
 
             this.exceptionCacheMap[exceptionId] = exception
@@ -73,10 +72,10 @@ class CacheService(private val module: Module) : Cache {
     /**
      * Get [FileMarkProvider] instance from [module] data.
      */
-    private fun getFileMarkProvider(): FileMarkProvider? {
+    private fun getDatabaseService(): DatabaseService? {
         val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module)
                 ?: return null
 
-        return FileMarkProvider(DatabaseService(moduleRuntimeInfoFile))
+        return DatabaseService(moduleRuntimeInfoFile)
     }
 }

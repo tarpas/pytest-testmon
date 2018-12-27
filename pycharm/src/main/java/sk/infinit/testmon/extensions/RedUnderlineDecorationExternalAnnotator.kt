@@ -94,7 +94,7 @@ class RedUnderlineDecorationExternalAnnotator
             val lineNumber = document.getLineNumber(elementOffset)
 
             if (lineNumber == fileMark.beginLine) {
-                val exceptionText = cacheService.getException(fileMark.exceptionId)?.exceptionText
+                val exceptionText = cacheService.getPyException(fileMark.exceptionId)?.exceptionText
 
                 if (exceptionText != null) {
                     redUnderlineAnnotations.add(RedUnderlineDecorationAnnotation(exceptionText, psiElement))
