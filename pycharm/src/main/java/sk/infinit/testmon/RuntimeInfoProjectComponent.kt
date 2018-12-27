@@ -21,11 +21,6 @@ import com.intellij.openapi.wm.ToolWindow
  */
 class RuntimeInfoProjectComponent(private val project: Project) : ProjectComponent {
 
-    /**
-     * Contains set of runtime info files for all projects in current window.
-     */
-    private val runtimeInfoFiles = HashSet<String>()
-
     private lateinit var virtualFileListener: VirtualFileListener
 
     companion object {
@@ -45,8 +40,6 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         for (contentRoot in contentRoots) {
             VfsUtilCore.iterateChildrenRecursively(contentRoot, null, {
                 if (it.name == DATABASE_FILE_NAME) {
-                    runtimeInfoFiles.add(it.path)
-
                     val module = ModuleUtil.findModuleForFile(it, project)
 
                     module?.putUserData(MODULE_DATABASE_FILE_KEY, it.path)
@@ -61,8 +54,6 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                 VfsUtilCore.iterateChildrenRecursively(event.file, null, {
                     if (it.name == DATABASE_FILE_NAME) {
                         val runtimeInfoFilePath = it.path
-
-                        runtimeInfoFiles.add(runtimeInfoFilePath)
 
                         val module = ModuleUtil.findModuleForFile(it, project)
 
@@ -81,8 +72,6 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                 VfsUtilCore.iterateChildrenRecursively(event.file, null, {
                     if (it.name == DATABASE_FILE_NAME) {
                         val runtimeInfoFilePath = it.path
-
-                        runtimeInfoFiles.remove(runtimeInfoFilePath)
 
                         val module = ModuleUtil.findModuleForFile(it, project)
 
@@ -126,9 +115,9 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                                 if (it.name == DATABASE_FILE_NAME) {
                                     val runtimeInfoFilePath = it.path
 
-                                    runtimeInfoFiles.add(runtimeInfoFilePath)
-
                                     module.putUserData(MODULE_DATABASE_FILE_KEY, runtimeInfoFilePath)
+
+                                    getRuntimeInfoListPanel()?.listModel?.addElement(runtimeInfoFilePath)
                                 }
 
                                 true
@@ -143,8 +132,6 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
 
         project.messageBus.connect().disconnect()
     }
-
-    fun getRuntimeInfoFiles(): List<String> = runtimeInfoFiles.toList()
 
     private fun getToolWindow(): ToolWindow? {
         val toolWindowManager = ToolWindowManager.getInstance(project) ?: return null

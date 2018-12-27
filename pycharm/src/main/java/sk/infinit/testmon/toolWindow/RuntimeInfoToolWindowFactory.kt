@@ -1,9 +1,10 @@
 package sk.infinit.testmon.toolWindow
 
+import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
-import sk.infinit.testmon.RuntimeInfoProjectComponent
+import sk.infinit.testmon.getModuleRuntimeInfoFile
 
 /**
  * Factory for runtime info [ToolWindow].
@@ -16,11 +17,8 @@ class RuntimeInfoToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val runtimeInfoListPanel = RuntimeInfoListPanel()
 
-        val runtimeInfoProjectComponent = project
-                .getComponent(RuntimeInfoProjectComponent::class.java) as RuntimeInfoProjectComponent
-
-        for (runtimeInfoFile in runtimeInfoProjectComponent.getRuntimeInfoFiles()) {
-            runtimeInfoListPanel.listModel.addElement(runtimeInfoFile)
+        for (module in ModuleManager.getInstance(project).modules) {
+            runtimeInfoListPanel.listModel.addElement(getModuleRuntimeInfoFile(module))
         }
 
         val contentManager = toolWindow.contentManager
