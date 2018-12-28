@@ -5,4 +5,6 @@ package sk.infinit.testmon.database
  */
 class PyFileMark(val id: Int, val type: String, val text: String?, val fileName: String, val beginLine: Int, val beginCharacter: Int,
                  val endLine: Int, val endCharacter: Int, val checkContent: String, val targetPath: String?,
-                 val targetLine: Int, val targetCharacter: Int, val gutterLinkType: String?, val exceptionId: Int)
+                 val targetLine: Int, val targetCharacter: Int, val gutterLinkType: String?, val exceptionId: Int) {
+    var exception: PyException? = null
+}

@@ -23,7 +23,7 @@ const val DATABASE_FILE_NAME = ".runtime_info0"
 /**
  * Key for module database file path.
  */
-val MODULE_DATABASE_FILE_KEY = Key.create<String>(DATABASE_FILE_NAME)
+val MODULE_DATABASE_FILE_KEY = Key.create<List<String>>(DATABASE_FILE_NAME)
 
 /**
  * Log exception message to Notifications Bus.
@@ -101,15 +101,15 @@ fun getFileFullPath(project: Project, virtualFile: VirtualFile): String? {
 }
 
 /**
- * Get runtime info file from module.
+ * Get runtime info files list from module.
  */
-fun getModuleRuntimeInfoFile(module: Module) = module.getUserData<String>(MODULE_DATABASE_FILE_KEY)
+fun getModuleRuntimeInfoFile(module: Module) = module.getUserData<List<String>>(MODULE_DATABASE_FILE_KEY)
 
 /**
  * Check is module contains reference to [DATABASE_FILE_NAME]. If not - module is disabled.
  */
 fun isRuntimeInfoDisabledForModule(module: Module): Boolean {
-    val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module) ?: return true
+    val moduleRuntimeInfoFiles = getModuleRuntimeInfoFile(module) ?: return true
 
-    return moduleRuntimeInfoFile.isBlank()
+    return moduleRuntimeInfoFiles.isEmpty()
 }

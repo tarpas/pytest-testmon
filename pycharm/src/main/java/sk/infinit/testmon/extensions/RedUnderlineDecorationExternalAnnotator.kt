@@ -14,7 +14,6 @@ import com.intellij.openapi.module.ModuleServiceManager
 import sk.infinit.testmon.services.cache.Cache
 import com.intellij.openapi.module.ModuleUtil
 import sk.infinit.testmon.database.FileMarkType
-import sk.infinit.testmon.getModuleRuntimeInfoFile
 import sk.infinit.testmon.isRuntimeInfoDisabledForModule
 
 /**
@@ -33,10 +32,14 @@ class RedUnderlineDecorationExternalAnnotator
         }
 
         for (redUnderlineAnnotation in redUnderlineAnnotations) {
-            val annotation = annotationHolder
-                    .createErrorAnnotation(redUnderlineAnnotation.psiElement!!, redUnderlineAnnotation.message)
+            val psiElement = redUnderlineAnnotation.psiElement
 
-            annotation.tooltip = redUnderlineAnnotation.message
+            if (psiElement != null) {
+                val annotation = annotationHolder
+                        .createErrorAnnotation(psiElement, redUnderlineAnnotation.message)
+
+                annotation.tooltip = redUnderlineAnnotation.message
+            }
         }
     }
 
@@ -92,7 +95,7 @@ class RedUnderlineDecorationExternalAnnotator
             val lineNumber = document.getLineNumber(elementOffset)
 
             if (lineNumber == fileMark.beginLine) {
-                val exceptionText = cacheService.getPyException(fileMark.exceptionId)?.exceptionText
+                val exceptionText = fileMark.exception?.exceptionText
 
                 if (exceptionText != null) {
                     redUnderlineAnnotations.add(RedUnderlineDecorationAnnotation(exceptionText, psiElement))

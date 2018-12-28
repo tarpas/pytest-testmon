@@ -25,35 +25,26 @@ class CacheService(private val module: Module) : Cache {
                 return this.fileMarkCacheMap[keyPair]
             }
 
-            val fileMarkProvider = getDatabaseService() ?: return null
-
-            this.fileMarkCacheMap[keyPair] = fileMarkProvider.getPyFileMarks(fullPyFilePath, fileMarkType.value)
-
-            return this.fileMarkCacheMap[keyPair]
-        } catch (exception: Exception) {
-            logErrorMessage(exception, module.project)
-        }
-
-        return null
-    }
-
-    /**
-     * Get [PyException] from cache by id.
-     */
-    override fun getPyException(exceptionId: Int): PyException? {
-        if (this.exceptionCacheMap.containsKey(exceptionId)) {
-            return this.exceptionCacheMap[exceptionId]
-        }
-
-        try {
-            val fileMarkProvider = getDatabaseService() ?: return null
-
-            val exception = fileMarkProvider.getPyException(exceptionId)
+            val moduleRuntimeInfoFiles = getModuleRuntimeInfoFile(module)
                     ?: return null
 
-            this.exceptionCacheMap[exceptionId] = exception
+            val fileMarks = ArrayList<PyFileMark>()
 
-            return exception
+            for (moduleRuntimeInfoFile in moduleRuntimeInfoFiles) {
+                val databaseService = DatabaseService(moduleRuntimeInfoFile)
+
+                val tempFileMarks = databaseService.getPyFileMarks(fullPyFilePath, fileMarkType.value)
+
+                for (fileMark in tempFileMarks) {
+                    fileMark.exception = getPyException(fileMark.exceptionId, databaseService)
+                }
+
+                fileMarks.addAll(tempFileMarks)
+            }
+
+            this.fileMarkCacheMap[keyPair] = fileMarks
+
+            return this.fileMarkCacheMap[keyPair]
         } catch (exception: Exception) {
             logErrorMessage(exception, module.project)
         }
@@ -70,12 +61,24 @@ class CacheService(private val module: Module) : Cache {
     }
 
     /**
-     * Get [DatabaseService] instance from [module] data.
+     * Get [PyException] from cache by id for provided [DatabaseService] (one runtime-file).
      */
-    private fun getDatabaseService(): DatabaseService? {
-        val moduleRuntimeInfoFile = getModuleRuntimeInfoFile(module)
-                ?: return null
+    private fun getPyException(exceptionId: Int, databaseService: DatabaseService): PyException? {
+        if (this.exceptionCacheMap.containsKey(exceptionId)) {
+            return this.exceptionCacheMap[exceptionId]
+        }
 
-        return DatabaseService(moduleRuntimeInfoFile)
+        try {
+            val exception = databaseService.getPyException(exceptionId)
+                    ?: return null
+
+            this.exceptionCacheMap[exceptionId] = exception
+
+            return exception
+        } catch (exception: Exception) {
+            logErrorMessage(exception, module.project)
+        }
+
+        return null
     }
 }

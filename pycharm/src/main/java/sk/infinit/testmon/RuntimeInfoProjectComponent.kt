@@ -14,6 +14,8 @@ import sk.infinit.testmon.services.cache.Cache
 import sk.infinit.testmon.toolWindow.RuntimeInfoListPanel
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.wm.ToolWindow
+import java.util.*
+import kotlin.collections.ArrayList
 
 
 /**
@@ -40,9 +42,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         for (contentRoot in contentRoots) {
             VfsUtilCore.iterateChildrenRecursively(contentRoot, null, {
                 if (it.name == DATABASE_FILE_NAME) {
-                    val module = ModuleUtil.findModuleForFile(it, project)
-
-                    module?.putUserData(MODULE_DATABASE_FILE_KEY, it.path)
+                    addRuntimeInfoFileToModule(project, it)
                 }
 
                 true
@@ -84,9 +84,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                     if (it.name == DATABASE_FILE_NAME) {
                         val runtimeInfoFilePath = it.path
 
-                        val module = ModuleUtil.findModuleForFile(it, project)
-
-                        module?.putUserData(MODULE_DATABASE_FILE_KEY, runtimeInfoFilePath)
+                        addRuntimeInfoFileToModule(project, it)
 
                         logInfoMessage("Runtime Info: file created: $runtimeInfoFilePath", project)
 
@@ -102,9 +100,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                     if (it.name == DATABASE_FILE_NAME) {
                         val runtimeInfoFilePath = it.path
 
-                        val module = ModuleUtil.findModuleForFile(it, project)
-
-                        module?.putUserData(MODULE_DATABASE_FILE_KEY, null)
+                        removeRuntimeInfoFileFromModule(it)
 
                         logInfoMessage("Runtime Info: file deleted: $runtimeInfoFilePath", project)
 
@@ -146,7 +142,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                         if (it.name == DATABASE_FILE_NAME) {
                             val runtimeInfoFilePath = it.path
 
-                            module.putUserData(MODULE_DATABASE_FILE_KEY, runtimeInfoFilePath)
+                            addRuntimeInfoFileToModule(module, it)
 
                             getRuntimeInfoListPanel()?.listModel?.addElement(runtimeInfoFilePath)
                         }
@@ -174,5 +170,36 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                 ?: return null
 
         return content.component as RuntimeInfoListPanel
+    }
+
+    private fun addRuntimeInfoFileToModule(project: Project, virtualFile: VirtualFile) {
+        val module = ModuleUtil.findModuleForFile(virtualFile, project) ?: return
+
+        addRuntimeInfoFileToModule(module, virtualFile)
+    }
+
+    private fun addRuntimeInfoFileToModule(module: Module, virtualFile: VirtualFile) {
+        var list = getModuleRuntimeInfoFile(module)
+
+        if (list == null) {
+            list = ArrayList()
+        }
+
+        val moduleRuntimeInfoFiles = list as MutableList<String>
+
+        moduleRuntimeInfoFiles.add(virtualFile.path)
+
+        module.putUserData(MODULE_DATABASE_FILE_KEY, moduleRuntimeInfoFiles)
+    }
+
+    private fun removeRuntimeInfoFileFromModule(virtualFile: VirtualFile) {
+        val module = ModuleUtil.findModuleForFile(virtualFile, project) ?: return
+
+        val list = getModuleRuntimeInfoFile(module) ?: return
+        val moduleRuntimeInfoFiles = list as MutableList<String>
+
+        moduleRuntimeInfoFiles.remove(virtualFile.path)
+
+        module.putUserData(MODULE_DATABASE_FILE_KEY, moduleRuntimeInfoFiles)
     }
 }
