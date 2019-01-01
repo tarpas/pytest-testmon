@@ -61,10 +61,9 @@ class RedUnderlineDecorationExternalAnnotator
         val module = ModuleUtil.findModuleForFile(psiFile)
                 ?: return redUnderlineAnnotations
 
-        if (isRuntimeInfoDisabledForModule(module)) {
         val document = psiFile.viewProvider.document ?: return redUnderlineAnnotations
 
-        if (isExtensionsDisabled(project)) {
+        if (isRuntimeInfoDisabledForModule(module)) {
             return redUnderlineAnnotations
         }
 
@@ -102,11 +101,8 @@ class RedUnderlineDecorationExternalAnnotator
             val lineNumber = document.getLineNumber(lineElementOffset)
 
             if (psiElement != null && lineNumber == fileMark.beginLine) {
-                val exceptionText = psiElementErrorProvider.getExceptionText(fileMark) ?: continue
-            if (lineNumber == fileMark.beginLine) {
                 val exceptionText = fileMark.exception?.exceptionText
 
-                redUnderlineAnnotations.add(RedUnderlineDecorationAnnotation(exceptionText, psiElement))
                 if (exceptionText != null) {
                     redUnderlineAnnotations.add(RedUnderlineDecorationAnnotation(exceptionText, psiElement))
                 }
