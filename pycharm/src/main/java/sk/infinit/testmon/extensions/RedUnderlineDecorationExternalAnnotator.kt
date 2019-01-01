@@ -52,6 +52,8 @@ class RedUnderlineDecorationExternalAnnotator
 
         val project = psiFile?.project ?: return redUnderlineAnnotations
 
+        val document = psiFile.viewProvider.document ?: return redUnderlineAnnotations
+
         if (isExtensionsDisabled(project)) {
             return redUnderlineAnnotations
         }
@@ -64,29 +66,33 @@ class RedUnderlineDecorationExternalAnnotator
         val fileMarks = psiElementErrorProvider.getPyFileMarks(fileFullPath, FileMarkType.RED_UNDERLINE_DECORATION)
 
         for (fileMark in fileMarks) {
-            val document = psiFile.viewProvider.document
-
             val fileMarkContent = fileMark.checkContent.trim()
 
-            val elementOffset = StringUtil
-                    .indexOf(document?.immutableCharSequence!!, fileMarkContent as CharSequence)
+            val lineStartOffset = document.getLineStartOffset(fileMark.beginLine)
 
-            if (elementOffset < 0) {
+            if (lineStartOffset < 0) {
+                continue
+            }
+
+            val lineElementOffset = StringUtil.indexOf(document.immutableCharSequence,
+                    fileMarkContent as CharSequence, lineStartOffset)
+
+            if (lineElementOffset < 0) {
                 continue
             }
 
             val psiElement = ApplicationManager.getApplication()
                     .runReadAction(Computable<PsiElement> {
-                        PsiTreeUtil.findElementOfClassAtRange(psiFile, elementOffset,
-                                elementOffset + fileMarkContent.length, PsiElement::class.java)
+                        PsiTreeUtil.findElementOfClassAtRange(psiFile, lineElementOffset,
+                                lineElementOffset + fileMarkContent.length, PsiElement::class.java)
                     })
 
-            val lineNumber = document.getLineNumber(elementOffset)
+            val lineNumber = document.getLineNumber(lineElementOffset)
 
-            if (lineNumber == fileMark.beginLine) {
-                val exceptionText = psiElementErrorProvider.getExceptionText(fileMark)
+            if (psiElement != null && lineNumber == fileMark.beginLine) {
+                val exceptionText = psiElementErrorProvider.getExceptionText(fileMark) ?: continue
 
-                redUnderlineAnnotations.add(RedUnderlineDecorationAnnotation(exceptionText!!, psiElement))
+                redUnderlineAnnotations.add(RedUnderlineDecorationAnnotation(exceptionText, psiElement))
             }
         }
 
