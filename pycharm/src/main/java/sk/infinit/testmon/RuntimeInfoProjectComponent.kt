@@ -14,7 +14,6 @@ import sk.infinit.testmon.services.cache.Cache
 import sk.infinit.testmon.toolWindow.RuntimeInfoListPanel
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.wm.ToolWindow
-import java.util.*
 import kotlin.collections.ArrayList
 
 
@@ -86,7 +85,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
 
                         addRuntimeInfoFileToModule(project, it)
 
-                        logInfoMessage("Runtime Info: file created: $runtimeInfoFilePath", project)
+                        logInfoMessage("runtime-info file created: $runtimeInfoFilePath", project)
 
                         getRuntimeInfoListPanel()?.listModel?.addElement(runtimeInfoFilePath)
                     }
@@ -102,7 +101,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
 
                         removeRuntimeInfoFileFromModule(it)
 
-                        logInfoMessage("Runtime Info: file deleted: $runtimeInfoFilePath", project)
+                        logInfoMessage("runtime-info file deleted: $runtimeInfoFilePath", project)
 
                         getRuntimeInfoListPanel()?.listModel?.removeElement(runtimeInfoFilePath)
                     }
