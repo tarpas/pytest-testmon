@@ -25,4 +25,12 @@ class RuntimeInfoListPanel : JPanel() {
 
         add(runtimeInfoFilesList, BorderLayout.CENTER)
     }
+
+    fun addFile(runtimeInfoFile: String) {
+        listModel.addElement(runtimeInfoFile)
+    }
+
+    fun removeFile(runtimeInfoFile: String) {
+        listModel.removeElement(runtimeInfoFile)
+    }
 }

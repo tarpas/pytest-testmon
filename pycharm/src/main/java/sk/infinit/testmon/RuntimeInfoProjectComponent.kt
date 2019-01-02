@@ -89,7 +89,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
 
                         logInfoMessage("runtime-info file created: $runtimeInfoFilePath", project)
 
-                        getRuntimeInfoListPanel()?.listModel?.addElement(runtimeInfoFilePath)
+                        addRuntimeInfoFileToToolWindow(runtimeInfoFilePath)
                     }
 
                     true
@@ -107,7 +107,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
 
                         logInfoMessage("runtime-info file deleted: $runtimeInfoFilePath", project)
 
-                        getRuntimeInfoListPanel()?.listModel?.removeElement(runtimeInfoFilePath)
+                        removeRuntimeInfoFileFromToolWindow(runtimeInfoFilePath)
                     }
 
                     true
@@ -147,7 +147,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
 
                             addRuntimeInfoFileToModule(module, it)
 
-                            getRuntimeInfoListPanel()?.listModel?.addElement(runtimeInfoFilePath)
+                            addRuntimeInfoFileToToolWindow(runtimeInfoFilePath)
                         }
 
                         true
@@ -173,6 +173,14 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                 ?: return null
 
         return content.component as RuntimeInfoListPanel
+    }
+
+    private fun addRuntimeInfoFileToToolWindow(runtimeInfoFile: String) {
+        getRuntimeInfoListPanel()?.addFile(runtimeInfoFile)
+    }
+
+    private fun removeRuntimeInfoFileFromToolWindow(runtimeInfoFile: String) {
+        getRuntimeInfoListPanel()?.removeFile(runtimeInfoFile)
     }
 
     private fun addRuntimeInfoFileToModule(project: Project, virtualFile: VirtualFile) {
