@@ -20,7 +20,7 @@ import sk.infinit.testmon.isRuntimeInfoDisabled
  * Runtime info external annotator.
  */
 class RedUnderlineDecorationExternalAnnotator
-    : ExternalAnnotator<PsiFile, List<RedUnderlineDecorationAnnotation>>() {
+    : ExternalAnnotator<PsiFile, List<RedUnderlineDecorationExternalAnnotator.RedUnderlineDecorationAnnotation>>() {
 
     /**
      * Create annotations by #redUnderlineAnnotations list.
@@ -111,4 +111,6 @@ class RedUnderlineDecorationExternalAnnotator
 
         return redUnderlineAnnotations
     }
+
+    class RedUnderlineDecorationAnnotation(val message: String, val psiElement: PsiElement?)
 }
