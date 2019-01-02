@@ -44,6 +44,10 @@ class SuffixEditorLinePainter : EditorLinePainter() {
 
         val document = FileDocumentManager.getInstance().getDocument(virtualFile) ?: return lineExtensionInfos
 
+        if (lineNumber >= document.lineCount) {
+            return lineExtensionInfos
+        }
+
         val line = document.getText(TextRange(
                 document.getLineStartOffset(lineNumber),
                 document.getLineEndOffset(lineNumber)))

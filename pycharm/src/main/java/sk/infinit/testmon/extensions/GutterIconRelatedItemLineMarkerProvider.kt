@@ -50,7 +50,7 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
                 val fileMarkContent = fileMark.checkContent.trim()
 
                 if (targetVirtualFile != null && fileMarkContent == psiElement.text) {
-                    val targetPsiElement = findTargetPsiElement(fileMark, project, targetVirtualFile)
+                    val targetPsiElement = findTargetPsiElement(fileMark, project, targetVirtualFile) ?: continue
 
                     val navigationGutterIconBuilder = NavigationGutterIconBuilder
                             .create(AllIcons.General.Error)
@@ -69,18 +69,14 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
     private fun findTargetPsiElement(fileMark: PyFileMark, project: Project, targetVirtualFile: VirtualFile): PsiElement? {
         val targetPsiFile = targetVirtualFile.toPsi(project) as PyFile
 
-        val targetDocument = targetPsiFile.viewProvider.document
+        val document = targetPsiFile.viewProvider.document ?: return null
 
         val targetLine = fileMark.targetLine + 1
 
-        val targetLineStartOffset: Int?
-
-        targetLineStartOffset = if (targetLine == targetDocument?.lineCount) {
-            targetDocument.getLineStartOffset(targetLine - 1)
-        } else {
-            targetDocument?.getLineStartOffset(targetLine)
+        if (targetLine >= document.lineCount) {
+            return null
         }
 
-        return targetPsiFile.findElementAt(targetLineStartOffset!!)
+        return targetPsiFile.findElementAt(document.getLineStartOffset(targetLine))
     }
 }

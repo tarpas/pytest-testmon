@@ -79,6 +79,10 @@ class RedUnderlineDecorationExternalAnnotator
         for (fileMark in fileMarks) {
             val fileMarkContent = fileMark.checkContent.trim()
 
+            if (fileMark.beginLine >= document.lineCount) {
+                continue
+            }
+
             val lineStartOffset = document.getLineStartOffset(fileMark.beginLine)
 
             if (lineStartOffset < 0) {
