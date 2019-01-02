@@ -14,7 +14,7 @@ import com.intellij.openapi.module.ModuleServiceManager
 import sk.infinit.testmon.services.cache.Cache
 import com.intellij.openapi.module.ModuleUtil
 import sk.infinit.testmon.database.FileMarkType
-import sk.infinit.testmon.isRuntimeInfoDisabledForModule
+import sk.infinit.testmon.isRuntimeInfoDisabled
 
 /**
  * Runtime info external annotator.
@@ -63,14 +63,14 @@ class RedUnderlineDecorationExternalAnnotator
 
         val document = psiFile.viewProvider.document ?: return redUnderlineAnnotations
 
-        if (isRuntimeInfoDisabledForModule(module)) {
+        val fileFullPath = getFileFullPath(project, psiFile.virtualFile)
+                ?: return redUnderlineAnnotations
+
+        if (isRuntimeInfoDisabled(module, fileFullPath)) {
             return redUnderlineAnnotations
         }
 
         val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
-                ?: return redUnderlineAnnotations
-
-        val fileFullPath = getFileFullPath(project, psiFile.virtualFile)
                 ?: return redUnderlineAnnotations
 
         val fileMarks = cacheService.getPyFileMarks(fileFullPath, FileMarkType.RED_UNDERLINE_DECORATION)

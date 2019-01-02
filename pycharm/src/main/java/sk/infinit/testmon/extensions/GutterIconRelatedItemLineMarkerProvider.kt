@@ -32,14 +32,14 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
             val module = ModuleUtil.findModuleForFile(psiElement.containingFile)
                     ?: return
 
-            if (isRuntimeInfoDisabledForModule(module)) {
+            val fileFullPath = getFileFullPath(project, psiElement.containingFile.virtualFile)
+                    ?: return
+
+            if (isRuntimeInfoDisabled(module, fileFullPath)) {
                 return
             }
 
             val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
-                    ?: return
-
-            val fileFullPath = getFileFullPath(project, psiElement.containingFile.virtualFile)
                     ?: return
 
             val pyFileMarks = cacheService.getPyFileMarks(fileFullPath, FileMarkType.GUTTER_LINK) ?: return

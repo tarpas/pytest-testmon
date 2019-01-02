@@ -85,6 +85,8 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
 
                         addRuntimeInfoFileToModule(project, it)
 
+                        invalidateCache(it)
+
                         logInfoMessage("runtime-info file created: $runtimeInfoFilePath", project)
 
                         getRuntimeInfoListPanel()?.listModel?.addElement(runtimeInfoFilePath)
@@ -100,6 +102,8 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                         val runtimeInfoFilePath = it.path
 
                         removeRuntimeInfoFileFromModule(it)
+
+                        invalidateCache(it)
 
                         logInfoMessage("runtime-info file deleted: $runtimeInfoFilePath", project)
 
@@ -178,7 +182,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
     }
 
     private fun addRuntimeInfoFileToModule(module: Module, virtualFile: VirtualFile) {
-        var list = getModuleRuntimeInfoFile(module)
+        var list = getModuleRuntimeInfoFiles(module)
 
         if (list == null) {
             list = ArrayList()
@@ -188,17 +192,27 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
 
         moduleRuntimeInfoFiles.add(virtualFile.path)
 
-        module.putUserData(MODULE_DATABASE_FILE_KEY, moduleRuntimeInfoFiles)
+        module.putUserData(MODULE_DATABASE_FILES_KEY, moduleRuntimeInfoFiles)
     }
 
     private fun removeRuntimeInfoFileFromModule(virtualFile: VirtualFile) {
         val module = ModuleUtil.findModuleForFile(virtualFile, project) ?: return
 
-        val list = getModuleRuntimeInfoFile(module) ?: return
+        val list = getModuleRuntimeInfoFiles(module) ?: return
         val moduleRuntimeInfoFiles = list as MutableList<String>
 
         moduleRuntimeInfoFiles.remove(virtualFile.path)
 
-        module.putUserData(MODULE_DATABASE_FILE_KEY, moduleRuntimeInfoFiles)
+        module.putUserData(MODULE_DATABASE_FILES_KEY, moduleRuntimeInfoFiles)
+    }
+
+    private fun invalidateCache(virtualFile: VirtualFile) {
+        val module = ModuleUtil.findModuleForFile(virtualFile, project)
+
+        if (module != null) {
+            val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
+
+            cacheService?.clear()
+        }
     }
 }

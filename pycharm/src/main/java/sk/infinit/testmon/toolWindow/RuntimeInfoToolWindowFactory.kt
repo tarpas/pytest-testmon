@@ -4,7 +4,7 @@ import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
-import sk.infinit.testmon.getModuleRuntimeInfoFile
+import sk.infinit.testmon.getModuleRuntimeInfoFiles
 
 /**
  * Factory for runtime info [ToolWindow].
@@ -18,7 +18,7 @@ class RuntimeInfoToolWindowFactory : ToolWindowFactory {
         val runtimeInfoListPanel = RuntimeInfoListPanel()
 
         for (module in ModuleManager.getInstance(project).modules) {
-            val moduleRuntimeInfoFiles = getModuleRuntimeInfoFile(module)
+            val moduleRuntimeInfoFiles = getModuleRuntimeInfoFiles(module)
 
             if (moduleRuntimeInfoFiles != null) {
                 for (moduleRuntimeInfoFile in moduleRuntimeInfoFiles) {

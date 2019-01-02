@@ -5,7 +5,7 @@ import sk.infinit.testmon.database.PyFileMark
 import com.intellij.openapi.module.Module
 import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.PyException
-import sk.infinit.testmon.getModuleRuntimeInfoFile
+import sk.infinit.testmon.getModuleRuntimeInfoFiles
 import sk.infinit.testmon.logErrorMessage
 
 /**
@@ -25,7 +25,7 @@ class CacheService(private val module: Module) : Cache {
                 return this.fileMarkCacheMap[keyPair]
             }
 
-            val moduleRuntimeInfoFiles = getModuleRuntimeInfoFile(module)
+            val moduleRuntimeInfoFiles = getModuleRuntimeInfoFiles(module)
                     ?: return null
 
             val fileMarks = ArrayList<PyFileMark>()

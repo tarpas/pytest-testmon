@@ -12,7 +12,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.getFileFullPath
-import sk.infinit.testmon.isRuntimeInfoDisabledForModule
+import sk.infinit.testmon.isRuntimeInfoDisabled
 import sk.infinit.testmon.services.cache.Cache
 import java.awt.Color
 import java.awt.Font
@@ -36,7 +36,9 @@ class SuffixEditorLinePainter : EditorLinePainter() {
         val module = ModuleUtil.findModuleForFile(virtualFile, project)
                 ?: return lineExtensionInfos
 
-        if (isRuntimeInfoDisabledForModule(module)) {
+        val fileFullPath = getFileFullPath(project, virtualFile) ?: return lineExtensionInfos
+
+        if (isRuntimeInfoDisabled(module, fileFullPath)) {
             return lineExtensionInfos
         }
 
