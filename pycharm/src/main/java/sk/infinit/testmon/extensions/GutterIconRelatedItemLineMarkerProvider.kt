@@ -71,12 +71,18 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
 
         val document = targetPsiFile.viewProvider.document ?: return null
 
-        val targetLine = fileMark.targetLine + 1
+        val targetLine = fileMark.targetLine
+
+        val lineNumber = if (targetLine == document.lineCount) {
+            targetLine - 1
+        } else {
+            targetLine
+        }
 
         if (targetLine >= document.lineCount) {
             return null
         }
 
-        return targetPsiFile.findElementAt(document.getLineStartOffset(targetLine))
+        return targetPsiFile.findElementAt(document.getLineStartOffset(lineNumber))
     }
 }
