@@ -181,6 +181,12 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         addRuntimeInfoFileToModule(module, virtualFile)
     }
 
+    /**
+     * Add module runtime-info files list to module user data.
+     *
+     * If list already exists it will add file to it, if not exists it will create new one
+     * and add file to it.
+     */
     private fun addRuntimeInfoFileToModule(module: Module, virtualFile: VirtualFile) {
         var list = getModuleRuntimeInfoFiles(module)
 
@@ -195,6 +201,9 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         module.putUserData(MODULE_DATABASE_FILES_KEY, moduleRuntimeInfoFiles)
     }
 
+    /**
+     * Get runtime info files list from module user data and remove file from it.
+     */
     private fun removeRuntimeInfoFileFromModule(virtualFile: VirtualFile) {
         val module = ModuleUtil.findModuleForFile(virtualFile, project) ?: return
 
@@ -206,6 +215,9 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         module.putUserData(MODULE_DATABASE_FILES_KEY, moduleRuntimeInfoFiles)
     }
 
+    /**
+     * Get module cache service and clear it.
+     */
     private fun invalidateCache(virtualFile: VirtualFile) {
         val module = ModuleUtil.findModuleForFile(virtualFile, project)
 
