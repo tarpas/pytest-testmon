@@ -32,9 +32,6 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         return COMPONENT_NAME
     }
 
-    /**
-     * Initialize RuntimeInfoProjectComponent on project open.
-     */
     override fun projectOpened() {
         val contentRoots = ProjectRootManager.getInstance(project).contentRoots
 
@@ -48,7 +45,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
             })
         }
 
-        virtualFileListener = buildVirtualFileListener()
+        virtualFileListener = buildRIDatabaseFilesListener()
 
         VirtualFileManager.getInstance().addVirtualFileListener(virtualFileListener)
 
@@ -56,10 +53,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
     }
 
     /**
-     * 1. Remove [virtualFileListener] from [VirtualFileManager] instance.
-     * 2. Disconnect from project message bus.
-     *
-     * This steps needed to prevent handle events on closed project(s).
+     * This steps needed to prevent firing events on closed project(s).
      */
     override fun projectClosed() {
         VirtualFileManager.getInstance().removeVirtualFileListener(virtualFileListener)
@@ -67,16 +61,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         project.messageBus.connect().disconnect()
     }
 
-    /**
-     * Build [VirtualFileListener] instance with override:
-     *
-     * - [VirtualFileListener.fileCreated]
-     * - [VirtualFileListener.beforeFileDeletion]
-     * - [VirtualFileListener.contentsChanged]
-     *
-     * methods.
-     */
-    private fun buildVirtualFileListener(): VirtualFileListener {
+    private fun buildRIDatabaseFilesListener(): VirtualFileListener {
         return object : VirtualFileListener {
             override fun fileCreated(event: VirtualFileEvent) {
                 VfsUtilCore.iterateChildrenRecursively(event.file, null, {
@@ -132,9 +117,6 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         }
     }
 
-    /**
-     * Build [ModuleListener] with implementation of [ModuleListener.moduleAdded] method.
-     */
     private fun buildModuleListener(): ModuleListener {
         return object : ModuleListener {
             override fun moduleAdded(project: Project, module: Module) {
@@ -163,9 +145,6 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         return toolWindowManager.getToolWindow("Runtime Info")
     }
 
-    /**
-     * Get [RuntimeInfoListPanel] instance.
-     */
     private fun getRuntimeInfoListPanel(): RuntimeInfoListPanel? {
         val runtimeInfoToolWindow = getToolWindow() ?: return null
 
@@ -189,12 +168,6 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         addRuntimeInfoFileToModule(module, virtualFile)
     }
 
-    /**
-     * Add module runtime-info files list to module user data.
-     *
-     * If list already exists it will add file to it, if not exists it will create new one
-     * and add file to it.
-     */
     private fun addRuntimeInfoFileToModule(module: Module, virtualFile: VirtualFile) {
         var list = getModuleRuntimeInfoFiles(module)
 
@@ -209,9 +182,6 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         module.putUserData(MODULE_DATABASE_FILES_KEY, moduleRuntimeInfoFiles)
     }
 
-    /**
-     * Get runtime info files list from module user data and remove file from it.
-     */
     private fun removeRuntimeInfoFileFromModule(virtualFile: VirtualFile) {
         val module = ModuleUtil.findModuleForFile(virtualFile, project) ?: return
 
@@ -223,9 +193,6 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         module.putUserData(MODULE_DATABASE_FILES_KEY, moduleRuntimeInfoFiles)
     }
 
-    /**
-     * Get module cache service and clear it.
-     */
     private fun invalidateCache(virtualFile: VirtualFile) {
         val module = ModuleUtil.findModuleForFile(virtualFile, project)
 

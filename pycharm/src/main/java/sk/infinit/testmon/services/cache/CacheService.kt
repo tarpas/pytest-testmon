@@ -52,17 +52,11 @@ class CacheService(private val module: Module) : Cache {
         return null
     }
 
-    /**
-     * Clear cache's.
-     */
     override fun clear() {
         this.fileMarkCacheMap.clear()
         this.exceptionCacheMap.clear()
     }
 
-    /**
-     * Get [PyException] from cache by id for provided [DatabaseService] (one runtime-file).
-     */
     private fun getPyException(exceptionId: Int, databaseService: DatabaseService): PyException? {
         if (this.exceptionCacheMap.containsKey(exceptionId)) {
             return this.exceptionCacheMap[exceptionId]
