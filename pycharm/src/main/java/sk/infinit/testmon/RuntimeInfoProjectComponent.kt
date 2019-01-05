@@ -45,7 +45,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
             })
         }
 
-        virtualFileListener = buildRIDatabaseFilesListener()
+        virtualFileListener = buildDatabasesListener()
 
         VirtualFileManager.getInstance().addVirtualFileListener(virtualFileListener)
 
@@ -61,7 +61,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         project.messageBus.connect().disconnect()
     }
 
-    private fun buildRIDatabaseFilesListener(): VirtualFileListener {
+    private fun buildDatabasesListener(): VirtualFileListener {
         return object : VirtualFileListener {
             override fun fileCreated(event: VirtualFileEvent) {
                 VfsUtilCore.iterateChildrenRecursively(event.file, null, {
