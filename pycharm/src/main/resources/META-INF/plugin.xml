@@ -36,7 +36,7 @@
 
         <toolWindow id="Runtime Info" anchor="right" factoryClass="sk.infinit.testmon.toolWindow.RuntimeInfoToolWindowFactory"/>
 
-        <moduleService serviceInterface="sk.infinit.testmon.services.cache.Cache" serviceImplementation="sk.infinit.testmon.services.cache.CacheService" />
+        <projectService serviceInterface="sk.infinit.testmon.services.cache.Cache" serviceImplementation="sk.infinit.testmon.services.cache.CacheService" />
     </extensions>
 
     <actions>

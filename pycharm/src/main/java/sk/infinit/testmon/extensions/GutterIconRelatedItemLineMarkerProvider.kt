@@ -5,6 +5,7 @@ import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider
 import com.intellij.psi.PsiElement
 import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.components.ServiceManager
 import com.intellij.openapi.module.ModuleServiceManager
 import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.Project
@@ -29,17 +30,11 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
         if (psiElement is PyStatement) {
             val project = psiElement.project
 
-            val module = ModuleUtil.findModuleForFile(psiElement.containingFile)
-                    ?: return
 
             val fileFullPath = getFileFullPath(project, psiElement.containingFile.virtualFile)
                     ?: return
 
-            if (isRuntimeInfoDisabled(module, fileFullPath)) {
-                return
-            }
-
-            val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
+            val cacheService = ServiceManager.getService(project, Cache::class.java)
                     ?: return
 
             val pyFileMarks = cacheService.getPyFileMarks(fileFullPath, FileMarkType.GUTTER_LINK) ?: return

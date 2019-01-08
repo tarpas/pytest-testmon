@@ -127,7 +127,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                         if (it.name == DATABASE_FILE_NAME) {
                             val runtimeInfoFilePath = it.path
 
-                            addRuntimeInfoFileToModule(module, it)
+                            addRuntimeInfoFileToModule(project, it)
 
                             addRuntimeInfoFileToToolWindow(runtimeInfoFilePath)
                         }
@@ -162,14 +162,9 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         getRuntimeInfoListPanel()?.removeFile(runtimeInfoFile)
     }
 
+
     private fun addRuntimeInfoFileToModule(project: Project, virtualFile: VirtualFile) {
-        val module = ModuleUtil.findModuleForFile(virtualFile, project) ?: return
-
-        addRuntimeInfoFileToModule(module, virtualFile)
-    }
-
-    private fun addRuntimeInfoFileToModule(module: Module, virtualFile: VirtualFile) {
-        var list = getModuleRuntimeInfoFiles(module)
+        var list = getModuleRuntimeInfoFiles(project)
 
         if (list == null) {
             list = ArrayList()
@@ -179,18 +174,17 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
 
         moduleRuntimeInfoFiles.add(virtualFile.path)
 
-        module.putUserData(MODULE_DATABASE_FILES_KEY, moduleRuntimeInfoFiles)
+        project.putUserData(MODULE_DATABASE_FILES_KEY, moduleRuntimeInfoFiles)
     }
 
     private fun removeRuntimeInfoFileFromModule(virtualFile: VirtualFile) {
-        val module = ModuleUtil.findModuleForFile(virtualFile, project) ?: return
 
-        val list = getModuleRuntimeInfoFiles(module) ?: return
+        val list = getModuleRuntimeInfoFiles(project) ?: return
         val moduleRuntimeInfoFiles = list as MutableList<String>
 
         moduleRuntimeInfoFiles.remove(virtualFile.path)
 
-        module.putUserData(MODULE_DATABASE_FILES_KEY, moduleRuntimeInfoFiles)
+        project.putUserData(MODULE_DATABASE_FILES_KEY, moduleRuntimeInfoFiles)
     }
 
     private fun invalidateCache(virtualFile: VirtualFile) {

@@ -67,24 +67,4 @@ fun getFileFullPath(project: Project, virtualFile: VirtualFile): String? {
     return projectRootVirtualFile.path + File.separator + virtualFileRelativePath
 }
 
-fun getModuleRuntimeInfoFiles(module: Module) = module.getUserData<List<String>>(MODULE_DATABASE_FILES_KEY)
-
-fun isRuntimeInfoDisabled(module: Module, fileFullPath: String): Boolean {
-    val moduleRuntimeInfoFiles = getModuleRuntimeInfoFiles(module)
-            ?: return true
-
-    return if (moduleRuntimeInfoFiles.isEmpty()) {
-        true
-    } else {
-        for (runtimeInfoFile in moduleRuntimeInfoFiles) {
-            val absolutePath = File(runtimeInfoFile).parentFile.absolutePath
-                    ?: continue
-
-            if (fileFullPath.startsWith(absolutePath)) {
-                return false
-            }
-        }
-
-        true
-    }
-}
+fun getModuleRuntimeInfoFiles(project: Project) = project.getUserData<List<String>>(MODULE_DATABASE_FILES_KEY)

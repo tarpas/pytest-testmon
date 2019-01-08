@@ -1,18 +1,15 @@
 package sk.infinit.testmon.extensions
 
+import com.intellij.openapi.components.ServiceManager
 import com.intellij.openapi.editor.EditorLinePainter
 import com.intellij.openapi.editor.LineExtensionInfo
 import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.openapi.module.Module
-import com.intellij.openapi.module.ModuleServiceManager
-import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.getFileFullPath
-import sk.infinit.testmon.isRuntimeInfoDisabled
 import sk.infinit.testmon.services.cache.Cache
 import java.awt.Color
 import java.awt.Font
@@ -33,15 +30,6 @@ class SuffixEditorLinePainter : EditorLinePainter() {
             : MutableCollection<LineExtensionInfo> {
         val lineExtensionInfos = mutableListOf<LineExtensionInfo>()
 
-        val module = ModuleUtil.findModuleForFile(virtualFile, project)
-                ?: return lineExtensionInfos
-
-        val fileFullPath = getFileFullPath(project, virtualFile) ?: return lineExtensionInfos
-
-        if (isRuntimeInfoDisabled(module, fileFullPath)) {
-            return lineExtensionInfos
-        }
-
         val document = FileDocumentManager.getInstance().getDocument(virtualFile) ?: return lineExtensionInfos
 
         if (lineNumber >= document.lineCount) {
@@ -52,7 +40,7 @@ class SuffixEditorLinePainter : EditorLinePainter() {
                 document.getLineStartOffset(lineNumber),
                 document.getLineEndOffset(lineNumber)))
 
-        val pyFileMarks = getPyFileMarks(project, module, virtualFile, lineNumber, line)
+        val pyFileMarks = getPyFileMarks(project, virtualFile, lineNumber, line)
 
         for (fileMark in pyFileMarks) {
             lineExtensionInfos.add(LineExtensionInfo(
@@ -68,9 +56,9 @@ class SuffixEditorLinePainter : EditorLinePainter() {
     /**
      * Get file marks from cache or from DB
      */
-    private fun getPyFileMarks(project: Project, module: Module, virtualFile: VirtualFile, lineNumber: Int, lineText: String):
+    private fun getPyFileMarks(project: Project, virtualFile: VirtualFile, lineNumber: Int, lineText: String):
             List<PyFileMark> {
-        val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
+        val cacheService = ServiceManager.getService(project, Cache::class.java)
                 ?: return ArrayList()
 
         val fileFullPath = getFileFullPath(project, virtualFile) ?: return ArrayList()

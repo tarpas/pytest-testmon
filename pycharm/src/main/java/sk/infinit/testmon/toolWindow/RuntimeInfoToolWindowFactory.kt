@@ -17,13 +17,11 @@ class RuntimeInfoToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val runtimeInfoListPanel = RuntimeInfoListPanel()
 
-        for (module in ModuleManager.getInstance(project).modules) {
-            val moduleRuntimeInfoFiles = getModuleRuntimeInfoFiles(module)
+        val moduleRuntimeInfoFiles = getModuleRuntimeInfoFiles(project)
 
-            if (moduleRuntimeInfoFiles != null) {
-                for (moduleRuntimeInfoFile in moduleRuntimeInfoFiles) {
-                    runtimeInfoListPanel.listModel.addElement(moduleRuntimeInfoFile)
-                }
+        if (moduleRuntimeInfoFiles != null) {
+            for (moduleRuntimeInfoFile in moduleRuntimeInfoFiles) {
+                runtimeInfoListPanel.listModel.addElement(moduleRuntimeInfoFile)
             }
         }
 
