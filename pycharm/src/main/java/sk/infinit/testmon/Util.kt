@@ -3,7 +3,6 @@ package sk.infinit.testmon
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.Notifications
-import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.Key
@@ -17,7 +16,7 @@ import java.lang.Exception
 
 const val DATABASE_FILE_NAME = ".runtime_info0"
 
-val MODULE_DATABASE_FILES_KEY = Key.create<List<String>>(DATABASE_FILE_NAME)
+val PROJECT_USERDATA_KEY = Key.create<MutableSet<String>>("runtime-info")
 
 fun logErrorMessage(exception: Exception, project: Project) {
     val message = if (exception.message != null) {
@@ -67,4 +66,4 @@ fun getFileFullPath(project: Project, virtualFile: VirtualFile): String? {
     return projectRootVirtualFile.path + File.separator + virtualFileRelativePath
 }
 
-fun getRuntimeInfoFiles(project: Project) = project.getUserData<List<String>>(MODULE_DATABASE_FILES_KEY)
+fun getRuntimeInfoFiles(project: Project) = project.getUserData<MutableSet<String>>(PROJECT_USERDATA_KEY)

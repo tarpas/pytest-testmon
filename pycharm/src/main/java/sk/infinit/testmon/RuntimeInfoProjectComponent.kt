@@ -4,8 +4,6 @@ import com.intellij.ProjectTopics
 import com.intellij.openapi.components.ProjectComponent
 import com.intellij.openapi.components.ServiceManager
 import com.intellij.openapi.module.Module
-import com.intellij.openapi.module.ModuleServiceManager
-import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.ModuleListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
@@ -15,22 +13,22 @@ import sk.infinit.testmon.services.cache.Cache
 import sk.infinit.testmon.toolWindow.RuntimeInfoListPanel
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.wm.ToolWindow
-import kotlin.collections.ArrayList
 
 
-/**
- * RuntimeInfo project component.
- */
 class RuntimeInfoProjectComponent(private val project: Project) : ProjectComponent {
+
+    override fun getComponentName(): String {
+        return "RuntimeInfoProjectComponent"
+    }
 
     private lateinit var virtualFileListener: VirtualFileListener
 
-    companion object {
-        const val COMPONENT_NAME = "RuntimeInfoProjectComponent"
-    }
+    var databaseFiles: MutableSet<String>
 
-    override fun getComponentName(): String {
-        return COMPONENT_NAME
+    init {
+        databaseFiles = getRuntimeInfoFiles(project)?: HashSet()
+        project.putUserData(PROJECT_USERDATA_KEY, databaseFiles)
+
     }
 
     override fun projectOpened() {
@@ -39,7 +37,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
         for (contentRoot in contentRoots) {
             VfsUtilCore.iterateChildrenRecursively(contentRoot, null, {
                 if (it.name == DATABASE_FILE_NAME) {
-                    addRuntimeInfoFile(project, it)
+                    databaseFiles.add(it.path)
                 }
 
                 true
@@ -69,7 +67,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                     if (it.name == DATABASE_FILE_NAME) {
                         val runtimeInfoFilePath = it.path
 
-                        addRuntimeInfoFile(project, it)
+                        databaseFiles.add(runtimeInfoFilePath)
 
                         invalidateCache()
 
@@ -87,7 +85,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                     if (it.name == DATABASE_FILE_NAME) {
                         val runtimeInfoFilePath = it.path
 
-                        removeRuntimeInfoFile(it)
+                        databaseFiles.remove(runtimeInfoFilePath)
 
                         invalidateCache()
 
@@ -103,13 +101,10 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
             override fun contentsChanged(event: VirtualFileEvent) {
                 VfsUtilCore.iterateChildrenRecursively(event.file, null, {
                     if (it.name == DATABASE_FILE_NAME) {
-                        val module = ModuleUtil.findModuleForFile(it, project)
 
-                        if (module != null) {
-                            val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
+                        val cacheService = ServiceManager.getService(project, Cache::class.java)
 
-                            cacheService?.clear()
-                        }
+                        cacheService?.clear()
                     }
 
                     true
@@ -128,7 +123,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                         if (it.name == DATABASE_FILE_NAME) {
                             val runtimeInfoFilePath = it.path
 
-                            addRuntimeInfoFile(project, it)
+                            databaseFiles.add(runtimeInfoFilePath)
 
                             addRuntimeInfoFileToToolWindow(runtimeInfoFilePath)
                         }
@@ -138,6 +133,13 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
                 }
             }
         }
+    }
+
+    private fun invalidateCache() {
+
+        val cacheService = ServiceManager.getService(project, Cache::class.java)
+
+        cacheService?.clear()
     }
 
     private fun getToolWindow(): ToolWindow? {
@@ -161,37 +163,5 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
 
     private fun removeRuntimeInfoFileFromToolWindow(runtimeInfoFile: String) {
         getRuntimeInfoListPanel()?.removeFile(runtimeInfoFile)
-    }
-
-
-    private fun addRuntimeInfoFile(project: Project, virtualFile: VirtualFile) {
-        var list = getRuntimeInfoFiles(project)
-
-        if (list == null) {
-            list = ArrayList()
-        }
-
-        val moduleRuntimeInfoFiles = list as MutableList<String>
-
-        moduleRuntimeInfoFiles.add(virtualFile.path)
-
-        project.putUserData(MODULE_DATABASE_FILES_KEY, moduleRuntimeInfoFiles)
-    }
-
-    private fun removeRuntimeInfoFile(virtualFile: VirtualFile) {
-
-        val list = getRuntimeInfoFiles(project) ?: return
-        val moduleRuntimeInfoFiles = list as MutableList<String>
-
-        moduleRuntimeInfoFiles.remove(virtualFile.path)
-
-        project.putUserData(MODULE_DATABASE_FILES_KEY, moduleRuntimeInfoFiles)
-    }
-
-    private fun invalidateCache() {
-
-        val cacheService = ServiceManager.getService(project, Cache::class.java)
-
-        cacheService?.clear()
     }
 }
