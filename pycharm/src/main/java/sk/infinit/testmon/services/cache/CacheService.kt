@@ -5,7 +5,7 @@ import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.PyException
-import sk.infinit.testmon.getRuntimeInfoFiles
+import sk.infinit.testmon.getDatabaseFiles
 import sk.infinit.testmon.logErrorMessage
 
 /**
@@ -25,13 +25,13 @@ class CacheService(private val project: Project) : Cache {
                 return this.fileMarkCacheMap[keyPair]
             }
 
-            val moduleRuntimeInfoFiles = getRuntimeInfoFiles(project)
+            val databaseFiles = getDatabaseFiles(project)
                     ?: return null
 
             val fileMarks = ArrayList<PyFileMark>()
 
-            for (moduleRuntimeInfoFile in moduleRuntimeInfoFiles) {
-                val databaseService = DatabaseService(moduleRuntimeInfoFile)
+            for (databaseFile in databaseFiles) {
+                val databaseService = DatabaseService(databaseFile)
 
                 val tempFileMarks = databaseService.getPyFileMarks(fullPyFilePath, fileMarkType.value)
 

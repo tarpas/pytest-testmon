@@ -66,4 +66,4 @@ fun getFileFullPath(project: Project, virtualFile: VirtualFile): String? {
     return projectRootVirtualFile.path + File.separator + virtualFileRelativePath
 }
 
-fun getRuntimeInfoFiles(project: Project) = project.getUserData<MutableSet<String>>(PROJECT_USERDATA_KEY)
+fun getDatabaseFiles(project: Project) = project.getUserData<MutableSet<String>>(PROJECT_USERDATA_KEY)

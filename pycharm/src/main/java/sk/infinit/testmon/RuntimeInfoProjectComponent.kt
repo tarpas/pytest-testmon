@@ -26,7 +26,7 @@ class RuntimeInfoProjectComponent(private val project: Project) : ProjectCompone
     var databaseFiles: MutableSet<String>
 
     init {
-        databaseFiles = getRuntimeInfoFiles(project)?: HashSet()
+        databaseFiles = getDatabaseFiles(project)?: HashSet()
         project.putUserData(PROJECT_USERDATA_KEY, databaseFiles)
 
     }
