@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>sk.infinit.testmon</id>
     <name>runtime-info</name>
-    <version></version>
+    <version>0.0.5</version>
     <vendor email="tibor.arpas@infinit.sk" url="http://www.infinit.sk/">Infinit</vendor>
 
     <description>
@@ -23,7 +23,7 @@
 
     <project-components>
         <component>
-            <implementation-class>sk.infinit.testmon.database.DatabaseServiceProjectComponent</implementation-class>
+            <implementation-class>sk.infinit.testmon.RuntimeInfoProjectComponent</implementation-class>
         </component>
     </project-components>
 
@@ -33,6 +33,10 @@
         <editor.linePainter implementation="sk.infinit.testmon.extensions.SuffixEditorLinePainter"/>
 
         <codeInsight.lineMarkerProvider language="Python" implementationClass="sk.infinit.testmon.extensions.GutterIconRelatedItemLineMarkerProvider"/>
+
+        <toolWindow id="Runtime Info" anchor="right" factoryClass="sk.infinit.testmon.toolWindow.RuntimeInfoToolWindowFactory"/>
+
+        <moduleService serviceInterface="sk.infinit.testmon.services.cache.Cache" serviceImplementation="sk.infinit.testmon.services.cache.CacheService" />
     </extensions>
 
     <actions>

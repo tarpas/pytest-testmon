@@ -9,16 +9,18 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
-import sk.infinit.testmon.database.FileMarkType
-import sk.infinit.testmon.getDatabaseServiceProjectComponent
 import sk.infinit.testmon.getFileFullPath
-import sk.infinit.testmon.isExtensionsDisabled
+import com.intellij.openapi.module.ModuleServiceManager
+import sk.infinit.testmon.services.cache.Cache
+import com.intellij.openapi.module.ModuleUtil
+import sk.infinit.testmon.database.FileMarkType
+import sk.infinit.testmon.isRuntimeInfoDisabled
 
 /**
- * Testmon external annotator.
+ * Runtime info external annotator.
  */
 class RedUnderlineDecorationExternalAnnotator
-    : ExternalAnnotator<PsiFile, List<RedUnderlineDecorationAnnotation>>() {
+    : ExternalAnnotator<PsiFile, List<RedUnderlineDecorationExternalAnnotator.RedUnderlineDecorationAnnotation>>() {
 
     /**
      * Create annotations by #redUnderlineAnnotations list.
@@ -30,10 +32,14 @@ class RedUnderlineDecorationExternalAnnotator
         }
 
         for (redUnderlineAnnotation in redUnderlineAnnotations) {
-            val annotation = annotationHolder
-                    .createErrorAnnotation(redUnderlineAnnotation.psiElement!!, redUnderlineAnnotation.message)
+            val psiElement = redUnderlineAnnotation.psiElement
 
-            annotation.tooltip = redUnderlineAnnotation.message
+            if (psiElement != null) {
+                val annotation = annotationHolder
+                        .createErrorAnnotation(psiElement, redUnderlineAnnotation.message)
+
+                annotation.tooltip = redUnderlineAnnotation.message
+            }
         }
     }
 
@@ -52,44 +58,63 @@ class RedUnderlineDecorationExternalAnnotator
 
         val project = psiFile?.project ?: return redUnderlineAnnotations
 
-        if (isExtensionsDisabled(project)) {
-            return redUnderlineAnnotations
-        }
+        val module = ModuleUtil.findModuleForFile(psiFile)
+                ?: return redUnderlineAnnotations
 
-        val psiElementErrorProvider = FileMarkProvider(getDatabaseServiceProjectComponent(project))
+        val document = psiFile.viewProvider.document ?: return redUnderlineAnnotations
 
         val fileFullPath = getFileFullPath(project, psiFile.virtualFile)
                 ?: return redUnderlineAnnotations
 
-        val fileMarks = psiElementErrorProvider.getPyFileMarks(fileFullPath, FileMarkType.RED_UNDERLINE_DECORATION)
+        if (isRuntimeInfoDisabled(module, fileFullPath)) {
+            return redUnderlineAnnotations
+        }
+
+        val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
+                ?: return redUnderlineAnnotations
+
+        val fileMarks = cacheService.getPyFileMarks(fileFullPath, FileMarkType.RED_UNDERLINE_DECORATION)
+                ?: return redUnderlineAnnotations
 
         for (fileMark in fileMarks) {
-            val document = psiFile.viewProvider.document
-
             val fileMarkContent = fileMark.checkContent.trim()
 
-            val elementOffset = StringUtil
-                    .indexOf(document?.immutableCharSequence!!, fileMarkContent as CharSequence)
+            if (fileMark.beginLine >= document.lineCount) {
+                continue
+            }
 
-            if (elementOffset < 0) {
+            val lineStartOffset = document.getLineStartOffset(fileMark.beginLine)
+
+            if (lineStartOffset < 0) {
+                continue
+            }
+
+            val lineElementOffset = StringUtil.indexOf(document.immutableCharSequence,
+                    fileMarkContent as CharSequence, lineStartOffset)
+
+            if (lineElementOffset < 0) {
                 continue
             }
 
             val psiElement = ApplicationManager.getApplication()
                     .runReadAction(Computable<PsiElement> {
-                        PsiTreeUtil.findElementOfClassAtRange(psiFile, elementOffset,
-                                elementOffset + fileMarkContent.length, PsiElement::class.java)
+                        PsiTreeUtil.findElementOfClassAtRange(psiFile, lineElementOffset,
+                                lineElementOffset + fileMarkContent.length, PsiElement::class.java)
                     })
 
-            val lineNumber = document.getLineNumber(elementOffset)
+            val lineNumber = document.getLineNumber(lineElementOffset)
 
-            if (lineNumber == fileMark.beginLine) {
-                val exceptionText = psiElementErrorProvider.getExceptionText(fileMark)
+            if (psiElement != null && lineNumber == fileMark.beginLine) {
+                val exceptionText = fileMark.exception?.exceptionText
 
-                redUnderlineAnnotations.add(RedUnderlineDecorationAnnotation(exceptionText!!, psiElement))
+                if (exceptionText != null) {
+                    redUnderlineAnnotations.add(RedUnderlineDecorationAnnotation(exceptionText, psiElement))
+                }
             }
         }
 
         return redUnderlineAnnotations
     }
+
+    class RedUnderlineDecorationAnnotation(val message: String, val psiElement: PsiElement?)
 }

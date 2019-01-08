@@ -5,6 +5,8 @@ import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider
 import com.intellij.psi.PsiElement
 import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.module.ModuleServiceManager
+import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.jetbrains.extensions.python.toPsi
@@ -13,6 +15,7 @@ import com.jetbrains.python.psi.PyStatement
 import sk.infinit.testmon.*
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
+import sk.infinit.testmon.services.cache.Cache
 
 /**
  * Testmon RelatedItemLineMarkerProvider fod display gutter icons.
@@ -26,16 +29,20 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
         if (psiElement is PyStatement) {
             val project = psiElement.project
 
-            if (isExtensionsDisabled(project)) {
-                return
-            }
-
-            val testmonErrorProvider = FileMarkProvider(getDatabaseServiceProjectComponent(project))
+            val module = ModuleUtil.findModuleForFile(psiElement.containingFile)
+                    ?: return
 
             val fileFullPath = getFileFullPath(project, psiElement.containingFile.virtualFile)
                     ?: return
 
-            val pyFileMarks = testmonErrorProvider.getPyFileMarks(fileFullPath, FileMarkType.GUTTER_LINK)
+            if (isRuntimeInfoDisabled(module, fileFullPath)) {
+                return
+            }
+
+            val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
+                    ?: return
+
+            val pyFileMarks = cacheService.getPyFileMarks(fileFullPath, FileMarkType.GUTTER_LINK) ?: return
 
             for (fileMark in pyFileMarks) {
                 val targetVirtualFile = findVirtualFile(fileMark.targetPath)
@@ -43,7 +50,7 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
                 val fileMarkContent = fileMark.checkContent.trim()
 
                 if (targetVirtualFile != null && fileMarkContent == psiElement.text) {
-                    val targetPsiElement = findTargetPsiElement(fileMark, project, targetVirtualFile)
+                    val targetPsiElement = findTargetPsiElement(fileMark, project, targetVirtualFile) ?: continue
 
                     val navigationGutterIconBuilder = NavigationGutterIconBuilder
                             .create(AllIcons.General.Error)
@@ -62,18 +69,20 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
     private fun findTargetPsiElement(fileMark: PyFileMark, project: Project, targetVirtualFile: VirtualFile): PsiElement? {
         val targetPsiFile = targetVirtualFile.toPsi(project) as PyFile
 
-        val targetDocument = targetPsiFile.viewProvider.document
+        val document = targetPsiFile.viewProvider.document ?: return null
 
-        val targetLine = fileMark.targetLine + 1
+        val targetLine = fileMark.targetLine
 
-        val targetLineStartOffset: Int?
-
-        targetLineStartOffset = if (targetLine == targetDocument?.lineCount) {
-            targetDocument.getLineStartOffset(targetLine - 1)
+        val lineNumber = if (targetLine == document.lineCount) {
+            targetLine - 1
         } else {
-            targetDocument?.getLineStartOffset(targetLine)
+            targetLine
         }
 
-        return targetPsiFile.findElementAt(targetLineStartOffset!!)
+        if (targetLine >= document.lineCount) {
+            return null
+        }
+
+        return targetPsiFile.findElementAt(document.getLineStartOffset(lineNumber))
     }
 }

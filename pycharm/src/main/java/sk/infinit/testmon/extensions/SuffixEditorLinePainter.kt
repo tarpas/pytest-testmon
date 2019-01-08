@@ -3,22 +3,26 @@ package sk.infinit.testmon.extensions
 import com.intellij.openapi.editor.EditorLinePainter
 import com.intellij.openapi.editor.LineExtensionInfo
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.module.Module
+import com.intellij.openapi.module.ModuleServiceManager
+import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
-import sk.infinit.testmon.getDatabaseServiceProjectComponent
 import sk.infinit.testmon.getFileFullPath
-import sk.infinit.testmon.isExtensionsDisabled
+import sk.infinit.testmon.isRuntimeInfoDisabled
+import sk.infinit.testmon.services.cache.Cache
 import java.awt.Color
 import java.awt.Font
+import java.util.stream.Collectors
+
 
 /**
  * Testmon EditorLinePainter implementation.
  */
 class SuffixEditorLinePainter : EditorLinePainter() {
-    private var cachedPyFileMarks = mutableListOf<PyFileMark>()
 
     /**
      * Get list of LineExtensionInfo's by Testmon database data. Draw exception description text.
@@ -29,17 +33,26 @@ class SuffixEditorLinePainter : EditorLinePainter() {
             : MutableCollection<LineExtensionInfo> {
         val lineExtensionInfos = mutableListOf<LineExtensionInfo>()
 
-        if (isExtensionsDisabled(project)) {
+        val module = ModuleUtil.findModuleForFile(virtualFile, project)
+                ?: return lineExtensionInfos
+
+        val fileFullPath = getFileFullPath(project, virtualFile) ?: return lineExtensionInfos
+
+        if (isRuntimeInfoDisabled(module, fileFullPath)) {
             return lineExtensionInfos
         }
 
         val document = FileDocumentManager.getInstance().getDocument(virtualFile) ?: return lineExtensionInfos
 
+        if (lineNumber >= document.lineCount) {
+            return lineExtensionInfos
+        }
+
         val line = document.getText(TextRange(
                 document.getLineStartOffset(lineNumber),
                 document.getLineEndOffset(lineNumber)))
 
-        val pyFileMarks = getPyFileMarks(project, virtualFile, lineNumber, line)
+        val pyFileMarks = getPyFileMarks(project, module, virtualFile, lineNumber, line)
 
         for (fileMark in pyFileMarks) {
             lineExtensionInfos.add(LineExtensionInfo(
@@ -52,24 +65,28 @@ class SuffixEditorLinePainter : EditorLinePainter() {
         return lineExtensionInfos
     }
 
-
     /**
      * Get file marks from cache or from DB
      */
-    private fun getPyFileMarks(project: Project, virtualFile: VirtualFile, lineNumber: Int, line: String):
+    private fun getPyFileMarks(project: Project, module: Module, virtualFile: VirtualFile, lineNumber: Int, lineText: String):
             List<PyFileMark> {
-        val psiElementErrorProvider = FileMarkProvider(getDatabaseServiceProjectComponent(project))
+        val cacheService = ModuleServiceManager.getService(module, Cache::class.java)
+                ?: return ArrayList()
 
-        // Update cache
-        if (lineNumber == 0) {
-            val fileFullPath = getFileFullPath(project, virtualFile) ?: return ArrayList()
+        val fileFullPath = getFileFullPath(project, virtualFile) ?: return ArrayList()
 
-            cachedPyFileMarks = psiElementErrorProvider
-                    .getPyFileMarks(fileFullPath, FileMarkType.SUFFIX) as MutableList<PyFileMark>
-        }
+        val fileMarksList = cacheService.getPyFileMarks(fileFullPath, FileMarkType.SUFFIX) ?: ArrayList()
 
-        return psiElementErrorProvider
-                .filterPyFileMarks(cachedPyFileMarks, line, lineNumber)
+        val fileMarks = fileMarksList as MutableList<PyFileMark>
+
+        // Filter by text.
+        val filteredByTextFileMarks = fileMarks.stream()
+                .filter { it.checkContent == lineText }
+                .collect(Collectors.toList())
+
+        // Filter by line number.
+        return filteredByTextFileMarks.stream()
+                .filter { it.beginLine == lineNumber }
+                .collect(Collectors.toList())
     }
-
 }
