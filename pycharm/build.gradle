@@ -21,9 +21,11 @@ dependencies {
 }
 
 intellij {
-    localPath '.gradle/ide/pycharm-community-2018.3'
+    version "IC-2018.2"
+    plugins = ["PythonCore:2018.2.182.3684.101"]
     pluginName 'runtime-info'
 }
+
 
 publishPlugin {
     username ''
@@ -52,30 +54,30 @@ patchPluginXml {
     """
 }
 
-task setupPycharm() {
-    if (!new File('.gradle/ide').exists()) {
-        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-            download {
-                src 'https://download.jetbrains.com/python/pycharm-community-2018.3.zip'
-                dest '.gradle/downloads/pycharm.zip'
-            }
-            copy {
-                from tarTree(resources.gzip('.gradle/downloads/pycharm.zip'))
-                into '.gradle/ide'
-            }
-        } else if (Os.isFamily(Os.FAMILY_UNIX) || Os.isFamily(Os.FAMILY_MAC)) {
-            download {
-                src 'https://download.jetbrains.com/python/pycharm-community-2018.3.tar.gz'
-                dest '.gradle/downloads/pycharm.tar.gz'
-                overwrite false
-            }
-            copy {
-                from tarTree(resources.gzip('.gradle/downloads/pycharm.tar.gz'))
-                into '.gradle/ide'
-            }
-        }
-    }
-}
+//task setupPycharm() {
+//    if (!new File('.gradle/ide').exists()) {
+//        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+//            download {
+//                src 'https://download.jetbrains.com/python/pycharm-community-2018.3.zip'
+//                dest '.gradle/downloads/pycharm.zip'
+//            }
+//            copy {
+//                from tarTree(resources.gzip('.gradle/downloads/pycharm.zip'))
+//                into '.gradle/ide'
+//            }
+//        } else if (Os.isFamily(Os.FAMILY_UNIX) || Os.isFamily(Os.FAMILY_MAC)) {
+//            download {
+//                src 'https://download.jetbrains.com/python/pycharm-community-2018.3.tar.gz'
+//                dest '.gradle/downloads/pycharm.tar.gz'
+//                overwrite false
+//            }
+//            copy {
+//                from tarTree(resources.gzip('.gradle/downloads/pycharm.tar.gz'))
+//                into '.gradle/ide'
+//            }
+//        }
+//    }
+//}
 
-runIde.dependsOn(setupPycharm)
-buildPlugin.dependsOn(setupPycharm)
+//runIde.dependsOn(setupIdea)
+//buildPlugin.dependsOn(setupIdea)
