@@ -11,7 +11,7 @@ import sk.infinit.testmon.database.PyException
 
 
 class RedUnderlineDecorationExternalAnnotatorTest : LightPlatformCodeInsightFixtureTestCase() {
-    private val testFile = "test_a_file_underline.py"
+    private val testFile = "test_file_underline.py"
     private val testFilePath = "/src/$testFile"
 
     private fun createPyFileMarkFixture(cacheService : Cache) {
@@ -23,7 +23,7 @@ class RedUnderlineDecorationExternalAnnotatorTest : LightPlatformCodeInsightFixt
                 id = 1,
                 type = "RedUnderLineDecoration",
                 text = "AssertionError: assert (1 + 2) == 4",
-                fileName = testFilePath,
+                fileName = this.testFilePath,
                 beginLine = 2,
                 beginCharacter = 0,
                 endLine = 2,
@@ -38,7 +38,7 @@ class RedUnderlineDecorationExternalAnnotatorTest : LightPlatformCodeInsightFixt
 
         val pyException = PyException(
                 id = 1,
-                fileName = testFilePath,
+                fileName = this.testFilePath,
                 lineNumber = 2,
                 exceptionText = "AssertionError: assert (1 + 2) == 4"
         )
@@ -50,11 +50,11 @@ class RedUnderlineDecorationExternalAnnotatorTest : LightPlatformCodeInsightFixt
     }
 
     @Test
-    fun testGetLineExtensions() {
+    fun testUnderlineDecoration() {
         val cacheService = ServiceManager.getService(this.myFixture.project, Cache::class.java)
         createPyFileMarkFixture(cacheService)
 
-        val psiFile = this.myFixture.configureByFile("test_a_file_underline.py")
+        val psiFile = this.myFixture.configureByFile(this.testFile)
 
         this.myFixture.testHighlighting(false, false, false, psiFile.virtualFile)
     }
