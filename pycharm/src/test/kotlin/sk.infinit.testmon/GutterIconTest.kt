@@ -1,8 +1,9 @@
-package test
+package testmon.infinit.testmon
 
 import com.intellij.openapi.components.ServiceManager
 import com.intellij.testFramework.fixtures.LightPlatformCodeInsightFixtureTestCase
 import org.junit.Test
+import sk.infinit.testmon.Config
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.services.cache.Cache
@@ -52,6 +53,6 @@ class GutterIconTest : LightPlatformCodeInsightFixtureTestCase() {
     }
 
     override fun getTestDataPath(): String {
-        return Paths.get("").toAbsolutePath().toString() + "/src/main/java/test/testData"
+        return Paths.get("").toAbsolutePath().toString() + Config.testDataPath
     }
 }
