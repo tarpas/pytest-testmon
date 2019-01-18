@@ -24,7 +24,7 @@ matrix:
       python: 3.6
     - env: TOXENV=py36-pytestfeatures
       python: 3.6
-    - env: TOXENV=py36-pytest32-xdist
+    - env: TOXENV=py36-pytest41-xdist
       python: 3.6
 
 install:
