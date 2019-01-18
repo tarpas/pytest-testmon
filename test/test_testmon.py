@@ -812,14 +812,14 @@ class TestXdist(object):
 
     def test_xdist_4(self, testdir):
         pytest.importorskip("xdist")
-        testdir.makepyfile(test_a="""\
+        testdir.makepyfile(test_a="""
             import pytest
             @pytest.mark.parametrize("a", [
                                     ("test0", ),
                                     ("test1", ),
                                     ("test2", ),
                                     ("test3", )
-    ])
+            ])
             def test_1(a):
                 print(a)
             """)
