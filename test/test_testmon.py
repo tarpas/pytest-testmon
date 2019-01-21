@@ -301,6 +301,30 @@ def test_add():
         # interrupted run shouldn't save .testmondata
         assert 1800000000 == os.path.getmtime(datafilename)
 
+    def test_outcomes_exit(self, testdir):
+        testdir.makepyfile(test_a="""
+             def test_1():
+                 1
+
+             def test_2():
+                 2
+         """)
+        testdir.runpytest("--testmon")
+
+        tf = testdir.makepyfile(test_a="""
+             def test_1():
+                 import pytest
+                 pytest.exit("pytest_exit")
+
+             def test_2():
+                 3
+         """)
+        os.utime(datafilename, (1800000000, 1800000000))
+        tf.setmtime(1800000000)
+        testdir.runpytest("--testmon", )
+        # interrupted run shouldn't save .testmondata
+        assert 1800000000 == os.path.getmtime(datafilename)
+
     def test_nonfunc_class(self, testdir, monkeypatch):
         """"
         """
@@ -788,14 +812,14 @@ class TestXdist(object):
 
     def test_xdist_4(self, testdir):
         pytest.importorskip("xdist")
-        testdir.makepyfile(test_a="""\
+        testdir.makepyfile(test_a="""
             import pytest
             @pytest.mark.parametrize("a", [
                                     ("test0", ),
                                     ("test1", ),
                                     ("test2", ),
                                     ("test3", )
-    ])
+            ])
             def test_1(a):
                 print(a)
             """)
