@@ -216,7 +216,7 @@ class TestmonDeselect(object):
             self.testmon.start()
             result = yield
             if result.excinfo and issubclass(result.excinfo[0], (
-                    KeyboardInterrupt, SystemExit)):
+                    KeyboardInterrupt, pytest.exit.Exception)):
                 self.testmon.stop()
             else:
                 self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
