@@ -17,19 +17,19 @@ class GutterIconTest : LightPlatformCodeInsightFixtureTestCase() {
     private fun createPyFileMarkFixture(cacheService : Cache) {
         val fullPyFilePath = testFilePath
         val fileMarkType = FileMarkType.GUTTER_LINK
-        val keyPair = Pair(fullPyFilePath, fileMarkType)
+        val keyPair = Pair(testFile, fileMarkType)
 
         val pyFileMark = PyFileMark(
                 id = 1,
                 type = "GutterLink",
                 text = null,
-                fileName = this.testDataPath + '/' + this.testFile,
+                fileName = this.testFile,
                 beginLine = 5,
                 beginCharacter = 0,
                 endLine = 0,
                 endCharacter = 0,
                 checkContent = "    a()",
-                targetPath = this.testDataPath + '/' + this.testFile,
+                targetPath = "../../" + this.testDataPath + '/' + this.testFile,
                 targetLine = 8,
                 targetCharacter = 0,
                 gutterLinkType = "U",
