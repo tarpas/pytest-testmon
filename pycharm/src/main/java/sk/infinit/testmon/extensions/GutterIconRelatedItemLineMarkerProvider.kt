@@ -4,7 +4,6 @@ import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider
 import com.intellij.psi.PsiElement
 import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.components.ServiceManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
@@ -13,6 +12,7 @@ import com.jetbrains.python.psi.PyFile
 import com.jetbrains.python.psi.PyStatement
 import sk.infinit.testmon.*
 import sk.infinit.testmon.database.FileMarkType
+import sk.infinit.testmon.database.GutterIconType
 import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.services.cache.Cache
 import java.io.File
@@ -28,7 +28,6 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
     override fun collectNavigationMarkers(psiElement: PsiElement, resultCollection: MutableCollection<in RelatedItemLineMarkerInfo<PsiElement>>) {
         if (psiElement is PyStatement) {
             val project = psiElement.project
-
 
             val fileRelativePath = getVirtualFileRelativePath(project, psiElement.containingFile.virtualFile)
                     ?: return
@@ -47,8 +46,14 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
                 if (targetVirtualFile != null && fileMarkContent == psiElement.text) {
                     val targetPsiElement = findTargetPsiElement(fileMark, project, targetVirtualFile) ?: continue
 
+                    val arrowIcon = if (fileMark.gutterLinkType == GutterIconType.DOWN.value) {
+                        Icons.MOVE_UP_ARROW
+                    } else {
+                        Icons.MOVE_DOWN_ARROW
+                    }
+
                     val navigationGutterIconBuilder = NavigationGutterIconBuilder
-                            .create(AllIcons.General.Error)
+                            .create(arrowIcon)
                             .setTarget(targetPsiElement)
                             .setTooltipText("File ${targetVirtualFile.name}, Line ${fileMark.targetLine}")
 
