@@ -57,9 +57,19 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
                             .setTarget(targetPsiElement)
                             .setTooltipText("File ${targetVirtualFile.name}, Line ${fileMark.targetLine}")
 
-                    resultCollection.add(navigationGutterIconBuilder.createLineMarkerInfo(psiElement))
+                    val leafElement =  getFirstLeafElement(psiElement)
+                    resultCollection.add(navigationGutterIconBuilder.createLineMarkerInfo(leafElement))
                 }
             }
+        }
+    }
+
+    private fun getFirstLeafElement(psiElement: PsiElement): PsiElement {
+        val firstChild = psiElement.firstChild
+        return if (firstChild  == null){
+            psiElement
+        } else {
+            getFirstLeafElement(firstChild)
         }
     }
 

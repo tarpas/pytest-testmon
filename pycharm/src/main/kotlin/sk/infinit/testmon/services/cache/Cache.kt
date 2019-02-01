@@ -1,6 +1,7 @@
 package sk.infinit.testmon.services.cache
 
 import sk.infinit.testmon.database.FileMarkType
+import sk.infinit.testmon.database.PyException
 import sk.infinit.testmon.database.PyFileMark
 
 /**
@@ -8,6 +9,10 @@ import sk.infinit.testmon.database.PyFileMark
  */
 interface Cache {
     fun getPyFileMarks(relativePyFilePath: String, fileMarkType: FileMarkType): List<PyFileMark>?
+
+    fun setPyFileMarksCache(keyPair : Pair<String, FileMarkType>, fileMarks : List<PyFileMark>)
+
+    fun setPyExceptionCache(key : Int, pyException : PyException)
 
     fun clear()
 }

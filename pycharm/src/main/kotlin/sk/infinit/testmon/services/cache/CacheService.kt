@@ -75,4 +75,12 @@ class CacheService(private val project: Project) : Cache {
 
         return null
     }
+
+    override fun setPyFileMarksCache(keyPair : Pair<String, FileMarkType>, fileMarks : List<PyFileMark>) {
+        this.fileMarkCacheMap[keyPair] = fileMarks
+    }
+
+    override fun setPyExceptionCache(key : Int, pyException : PyException) {
+        this.exceptionCacheMap[key] = pyException
+    }
 }

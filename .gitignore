@@ -50,3 +50,4 @@ nosetests.xml
 /pycharm/gradlew
 /pycharm/gradlew.bat
 /pycharm/settings.gradle
+/pycharm/out/
