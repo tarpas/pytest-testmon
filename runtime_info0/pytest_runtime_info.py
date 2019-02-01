@@ -66,15 +66,15 @@ class RuntimeInfo(object):
                 for traceback_entry in call.excinfo.traceback:
                     if not is_project_path(traceback_entry.path, item.config.rootdir):
                         continue  # skiping files outside of project path
-                    striped_statement = str(traceback_entry.statement)
-                    start = len(str(traceback_entry.statement)) - len(striped_statement)
+                    statement = str(traceback_entry.statement)
+                    start = len(str(traceback_entry.statement)) - len(statement)
                     mark_info = {
                         "exception_text": exception_text,
-                        "path": str(traceback_entry.path),
+                        "path": str(os.path.relpath(traceback_entry.path.strpath, item.config.rootdir.strpath)),
                         "line": traceback_entry.lineno,
                         "start": start,
                         "end": len(str(traceback_entry.statement)),
-                        "check_content": striped_statement
+                        "check_content": statement
                     }
                     if last_mark_info:
                         mark_info["prev"] = last_mark_info

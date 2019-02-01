@@ -10,10 +10,8 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
-import sk.infinit.testmon.getFileFullPath
-import com.intellij.openapi.module.ModuleServiceManager
+import sk.infinit.testmon.getVirtualFileRelativePath
 import sk.infinit.testmon.services.cache.Cache
-import com.intellij.openapi.module.ModuleUtil
 import sk.infinit.testmon.database.FileMarkType
 
 /**
@@ -60,13 +58,13 @@ class RedUnderlineDecorationExternalAnnotator
 
         val document = psiFile.viewProvider.document ?: return redUnderlineAnnotations
 
-        val fileFullPath = getFileFullPath(project, psiFile.virtualFile)
+        val fileRelativePath = getVirtualFileRelativePath(project, psiFile.virtualFile)
                 ?: return redUnderlineAnnotations
 
         val cacheService = ServiceManager.getService(project, Cache::class.java)
                 ?: return redUnderlineAnnotations
 
-        val fileMarks = cacheService.getPyFileMarks(fileFullPath, FileMarkType.RED_UNDERLINE_DECORATION)
+        val fileMarks = cacheService.getPyFileMarks(fileRelativePath, FileMarkType.RED_UNDERLINE_DECORATION)
                 ?: return redUnderlineAnnotations
 
         for (fileMark in fileMarks) {

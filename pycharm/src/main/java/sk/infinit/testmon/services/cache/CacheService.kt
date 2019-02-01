@@ -17,9 +17,9 @@ class CacheService(private val project: Project) : Cache {
 
     private val exceptionCacheMap = HashMap<Int, PyException>()
 
-    override fun getPyFileMarks(fullPyFilePath: String, fileMarkType: FileMarkType): List<PyFileMark>? {
+    override fun getPyFileMarks(relativePyFilePath: String, fileMarkType: FileMarkType): List<PyFileMark>? {
         try {
-            val keyPair = Pair(fullPyFilePath, fileMarkType)
+            val keyPair = Pair(relativePyFilePath, fileMarkType)
 
             if (this.fileMarkCacheMap.containsKey(keyPair)) {
                 return this.fileMarkCacheMap[keyPair]
@@ -33,7 +33,7 @@ class CacheService(private val project: Project) : Cache {
             for (databaseFile in databaseFiles) {
                 val databaseService = DatabaseService(databaseFile)
 
-                val tempFileMarks = databaseService.getPyFileMarks(fullPyFilePath, fileMarkType.value)
+                val tempFileMarks = databaseService.getPyFileMarks(relativePyFilePath, fileMarkType.value)
 
                 for (fileMark in tempFileMarks) {
                     fileMark.exception = getPyException(fileMark.exceptionId, databaseService)

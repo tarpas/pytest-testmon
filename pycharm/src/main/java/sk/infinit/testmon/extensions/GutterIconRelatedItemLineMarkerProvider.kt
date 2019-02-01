@@ -6,8 +6,6 @@ import com.intellij.psi.PsiElement
 import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.components.ServiceManager
-import com.intellij.openapi.module.ModuleServiceManager
-import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.jetbrains.extensions.python.toPsi
@@ -17,6 +15,7 @@ import sk.infinit.testmon.*
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.services.cache.Cache
+import java.io.File
 
 /**
  * Testmon RelatedItemLineMarkerProvider fod display gutter icons.
@@ -31,16 +30,17 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
             val project = psiElement.project
 
 
-            val fileFullPath = getFileFullPath(project, psiElement.containingFile.virtualFile)
+            val fileRelativePath = getVirtualFileRelativePath(project, psiElement.containingFile.virtualFile)
                     ?: return
 
             val cacheService = ServiceManager.getService(project, Cache::class.java)
                     ?: return
 
-            val pyFileMarks = cacheService.getPyFileMarks(fileFullPath, FileMarkType.GUTTER_LINK) ?: return
+            val pyFileMarks = cacheService.getPyFileMarks(fileRelativePath, FileMarkType.GUTTER_LINK) ?: return
 
             for (fileMark in pyFileMarks) {
-                val targetVirtualFile = findVirtualFile(fileMark.targetPath)
+                val targetFileFullPath = project.basePath + File.separator + fileMark.targetPath
+                val targetVirtualFile = findVirtualFile(targetFileFullPath)
 
                 val fileMarkContent = fileMark.checkContent.trim()
 
