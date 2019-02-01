@@ -57,13 +57,11 @@ fun getStackTrace(throwable: Throwable): String {
     return stringWriter.buffer.toString()
 }
 
-fun getFileFullPath(project: Project, virtualFile: VirtualFile): String? {
+fun getVirtualFileRelativePath(project: Project, virtualFile: VirtualFile): String? {
     val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
             ?: return null
 
-    val virtualFileRelativePath = getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
-
-    return projectRootVirtualFile.path + File.separator + virtualFileRelativePath
+    return getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
 }
 
 fun getDatabaseFiles(project: Project) = project.getUserData<MutableSet<String>>(PROJECT_USERDATA_KEY)

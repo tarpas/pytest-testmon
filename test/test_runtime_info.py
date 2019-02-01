@@ -45,9 +45,9 @@ def test_plugin(testdir, lib_py, a_py, b_py):
 
     c = sqlite3.connect('.runtime_info0').cursor()
 
-    a_file = os.path.join(str(testdir.tmpdir), "test_a.py")
-    b_file = os.path.join(str(testdir.tmpdir), "test_b.py")
-    lib_file = os.path.join(str(testdir.tmpdir), "lib.py")
+    a_file = "test_a.py"
+    b_file = "test_b.py"
+    lib_file = "lib.py"
 
     # Exception Table
     c.execute("SELECT * FROM Exception")

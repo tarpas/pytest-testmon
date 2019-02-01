@@ -4,7 +4,7 @@ setup(
     name='runtime-info',
     description='TODO',
     long_description='TODO',
-    version='0.15.9',
+    version='0.15.10',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
     packages=['runtime_info0'],

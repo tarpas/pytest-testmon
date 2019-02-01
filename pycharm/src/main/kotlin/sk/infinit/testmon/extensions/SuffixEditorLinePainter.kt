@@ -9,7 +9,7 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import sk.infinit.testmon.database.FileMarkType
 import sk.infinit.testmon.database.PyFileMark
-import sk.infinit.testmon.getFileFullPath
+import sk.infinit.testmon.getVirtualFileRelativePath
 import sk.infinit.testmon.services.cache.Cache
 import java.awt.Color
 import java.awt.Font
@@ -61,9 +61,9 @@ class SuffixEditorLinePainter : EditorLinePainter() {
         val cacheService = ServiceManager.getService(project, Cache::class.java)
                 ?: return ArrayList()
 
-        val fileFullPath = getFileFullPath(project, virtualFile) ?: return ArrayList()
+        val relativeFullPath = getVirtualFileRelativePath(project, virtualFile) ?: return ArrayList()
 
-        val fileMarksList = cacheService.getPyFileMarks(fileFullPath, FileMarkType.SUFFIX) ?: ArrayList()
+        val fileMarksList = cacheService.getPyFileMarks(relativeFullPath, FileMarkType.SUFFIX) ?: ArrayList()
 
         val fileMarks = fileMarksList as MutableList<PyFileMark>
 
