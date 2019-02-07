@@ -238,6 +238,6 @@ class TestmonDeselect(object):
         self.testmon_save = False
 
     def pytest_sessionfinish(self, session):
-        if self.testmon_save and not self.config.getoption('collectonly'):
+        if self.testmon_save and not self.config.getoption('collectonly') and not self.config.getoption('testmon_readonly'):
             self.testmon_data.write_data()
         self.testmon.close()
