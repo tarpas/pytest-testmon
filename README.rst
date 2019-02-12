@@ -73,14 +73,14 @@ Tests are failing when running under testmon: It's quite unlikely testmon influe
 of the test itself. However set of deselected and executed tests with testmon is highly variable,
 which means testmon is likely to expose undesired test dependencies. Please fix your test suite.
 
-You can also try if your test is unfluenced under pytest-cov (coverage) without testmon. For reporting
+You can also try if your test is influenced under pytest-cov (coverage) without testmon. For reporting
 a bug a repository with description of unexpected behavior is the best, but please don't hesitate to
 report even if your project is closed source. We'll try to fix it!
 
 Roadmap
 =======
-testmon is approaching completeness. Unfortunatelly the classic console UI is reaching it's usability limits even without testmon.
-With testmon it's even a little more difficult to determine which tests are beeing executed, which are failing and why.
+testmon is approaching completeness. Unfortunately the classic console UI is reaching it's usability limits even without testmon.
+With testmon it's even a little more difficult to determine which tests are being executed, which are failing and why.
 Next step would be an implementation or integration of GUI. I don't like any  of the existing graphical test runners, so
 if you have some better new concept in mind, get in touch!
 
@@ -110,4 +110,4 @@ Later versions can implement some detection of other categories
 Sponsors
 =============
 Big thanks to Qvantel, `Nick Coghlan <http://www.curiousefficiency.org/>`_
-,  `Abilian SAS <https://www.abilian.com/>`_ and `Infinit <http://www.infinit.sk>`_ for beeing silver sponsors of the first release of **testmon**. List of all contributors to our campaign is `here <https://www.indiegogo.com/projects/testmon#pledges>`_ . Thanks a lot to all contributors.
+,  `Abilian SAS <https://www.abilian.com/>`_ and `Infinit <http://www.infinit.sk>`_ for being silver sponsors of the first release of **testmon**. List of all contributors to our campaign is `here <https://www.indiegogo.com/projects/testmon#pledges>`_ . Thanks a lot to all contributors.
