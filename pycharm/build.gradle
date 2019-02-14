@@ -21,11 +21,15 @@ dependencies {
 }
 
 intellij {
-    version "IC-2018.2"
-    plugins = ["PythonCore:2018.2.182.3684.101"]
+    version "IC-2018.3" // https://www.jetbrains.com/idea/download/#section=linux
+    plugins = ["PythonCore:2018.3.183.4284.148"] // https://plugins.jetbrains.com/plugin/631-python
     pluginName 'runtime-info'
 }
 
+patchPluginXml {
+    sinceBuild '171.*'
+    untilBuild '184.*'
+}
 
 publishPlugin {
     username ''
