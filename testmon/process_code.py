@@ -216,7 +216,9 @@ def block_list_list(afile, coverage):
     l2 = []
     l1 = []
     for i in sorted(coverage):
-        if not (nonempty.get(previous, -1) == nonempty[i] - 1):
+        current_nonempty_line = nonempty[i]
+        previous_non_empty_line = nonempty.get(previous, current_nonempty_line - 1)
+        if not (previous_non_empty_line == current_nonempty_line - 1):
             l1.append(l2)
             l2 = []
         l2.append(afile[i - 1])
@@ -240,4 +242,5 @@ def file_has_lines(file_fingerprints, required_fingerprints):
                 return False
         i += 1
 
-    return i == len(required_fingerprints) and j == len(required_fingerprints[-1])
+    result = i == len(required_fingerprints) and j == len(required_fingerprints[-1])
+    return result

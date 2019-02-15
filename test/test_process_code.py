@@ -301,15 +301,19 @@ class TestEmentalTests():
 
     def test_block_list_list(self):
         afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
-        assert block_list_list(afile, set((1, 3, 4, 5, 9, 10))) == [['a'], ['c', 'd', 'e'], ['i', 'j']]
+        assert block_list_list(afile, {1, 3, 4, 5, 9, 10}) == [['a'], ['c', 'd', 'e'], ['i', 'j']]
+
+    def test_block_list_list_simple(self):
+        afile = ['a', 'b', ]
+        assert block_list_list(afile, {2} ) == [['b'], ]
 
     def test_block_1_block(self):
         afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
-        assert block_list_list(afile, set((1, 2, 4, 6, 7))) == [['a', 'b'], ['d'], ['f', 'g']]
+        assert block_list_list(afile, {1, 2, 4, 6, 7}) == [['a', 'b'], ['d'], ['f', 'g']]
 
     def test_ignore_empty(self):
         afile = ['a', '\n', 'b', 'c', 'd', 'e']
-        assert block_list_list(afile, set((1, 3, 5, 6))) == [['a', 'b'], ['d', 'e']]
+        assert block_list_list(afile, {1, 3, 5, 6}) == [['a', 'b'], ['d', 'e']]
 
     def test_empty(self):
         assert block_list_list(["a", ], []) == []
