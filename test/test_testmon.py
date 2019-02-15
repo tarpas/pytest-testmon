@@ -114,6 +114,27 @@ class TestmonDeselect(object):
         """)
         testdir.inline_run(["--testmon", ])
 
+    def test_simple_change(self, testdir):
+        testdir.makepyfile(test_a="""
+            def test_add():
+                assert 1 + 2 == 3
+                    """)
+
+        result = testdir.runpytest("--testmon", )
+        result.stdout.fnmatch_lines([
+            "*1 passed*",
+        ])
+
+        test_a = testdir.makepyfile(test_a="""
+            def test_add():
+                assert 1 + 2 + 3 == 6
+                    """)
+        test_a.setmtime(1424880935)
+        result = testdir.runpytest("--testmon", )
+        result.stdout.fnmatch_lines([
+            "*passed*",
+        ])
+
     def test_not_running_after_failure(self, testdir):
         tf = testdir.makepyfile(test_a="""
             def test_add():
