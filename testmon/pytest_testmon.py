@@ -237,5 +237,5 @@ class TestmonDeselect(object):
 
     def pytest_sessionfinish(self, session):
         if self.testmon_save and not self.config.getoption('collectonly'):
-            self.testmon_data.write_data()
+            self.testmon_data.write_common_data()
         self.testmon.close()

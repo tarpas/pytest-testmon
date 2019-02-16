@@ -196,7 +196,7 @@ class TestmonData(object):
         self.f_last_failed = set(nodeid.split("::", 1)[0] for nodeid in self.fail_reports)
         self.f_tests = node_data_to_test_files(self.node_data)
 
-    def write_data(self):
+    def write_common_data(self):
         with self.connection:
             if hasattr(self, 'source_tree'):
                 self._write_attribute('mtimes', self.source_tree.mtimes)
@@ -222,7 +222,6 @@ class TestmonData(object):
         result = {}
         for filename in cov.get_data().measured_files():
             relfilename = os.path.relpath(filename, self.rootdir)
-            lines = cov.get_data().lines(filename)
             if os.path.exists(filename):
                 result[relfilename] = block_list_list(self.source_tree.get_file(relfilename).lines, human_coverage(cov._analyze(filename)))  #checksum_coverage(self.source_tree.get_file(relfilename).blocks, lines)
         if not result:  # when testmon kicks-in the test module is already imported. If the test function is skipped
@@ -235,6 +234,9 @@ class TestmonData(object):
 
     def set_dependencies(self, nodeid, cov, result=None):
         nodedata = self.get_nodedata(cov, nodeid)
+        self.write_node_data(nodeid, nodedata, result)
+
+    def write_node_data(self, nodeid, nodedata, result):
         with self.connection as con:
             outcome = bool([True for r in result.values() if r.get('outcome') == u'failed'])
             cursor = con.cursor()
