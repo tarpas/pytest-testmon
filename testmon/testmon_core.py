@@ -218,10 +218,10 @@ class TestmonData(object):
     def file_data(self):
         return flip_dictionary(self.node_data)
 
-    def get_nodedata(self, nodeid, cov, rootdir):
+    def get_nodedata(self, cov, nodeid):
         result = {}
         for filename in cov.get_data().measured_files():
-            relfilename = os.path.relpath(filename, rootdir)
+            relfilename = os.path.relpath(filename, self.rootdir)
             lines = cov.get_data().lines(filename)
             if os.path.exists(filename):
                 result[relfilename] = block_list_list(self.source_tree.get_file(relfilename).lines, human_coverage(cov._analyze(filename)))  #checksum_coverage(self.source_tree.get_file(relfilename).blocks, lines)
@@ -229,11 +229,12 @@ class TestmonData(object):
             # coverage_data is empty. However, we need to write down, that we depend on the
             # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)
             # therefore we pick the last (which should be the outermost AST level) checksum
-            relfilename = os.path.relpath(os.path.join(rootdir, nodeid).split("::", 1)[0], self.rootdir)
+            relfilename = os.path.relpath(os.path.join(self.rootdir, nodeid).split("::", 1)[0], self.rootdir)
             result[relfilename] = [self.source_tree.get_file(relfilename).blocks[-1].checksum]
         return result
 
-    def set_dependencies(self, nodeid, nodedata, result=None):
+    def set_dependencies(self, nodeid, cov, result=None):
+        nodedata = self.get_nodedata(cov, nodeid)
         with self.connection as con:
             outcome = bool([True for r in result.values() if r.get('outcome') == u'failed'])
             cursor = con.cursor()
@@ -325,7 +326,7 @@ class Testmon(object):
         if hasattr(self, 'sub_cov_file'):
             self.cov.combine()
 
-        testmon_data.set_dependencies(nodeid, testmon_data.get_nodedata(nodeid, self.cov, rootdir), result)
+        testmon_data.set_dependencies(nodeid, self.cov, result)
 
     def close(self):
         if hasattr(self, 'sub_cov_file'):
