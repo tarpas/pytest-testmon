@@ -44,13 +44,6 @@ def pytest_addoption(parser):
     )
 
     group.addoption(
-        '--by-test-count',
-        action='store_true',
-        dest='by_test_count',
-        help="Print modules by test count (from lowest to highest count)"
-    )
-
-    group.addoption(
         '--testmon-off',
         action='store_true',
         dest='testmon_off',
@@ -104,14 +97,6 @@ def init_testmon_data(config, read_source=True):
         config.testmon_data = testmon_data
 
 
-def pytest_cmdline_main(config):
-    if config.option.by_test_count:
-        init_testmon_data(config, read_source=False)
-        from _pytest.main import wrap_session
-
-        return wrap_session(config, by_test_count)
-
-
 def is_active(config):
     return (config.getoption('testmon') or config.getoption('testmon_readonly')) and not (config.getoption("testmon_off"))
 
@@ -120,8 +105,10 @@ def pytest_configure(config):
     if is_active(config):
         config.option.continue_on_collection_errors = True
         init_testmon_data(config)
-        config.pluginmanager.register(TestmonDeselect(config, config.testmon_data),
-                                      "TestmonDeselect")
+        config.pluginmanager.register(TestmonSelect(config, config.testmon_data),
+                                      "TestmonSelect")
+        config.pluginmanager.register(TestmonCollect(config, config.testmon_data),
+                                      "TestmonCollect")
 
 
 def pytest_unconfigure(config):
@@ -129,13 +116,51 @@ def pytest_unconfigure(config):
         config.testmon_data.close_connection()
 
 
-def by_test_count(config, session):
-    file_data = config.testmon_data.file_data()
-    for filename, nodeids in sorted(file_data.items(), key=lambda ite: len(ite[1]), reverse=True):
-        print("%s: %s" % (len(nodeids), os.path.relpath(filename)))
+class TestmonCollect(object):
+    def __init__(self, config, testmon_data):
+        self.testmon_data = testmon_data
+        self.testmon = Testmon(config.project_dirs, testmon_labels=testmon_options(config))
+
+        self.testmon_save = True
+        self.config = config
+        self.reports = defaultdict(lambda: {})
+        self.file_data = self.testmon_data.file_data()
+        self.f_to_ignore = self.testmon_data.stable_files
+        if self.config.getoption('tlf'):
+            self.f_to_ignore -= self.testmon_data.f_last_failed
 
 
-class TestmonDeselect(object):
+    @pytest.mark.hookwrapper
+    def pytest_runtest_protocol(self, item, nextitem):
+        if self.config.getoption('testmon_readonly'):
+            yield
+        else:
+            self.testmon.start()
+            result = yield
+            if result.excinfo and issubclass(result.excinfo[0], KeyboardInterrupt):
+                self.testmon.stop()
+            else:
+                self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
+                                           self.reports[item.nodeid])
+
+    def pytest_runtest_logreport(self, report):
+        assert report.when not in self.reports, \
+            "{} {} {}".format(report.nodeid, report.when, self.reports)
+        self.reports[report.nodeid][report.when] = serialize_report(report)
+
+    def pytest_internalerror(self, excrepr, excinfo):
+        self.testmon_save = False
+
+    def pytest_keyboard_interrupt(self, excinfo):
+        self.testmon_save = False
+
+    def pytest_sessionfinish(self, session):
+        if self.testmon_save and not self.config.getoption('collectonly'):
+            self.testmon_data.write_common_data()
+        self.testmon.close()
+
+
+class TestmonSelect():
     def __init__(self, config, testmon_data):
         self.testmon_data = testmon_data
         self.testmon = Testmon(config.project_dirs, testmon_labels=testmon_options(config))
@@ -207,35 +232,6 @@ class TestmonDeselect(object):
         for nodeid in ignored_deselected:
             self.report_if_failed(nodeid)
 
-    @pytest.mark.hookwrapper
-    def pytest_runtest_protocol(self, item, nextitem):
-        if self.config.getoption('testmon_readonly'):
-            yield
-        else:
-            self.testmon.start()
-            result = yield
-            if result.excinfo and issubclass(result.excinfo[0], KeyboardInterrupt):
-                self.testmon.stop()
-            else:
-                self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
-                                           self.reports[item.nodeid])
-
-    def pytest_runtest_logreport(self, report):
-        assert report.when not in self.reports, \
-            "{} {} {}".format(report.nodeid, report.when, self.reports)
-        self.reports[report.nodeid][report.when] = serialize_report(report)
-
     class FakeItemFromTestmon(object):
         def __init__(self, config):
             self.config = config
-
-    def pytest_internalerror(self, excrepr, excinfo):
-        self.testmon_save = False
-
-    def pytest_keyboard_interrupt(self, excinfo):
-        self.testmon_save = False
-
-    def pytest_sessionfinish(self, session):
-        if self.testmon_save and not self.config.getoption('collectonly'):
-            self.testmon_data.write_common_data()
-        self.testmon.close()
