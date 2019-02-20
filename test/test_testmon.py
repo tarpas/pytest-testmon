@@ -28,7 +28,7 @@ class TestVariant:
 
         testmon2_data = CoreTestmonData(testdir.tmpdir.strpath, variant='2')
         testmon2_data.node_data['node1'] = {'a.py': 2}
-        testmon2_data.write_data()
+        testmon2_data.write_common_data()
 
         testmon_check_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
         assert testmon1_data.node_data['node1'] == {'a.py': 1}
