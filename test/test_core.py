@@ -176,13 +176,13 @@ def get_changed_files(dependencies, changes):
 class TestStable():
     def test_nothing_changed(self):
         changed = {'a.py': [101, 102, 103]}
-        dependencies = {'test_a.py::node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]}}
+        dependencies = {'test_a.py::node1': {'test_a.py': [[201, 202]], 'a.py': [[101, 102, 103]]}}
         assert stable(NodesData(dependencies), blockify(changed))[0] == dependencies.keys()
 
     def test_simple_change(self):
         changed = {'a.py': [101, 102, 151]}
-        dependencies = {'test_a.py::node1': {'test_a.py': [201, 202], 'a.py': [101, 102, 103]},
-                        'test_b.py::node2': {'test_b.py': [301, 302], 'a.py': [151]}}
+        dependencies = {'test_a.py::node1': {'test_a.py': [[201, 202]], 'a.py': [[101, 102, 103]]},
+                        'test_b.py::node2': {'test_b.py': [[301, 302]], 'a.py': [[151]]}}
 
         nodes, files = stable(NodesData(dependencies), blockify(changed))
 
