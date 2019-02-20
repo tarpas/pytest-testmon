@@ -8,7 +8,6 @@ import re
 from coverage.python import get_python_source
 
 
-
 blank_re = re.compile(r"\s*(#|$)")
 coding_re = re.compile(b'coding[=:]\s*([-\w.]+)')
 
@@ -118,14 +117,12 @@ class Module(object):
     def checksums(self):
         return [block.checksum for block in self.blocks]
 
-
     @property
     def fingerprints(self):
         if self._fingerprints:
             return self._fingerprints
         else:
             return self.lines
-
 
     def coverage_to_fingerprints(self, coverage):
 
@@ -228,19 +225,32 @@ def block_list_list(afile, coverage):
     return l1
 
 
-def file_has_lines(file_fingerprints, required_fingerprints):
-    i = 0
-    fi = 0
-    while i < len(required_fingerprints):
-        j = 0
-        subblock = required_fingerprints[i]
-        while j < len(subblock) and fi < len(file_fingerprints):
-            if subblock[j] == file_fingerprints[fi]:
-                fi += 1
-                j += 1
-            else:
-                return False
-        i += 1
+class DoesntHaveException(Exception):
+    pass
 
-    result = i == len(required_fingerprints) and j == len(required_fingerprints[-1])
-    return result
+
+def therest_after(a, subblock):
+    if len(a) < len(subblock):
+        raise DoesntHaveException()
+
+    i = 0
+
+    for x in subblock:
+        if x == a[i]:
+            i += 1
+
+    if i == len(subblock):
+        return a[i:]
+    else:
+        return therest_after(a[1:], subblock)
+
+
+def file_has_lines(file_fingerprints, required_fingerprints):
+    a = file_fingerprints
+
+    try:
+        for rf in required_fingerprints:
+            a = therest_after(a, rf)
+        return True
+    except DoesntHaveException:
+        return False

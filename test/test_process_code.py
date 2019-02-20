@@ -5,7 +5,7 @@ import pytest
 
 from test.test_testmon import CodeSample
 from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum, create_emental, \
-    block_list_list, file_has_lines
+    block_list_list, file_has_lines, therest_after, DoesntHaveException
 
 try:
     from StringIO import StringIO as MemFile
@@ -13,6 +13,7 @@ except ImportError:
     from io import BytesIO as MemFile
 
 from collections import namedtuple
+from pytest import raises
 
 
 def parse(source_code, file_name='a.py'):
@@ -329,13 +330,45 @@ class TestEmentalTests():
         pass
 
 
-class TestModule2():
+class TestFileHasLines():
+
+
+    def test_rest1(self):
+        with raises(DoesntHaveException):
+            therest_after([], [1])
+
+
+    def test_rest2(self):
+        with raises(DoesntHaveException):
+            therest_after([1], [2])
+
+    def test_rest3(self):
+        assert therest_after([1],[1]) == []
+
 
     def test_matches(self):
         required_fingerprints = [[2], [1, 0]]
         file_fingerprints = [2, 'a', 'b', 1, 0]
 
         assert file_has_lines(file_fingerprints, required_fingerprints)
+
+    def test_one_couple(self):
+        required_fingerprints = [[1, 0]]
+        file_fingerprints = [2, 'a', 'b', 1, 0]
+        assert file_has_lines(file_fingerprints, required_fingerprints)
+
+    def test_two_singles(self):
+        required_fingerprints = [[1], [3]]
+        file_fingerprints = [0, 1, 2, 3, 4]
+
+        assert file_has_lines(file_fingerprints, required_fingerprints)
+
+
+    def test_one_doesnt(self):
+        fps = [[2], [1, 7]]
+        filep = [0, 1, 2, 3, 4]
+
+        assert file_has_lines(filep, fps) is False
 
 
 
