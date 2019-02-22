@@ -13,16 +13,17 @@ import sk.infinit.testmon.database.PyException
 
 class RedUnderlineDecorationExternalAnnotatorTest : LightPlatformCodeInsightFixtureTestCase() {
     private val testFile = "test_file_underline.py"
+    private val testFilePath = "/src/test_file_underline.py"
 
     private fun createPyFileMarkFixture(cacheService : Cache) {
         val fileMarkType = FileMarkType.RED_UNDERLINE_DECORATION
-        val keyPair = Pair(testFile, fileMarkType)
+        val keyPair = Pair(testFilePath, fileMarkType)
 
         val pyFileMark = PyFileMark(
                 id = 1,
                 type = "RedUnderLineDecoration",
                 text = "AssertionError: assert (1 + 2) == 4",
-                fileName = this.testFile,
+                fileName = this.testFilePath,
                 beginLine = 2,
                 beginCharacter = 0,
                 endLine = 2,
@@ -37,7 +38,7 @@ class RedUnderlineDecorationExternalAnnotatorTest : LightPlatformCodeInsightFixt
 
         val pyException = PyException(
                 id = 1,
-                fileName = this.testFile,
+                fileName = this.testFilePath,
                 lineNumber = 2,
                 exceptionText = "AssertionError: assert (1 + 2) == 4"
         )

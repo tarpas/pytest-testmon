@@ -1,5 +1,6 @@
 package sk.infinit.testmon.database
 
+import sk.infinit.testmon.DATABASE_FILE_NAME
 import java.io.File
 import java.sql.*
 import java.sql.ResultSet
@@ -81,6 +82,10 @@ class DatabaseService(private val databaseFilePath: String) {
         }
 
         return null
+    }
+
+    fun getDatabaseDirectory(): String {
+        return databaseFilePath.removeSuffix(DATABASE_FILE_NAME)
     }
 
     /**

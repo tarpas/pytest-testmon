@@ -61,9 +61,9 @@ class SuffixEditorLinePainter : EditorLinePainter() {
         val cacheService = ServiceManager.getService(project, Cache::class.java)
                 ?: return ArrayList()
 
-        val relativeFullPath = getVirtualFileRelativePath(project, virtualFile) ?: return ArrayList()
+        val absoluteFilePath = virtualFile.path
 
-        val fileMarksList = cacheService.getPyFileMarks(relativeFullPath, FileMarkType.SUFFIX) ?: ArrayList()
+        val fileMarksList = cacheService.getPyFileMarks(absoluteFilePath, FileMarkType.SUFFIX) ?: ArrayList()
 
         val fileMarks = fileMarksList as MutableList<PyFileMark>
 

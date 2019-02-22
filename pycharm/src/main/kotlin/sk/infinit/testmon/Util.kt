@@ -9,6 +9,8 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import sk.infinit.testmon.services.cache.Cache
+import sk.infinit.testmon.services.cache.CacheService
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -57,11 +59,9 @@ fun getStackTrace(throwable: Throwable): String {
     return stringWriter.buffer.toString()
 }
 
-fun getVirtualFileRelativePath(project: Project, virtualFile: VirtualFile): String? {
-    val projectRootVirtualFile = getProjectRootDirectoryVirtualFile(project, virtualFile)
-            ?: return null
-
-    return getVirtualFileRelativePath(virtualFile, projectRootVirtualFile)
+fun getVirtualFileRelativePath(fileRootDirectoryPath: String, absolutePyFilePath: String): String {
+    val file = File(absolutePyFilePath)
+    return file.toRelativeString(File(fileRootDirectoryPath))
 }
 
 fun getDatabaseFiles(project: Project) = project.getUserData<MutableSet<String>>(PROJECT_USERDATA_KEY)

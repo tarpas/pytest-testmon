@@ -58,13 +58,12 @@ class RedUnderlineDecorationExternalAnnotator
 
         val document = psiFile.viewProvider.document ?: return redUnderlineAnnotations
 
-        val fileRelativePath = getVirtualFileRelativePath(project, psiFile.virtualFile)
-                ?: return redUnderlineAnnotations
-
         val cacheService = ServiceManager.getService(project, Cache::class.java)
                 ?: return redUnderlineAnnotations
 
-        val fileMarks = cacheService.getPyFileMarks(fileRelativePath, FileMarkType.RED_UNDERLINE_DECORATION)
+        val fileAbsolutePath = psiFile.virtualFile.path
+
+        val fileMarks = cacheService.getPyFileMarks(fileAbsolutePath, FileMarkType.RED_UNDERLINE_DECORATION)
                 ?: return redUnderlineAnnotations
 
         for (fileMark in fileMarks) {

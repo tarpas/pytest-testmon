@@ -6,6 +6,7 @@ import sk.infinit.testmon.database.PyFileMark
 import sk.infinit.testmon.database.DatabaseService
 import sk.infinit.testmon.database.PyException
 import sk.infinit.testmon.getDatabaseFiles
+import sk.infinit.testmon.getVirtualFileRelativePath
 import sk.infinit.testmon.logErrorMessage
 
 /**
@@ -17,9 +18,9 @@ class CacheService(private val project: Project) : Cache {
 
     private val exceptionCacheMap = HashMap<Int, PyException>()
 
-    override fun getPyFileMarks(relativePyFilePath: String, fileMarkType: FileMarkType): List<PyFileMark>? {
+    override fun getPyFileMarks(absolutePyFilePath: String, fileMarkType: FileMarkType): List<PyFileMark>? {
         try {
-            val keyPair = Pair(relativePyFilePath, fileMarkType)
+            val keyPair = Pair(absolutePyFilePath, fileMarkType)
 
             if (this.fileMarkCacheMap.containsKey(keyPair)) {
                 return this.fileMarkCacheMap[keyPair]
@@ -32,11 +33,14 @@ class CacheService(private val project: Project) : Cache {
 
             for (databaseFile in databaseFiles) {
                 val databaseService = DatabaseService(databaseFile)
+                val fileRootDirectoryPath = databaseService.getDatabaseDirectory()
+                val virtualFileRelativePath = getVirtualFileRelativePath(fileRootDirectoryPath, absolutePyFilePath)
 
-                val tempFileMarks = databaseService.getPyFileMarks(relativePyFilePath, fileMarkType.value)
+                val tempFileMarks = databaseService.getPyFileMarks(virtualFileRelativePath, fileMarkType.value)
 
                 for (fileMark in tempFileMarks) {
                     fileMark.exception = getPyException(fileMark.exceptionId, databaseService)
+                    fileMark.dbDir = fileRootDirectoryPath
                 }
 
                 fileMarks.addAll(tempFileMarks)
