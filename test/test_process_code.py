@@ -306,7 +306,7 @@ class TestEmentalTests():
 
     def test_block_list_list_simple(self):
         afile = ['a', 'b', ]
-        assert block_list_list(afile, {2} ) == [['b'], ]
+        assert block_list_list(afile, {2}) == [['b'], ]
 
     def test_block_1_block(self):
         afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
@@ -332,19 +332,19 @@ class TestEmentalTests():
 
 class TestFileHasLines():
 
-
     def test_rest1(self):
         with raises(DoesntHaveException):
             therest_after([], [1])
-
 
     def test_rest2(self):
         with raises(DoesntHaveException):
             therest_after([1], [2])
 
     def test_rest3(self):
-        assert therest_after([1],[1]) == []
+        assert therest_after([1], [1]) == []
 
+    def test_rest4(self):
+        assert therest_after([1, 2, 3], [2]) == [3]
 
     def test_matches(self):
         required_fingerprints = [[2], [1, 0]]
@@ -363,13 +363,11 @@ class TestFileHasLines():
 
         assert file_has_lines(file_fingerprints, required_fingerprints)
 
-
     def test_one_doesnt(self):
         fps = [[2], [1, 7]]
         filep = [0, 1, 2, 3, 4]
 
         assert file_has_lines(filep, fps) is False
-
 
 
 class TestCoverageAssumptions(CoverageTest):
