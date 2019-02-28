@@ -808,6 +808,79 @@ def test_add():
         result.stdout.fnmatch_lines(["*1 error*", ])
 
 
+class TestLineAlgEssentialProblems:
+
+    def test_add_line_at_beginning(self, testdir):
+        testdir.makepyfile(test_a="""
+            def test_a():
+                assert 1 + 2 == 3
+        """)
+        testdir.runpytest("--testmon", )
+        testdir.makepyfile(test_a="""
+            def test_a():
+                1/0
+                assert 1 + 2 == 3
+        """)
+        result = testdir.runpytest("--testmon", )
+        result.stdout.fnmatch_lines([
+            "*1 failed*",
+        ])
+
+    def test_add_line_at_end(self, testdir):
+        testdir.makepyfile(test_a="""
+                   def test_a():
+                       assert 1 + 2 == 3
+               """)
+        testdir.runpytest("--testmon", )
+        testdir.makepyfile(test_a="""
+                   def test_a():
+                       assert 1 + 2 == 3
+                       1/0
+                """)
+        result = testdir.runpytest("--testmon", )
+        result.stdout.fnmatch_lines([
+            "*1 failed*",
+        ])
+
+    def test_add_method(self, testdir):
+        testdir.makepyfile(test_a="""
+                   def test_a():
+                       assert 1 + 2 == 3
+               """)
+        testdir.runpytest("--testmon", )
+        testdir.makepyfile(test_a="""
+                   def test_a():
+                       assert 1 + 2 == 3
+                    
+                   def test_a_new():
+                       assert 2 + 2 == 4
+                """)
+        result = testdir.runpytest("--testmon", )
+        result.stdout.fnmatch_lines([
+            "*1 passed, 1 deselected*",
+        ])
+
+    def test_remove_method_definition(self, testdir):
+        testdir.makepyfile(test_a="""
+                           def test_1():
+                               assert 1 + 2 == 3
+
+                           def test_2():
+                               assert 2 + 2 == 4
+                       """)
+        testdir.runpytest("--testmon", )
+        testdir.makepyfile(test_a="""
+                           def test_1():
+                               assert 1 + 2 == 3
+
+                               assert 2 + 2 == 4
+                        """)
+        result = testdir.runpytest("--testmon", )
+        result.stdout.fnmatch_lines([
+            "*1 passed*",
+        ])
+
+
 class TestXdist(object):
 
     def test_xdist_4(self, testdir):
