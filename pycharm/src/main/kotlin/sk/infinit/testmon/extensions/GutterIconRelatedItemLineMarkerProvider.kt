@@ -46,9 +46,9 @@ class GutterIconRelatedItemLineMarkerProvider : RelatedItemLineMarkerProvider() 
                     val targetPsiElement = findTargetPsiElement(fileMark, project, targetVirtualFile) ?: continue
 
                     val arrowIcon = if (fileMark.gutterLinkType == GutterIconType.DOWN.value) {
-                        Icons.MOVE_UP_ARROW
-                    } else {
                         Icons.MOVE_DOWN_ARROW
+                    } else {
+                        Icons.MOVE_UP_ARROW
                     }
 
                     val navigationGutterIconBuilder = NavigationGutterIconBuilder
