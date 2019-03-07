@@ -67,14 +67,17 @@ class SuffixEditorLinePainter : EditorLinePainter() {
 
         val fileMarks = fileMarksList as MutableList<PyFileMark>
 
-        // Filter by text.
-        val filteredByTextFileMarks = fileMarks.stream()
+        // Filter by line text.
+        val filteredByLineTextFileMarks = fileMarks.stream()
                 .filter { it.checkContent == lineText }
                 .collect(Collectors.toList())
 
         // Filter by line number.
-        return filteredByTextFileMarks.stream()
+        val filteredByLineNumberFileMarks = filteredByLineTextFileMarks.stream()
                 .filter { it.beginLine == lineNumber }
                 .collect(Collectors.toList())
+
+        // Deduplicate using exception text
+        return filteredByLineNumberFileMarks.distinctBy { it.text }
     }
 }
