@@ -51,6 +51,10 @@ patchPluginXml {
     """
 
     changeNotes """
+    0.15.11<br>
+    <ul>
+        <li>Bug fix: plugin was not working correctly when pytest started in subdirectory of the project</li>
+    </ul>
     0.15.0<br>
     <ul>
         <li>Support for display Red Underline Decoration, Gutter Icon, Suffix</li>
