@@ -1,0 +1,34 @@
+sudo: false
+
+language: python
+
+cache:
+  directories:
+    - $HOME/.cache/pip
+
+matrix:
+  include:
+    - env: TOXENV=py36-pytest31
+      python: 3.6
+    - env: TOXENV=py27-pytest31
+      python: 2.7
+    - env: TOXENV=py27-pytestmaster
+      python: 2.7
+    - env: TOXENV=py27-pytestfeatures
+      python: 2.7
+    - env: TOXENV=py36-pytest32
+      python: 3.6
+    - env: TOXENV=py36-pytest33
+      python: 3.6
+    - env: TOXENV=py36-pytestmaster
+      python: 3.6
+    - env: TOXENV=py36-pytestfeatures
+      python: 3.6
+    - env: TOXENV=py36-pytest41-xdist
+      python: 3.6
+
+install:
+  - pip install tox
+
+script:
+  - tox
