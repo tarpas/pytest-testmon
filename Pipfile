@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 pytest = "*"
+pytest-testmon = {editable = true, path = "."}
+runtime-info = {editable = true, path = "io.pyri/" }
 
 [dev-packages]
 tox = "*"
