@@ -660,16 +660,11 @@ def test_add():
         del sys.modules['a']
 
     def test_report_roundtrip(self, testdir):
-        class PlugWrite:
-            def pytest_runtest_logreport(self, report):
-                global global_reports
-                global_reports.append(report)
 
         class PlugRereport:
             def pytest_runtest_protocol(self, item, nextitem):
                 hook = getattr(item.ihook, 'pytest_runtest_logreport')
-                for g in global_reports:
-                    hook(report=g)
+                #hook(report=)
                 return True
 
         testdir.makepyfile("""
@@ -677,14 +672,9 @@ def test_add():
             raise Exception('exception from test_a')
         """)
 
-        testdir.runpytest_inprocess(plugins=[PlugWrite()])
+        result = testdir.runpytest_inprocess("-s", "-v", plugins=[PlugRereport()], )
 
-        testdir.makepyfile("""
-        def test_a():
-            pass
-        """)
-
-        testdir.runpytest_inprocess(plugins=[PlugRereport()])
+        result.stdout.fnmatch_lines(["*no tests ran*", ])
 
     def test_dependent_testmodule2(self, testdir):
         testdir.makepyfile(test_a="""
