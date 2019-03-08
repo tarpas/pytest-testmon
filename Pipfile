@@ -10,6 +10,7 @@ runtime-info = {editable = true, path = "io.pyri/" }
 
 [dev-packages]
 tox = "*"
+pydevd-pycharm = "*"
 
 [requires]
 python_version = "3.7"
