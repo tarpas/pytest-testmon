@@ -1,5 +1,5 @@
-from project import a_file
-import out
+from .. import a_file
+from ... import out
 
 #
 def test_a():

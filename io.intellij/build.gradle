@@ -8,7 +8,7 @@ plugins {
 }
 
 group 'sk.infinit'
-version '0.15.11'
+version '0.15.12'
 sourceCompatibility = 1.8
 
 repositories {
@@ -51,6 +51,10 @@ patchPluginXml {
     """
 
     changeNotes """
+    0.15.12<br>
+    <ul>
+        <li>Improvement: picking only one exception for navigation when multiple of them hit one line</li>
+    </ul>
     0.15.11<br>
     <ul>
         <li>Bug fix: plugin was not working correctly when pytest started in subdirectory of the project</li>

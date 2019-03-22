@@ -61,6 +61,7 @@ class RuntimeInfo(object):
 
         with conn:
             if call.excinfo:
+                stacktrace_length = 0
                 last_mark_info = None
                 exception_text = get_exception_text(call.excinfo)
                 for traceback_entry in call.excinfo.traceback:
@@ -81,11 +82,13 @@ class RuntimeInfo(object):
                         last_mark_info["next"] = mark_info
                     marks.append(mark_info)
                     last_mark_info = mark_info
+                    stacktrace_length += 1
                 if last_mark_info:
                     exception_id = insert_exception(c,
                                                     item.nodeid,
                                                     exception_text,
-                                                    last_mark_info)
+                                                    last_mark_info,
+                                                    stacktrace_length)
                     insert_file_mark(c, marks, exception_id)
             elif call.when == 'setup' and item.nodeid in item.config.nodeids:
                 remove_exception_by_nodeid(c, item.nodeid)
@@ -123,14 +126,16 @@ def init_tables(conn):
         conn.execute(statement)
 
 
-def insert_exception(c, nodeid, text, mark):
+def insert_exception(c, nodeid, text, mark, stacktrace_length):
+    query_parameters = [nodeid, mark["path"], mark["line"], text, stacktrace_length]
     c.execute("""INSERT OR REPLACE INTO Exception (
                 nodeid,
                 file_name,
                 line,
-                exception_text
+                exception_text,
+                stacktrace_length
                 )
-                VALUES (:nodeid, :file_name, :line, :exception_text)""", [nodeid, mark["path"], mark["line"], text])
+                VALUES (:nodeid, :file_name, :line, :exception_text, :stacktrace_length)""", query_parameters)
 
     return c.lastrowid
 
@@ -196,7 +201,9 @@ CREATE_STATEMENTS = [
     file_name text, -- file_name:line is used in a list of exceptions. It's the most sensible place where user 
                     -- should be navigated when double-clicking the exception.  (Not implemented yet)  
     line integer, -- see above
-    exception_text text) -- eg "ZeroDivisionError: division by zero"
+    exception_text text, -- eg "ZeroDivisionError: division by zero"
+    stacktrace_length integer
+    )
     """
     ,
     """

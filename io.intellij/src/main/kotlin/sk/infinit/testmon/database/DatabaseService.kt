@@ -7,7 +7,7 @@ import java.sql.ResultSet
 import java.util.*
 
 /**
- * Database service to wokr with Sqlite project files.
+ * Database service to work with Sqlite project files.
  *
  * Low level database API.
  */
@@ -101,8 +101,9 @@ class DatabaseService(private val databaseFilePath: String) {
         val fileName = resultSet.getString("file_name")
         val line = resultSet.getInt("line")
         val exceptionText = resultSet.getString("exception_text")
+        val stacktraceLength = resultSet.getInt("stacktrace_length")
 
-        return PyException(exceptionId, fileName, line, exceptionText)
+        return PyException(exceptionId, fileName, line, exceptionText, stacktraceLength)
     }
 
     /**

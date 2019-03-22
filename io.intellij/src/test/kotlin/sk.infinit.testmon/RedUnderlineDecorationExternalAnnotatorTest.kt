@@ -40,7 +40,8 @@ class RedUnderlineDecorationExternalAnnotatorTest : LightPlatformCodeInsightFixt
                 id = 1,
                 fileName = this.testFilePath,
                 lineNumber = 2,
-                exceptionText = "AssertionError: assert (1 + 2) == 4"
+                exceptionText = "AssertionError: assert (1 + 2) == 4",
+                stacktraceLength = 5
         )
         pyFileMark.exception = pyException
 
