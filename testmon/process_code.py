@@ -209,48 +209,80 @@ def block_list_list(afile, coverage):
         if not blank_re.match(line):
             nonempty[lineno] = i
             i += 1
+            prev = lineno
 
     l2 = []
     l1 = []
     for i in sorted(coverage):
         current_nonempty_line = nonempty[i]
         previous_non_empty_line = nonempty.get(previous, current_nonempty_line - 1)
+
         if not (previous_non_empty_line == current_nonempty_line - 1):
+            add_non_executed_line_in_the_end(l2, afile, previous)
             l1.append(l2)
             l2 = []
+
+        add_non_executed_line_in_the_beginning(l2, afile, i - 2)
         l2.append(afile[i - 1])
         previous = i
+
     if l2:
+        add_non_executed_line_in_the_end(l2, afile, previous)
         l1.append(l2)
     return l1
+
+
+def add_non_executed_line_in_the_beginning(l2, afile, i):
+    while blank_re.match(afile[i]):
+        i -= 1
+        if i < 0:
+            return
+
+    l2.append(afile[i])
+
+
+def add_non_executed_line_in_the_end(l2, afile, i):
+    if i > len(afile) - 1:
+        return
+
+    while blank_re.match(afile[i]):
+        i += 1
+        if i > len(afile) - 1:
+            return
+
+    l2.append(afile[i])
 
 
 class DoesntHaveException(Exception):
     pass
 
-
-def therest_after(a, subblock):
-    if len(a) < len(subblock):
+def the_rest_after(act_file_lines, subblock):
+    if len(act_file_lines) < len(subblock):
         raise DoesntHaveException()
 
     i = 0
 
-    for x in subblock:
-        if x == a[i]:
+    for subblock_line in subblock:
+        if subblock_line == act_file_lines[i]:
             i += 1
 
     if i == len(subblock):
-        return a[i:]
+        return act_file_lines[i-1:]
     else:
-        return therest_after(a[1:], subblock)
+        return the_rest_after(act_file_lines[1:], subblock)
 
 
 def file_has_lines(file_fingerprints, required_fingerprints):
     a = file_fingerprints
 
+    nonmpty = []
+    for e in a:
+        if not blank_re.match(e):
+            nonmpty.append(e)
+
     try:
         for rf in required_fingerprints:
-            a = therest_after(a, rf)
+            nonmpty = the_rest_after(nonmpty, rf)
         return True
     except DoesntHaveException:
         return False
