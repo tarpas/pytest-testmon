@@ -209,7 +209,6 @@ def block_list_list(afile, coverage):
         if not blank_re.match(line):
             nonempty[lineno] = i
             i += 1
-            prev = lineno
 
     l2 = []
     l1 = []
@@ -222,7 +221,9 @@ def block_list_list(afile, coverage):
             l1.append(l2)
             l2 = []
 
-        add_non_executed_line_in_the_beginning(l2, afile, i - 2)
+        if not l2:
+            add_non_executed_line_in_the_beginning(l2, afile, i - 2)
+
         l2.append(afile[i - 1])
         previous = i
 
@@ -256,6 +257,7 @@ def add_non_executed_line_in_the_end(l2, afile, i):
 class DoesntHaveException(Exception):
     pass
 
+
 def the_rest_after(act_file_lines, subblock):
     if len(act_file_lines) < len(subblock):
         raise DoesntHaveException()
@@ -273,16 +275,14 @@ def the_rest_after(act_file_lines, subblock):
 
 
 def file_has_lines(file_fingerprints, required_fingerprints):
-    a = file_fingerprints
-
-    nonmpty = []
-    for e in a:
+    non_empty_lines = []
+    for e in file_fingerprints:
         if not blank_re.match(e):
-            nonmpty.append(e)
+            non_empty_lines.append(e)
 
     try:
         for rf in required_fingerprints:
-            nonmpty = the_rest_after(nonmpty, rf)
+            non_empty_lines = the_rest_after(non_empty_lines, rf)
         return True
     except DoesntHaveException:
         return False
