@@ -5,7 +5,7 @@ import pytest
 
 from test.test_testmon import CodeSample
 from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum, create_emental, \
-    block_list_list, file_has_lines, therest_after, DoesntHaveException
+    block_list_list, file_has_lines, DoesntHaveException
 
 try:
     from StringIO import StringIO as MemFile

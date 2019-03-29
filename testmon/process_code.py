@@ -23,7 +23,7 @@ class Block():
     @property
     def checksum(self):
         if isinstance(self.code, int):
-            return self.code
+            return str(self.code)
         else:
             return zlib.adler32(self.code.encode('UTF-8')) & 0xffffffff
 
