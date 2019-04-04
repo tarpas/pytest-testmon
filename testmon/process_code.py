@@ -7,10 +7,10 @@ import os
 import re
 from coverage.python import get_python_source
 
+END_OF_FILE_MARK = '=END OF FILE='
 
 blank_re = re.compile(r"\s*(#|$)")
 coding_re = re.compile(b'coding[=:]\s*([-\w.]+)')
-
 
 class Block():
     def __init__(self, start, end, code=0, name=''):
@@ -234,6 +234,9 @@ def block_list_list(afile, coverage):
 
 
 def add_non_executed_line_in_the_beginning(l2, afile, i):
+    if i < 0:
+        return
+
     while blank_re.match(afile[i]):
         i -= 1
         if i < 0:
@@ -244,11 +247,13 @@ def add_non_executed_line_in_the_beginning(l2, afile, i):
 
 def add_non_executed_line_in_the_end(l2, afile, i):
     if i > len(afile) - 1:
+        l2.append(END_OF_FILE_MARK)
         return
 
     while blank_re.match(afile[i]):
         i += 1
         if i > len(afile) - 1:
+            l2.append(END_OF_FILE_MARK)
             return
 
     l2.append(afile[i])
@@ -265,6 +270,11 @@ def the_rest_after(act_file_lines, subblock):
     i = 0
 
     for subblock_line in subblock:
+        # This fix case when user add line at the end of file
+        # TODO It create antoher false positives when non-executed line is added
+        if subblock_line == END_OF_FILE_MARK and i >= len(act_file_lines):
+            i += 1
+
         if subblock_line == act_file_lines[i]:
             i += 1
 
