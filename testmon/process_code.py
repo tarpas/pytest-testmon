@@ -263,8 +263,17 @@ class DoesntHaveException(Exception):
     pass
 
 
+def get_real_subblock_length(subblock):
+    subblock_length = len(subblock)
+    if END_OF_FILE_MARK in subblock:
+        return subblock_length - 1
+    else:
+        return subblock_length
+
+
 def the_rest_after(act_file_lines, subblock):
-    if len(act_file_lines) < len(subblock):
+
+    if len(act_file_lines) < get_real_subblock_length(subblock):
         raise DoesntHaveException()
 
     i = 0
@@ -274,6 +283,7 @@ def the_rest_after(act_file_lines, subblock):
         # TODO It create antoher false positives when non-executed line is added
         if subblock_line == END_OF_FILE_MARK and i >= len(act_file_lines):
             i += 1
+            continue
 
         if subblock_line == act_file_lines[i]:
             i += 1
