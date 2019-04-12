@@ -5,7 +5,7 @@ import pytest
 
 from test.test_testmon import CodeSample
 from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum, create_emental, \
-    block_list_list, file_has_lines, DoesntHaveException
+    block_list_list, file_has_lines, DoesntHaveException, END_OF_FILE_MARK
 
 try:
     from StringIO import StringIO as MemFile
@@ -116,33 +116,33 @@ GLOBAL_BLOCK = Block(1, 8, 1000)
 
 class TestchecksumCoverage(object):
     def test_miss_before(self):
-        assert checksum_coverage([Block(2, 3, 101), GLOBAL_BLOCK, ], [1]) == [1000, ]
+        assert checksum_coverage([Block(2, 3, 101), GLOBAL_BLOCK, ], [1]) == ['1000', ]
 
     def test_hit_first(self):
-        assert checksum_coverage([Block(2, 3, 102), GLOBAL_BLOCK], [2]) == [1000, 102]
+        assert checksum_coverage([Block(2, 3, 102), GLOBAL_BLOCK], [2]) == ['1000', '102']
 
     def test_hit_first2(self):
-        assert checksum_coverage([Block(2, 3, 102), Block(6, 7, 103), GLOBAL_BLOCK], [2]) == [1000, 102]
+        assert checksum_coverage([Block(2, 3, 102), Block(6, 7, 103), GLOBAL_BLOCK], [2]) == ['1000', '102']
 
     def test_hit_first3(self):
-        assert checksum_coverage([Block(2, 3, 102), Block(6, 7, 103), GLOBAL_BLOCK], [6]) == [1000, 103]
+        assert checksum_coverage([Block(2, 3, 102), Block(6, 7, 103), GLOBAL_BLOCK], [6]) == ['1000', '103']
 
     def test_miss_after(self):
-        assert checksum_coverage([GLOBAL_BLOCK, Block(1, 2, 103)], [3]) == [1000, ]
+        assert checksum_coverage([GLOBAL_BLOCK, Block(1, 2, 103)], [3]) == ['1000', ]
 
     def test_hit_second(self):
-        assert checksum_coverage([GLOBAL_BLOCK, Block(2, 3, 101), Block(5, 6, 102)], [5]) == [1000, 102]
+        assert checksum_coverage([GLOBAL_BLOCK, Block(2, 3, 101), Block(5, 6, 102)], [5]) == ['1000', '102']
 
     def test_hit_second_twice(self):
-        assert checksum_coverage([GLOBAL_BLOCK, Block(2, 3, 101), Block(4, 7, 102)], [5, 6]) == [1000, 102]
+        assert checksum_coverage([GLOBAL_BLOCK, Block(2, 3, 101), Block(4, 7, 102)], [5, 6]) == ['1000', '102']
 
     @pytest.mark.parametrize("lines", [[3, 5], [5, 3]])
     def test_hit_both(self, lines):
-        assert checksum_coverage([GLOBAL_BLOCK, Block(2, 3, 101), Block(5, 6, 102)], lines) == [1000, 101, 102]
+        assert checksum_coverage([GLOBAL_BLOCK, Block(2, 3, 101), Block(5, 6, 102)], lines) == ['1000', '101', '102']
 
     @pytest.mark.parametrize("lines", [[4, 7], [7, 4]])
     def test_miss_both(self, lines):
-        assert checksum_coverage([GLOBAL_BLOCK, Block(2, 3, 101), Block(5, 6, 102)], lines) == [1000, ]
+        assert checksum_coverage([GLOBAL_BLOCK, Block(2, 3, 101), Block(5, 6, 102)], lines) == ['1000', ]
 
 
 code_samples = {
@@ -302,11 +302,11 @@ class TestEmentalTests():
 
     def test_block_list_list(self):
         afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
-        assert block_list_list(afile, {1, 3, 4, 5, 9, 10}) == [['a'], ['c', 'd', 'e'], ['i', 'j']]
+        assert block_list_list(afile, {1, 3, 4, 5, 9, 10}) == [['a', 'b'], ['b', 'c', 'd', 'e', 'f'], ['h', 'i', 'j', END_OF_FILE_MARK]]
 
     def test_block_list_list_simple(self):
         afile = ['a', 'b', ]
-        assert block_list_list(afile, {2}) == [['b'], ]
+        assert block_list_list(afile, {2}) == [['b', END_OF_FILE_MARK], ]
 
     def test_block_1_block(self):
         afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
@@ -314,7 +314,7 @@ class TestEmentalTests():
 
     def test_ignore_empty(self):
         afile = ['a', '\n', 'b', 'c', 'd', 'e']
-        assert block_list_list(afile, {1, 3, 5, 6}) == [['a', 'b'], ['d', 'e']]
+        assert block_list_list(afile, {1, 3, 5, 6}) == [['a', 'b'], ['d', 'e', END_OF_FILE_MARK]]
 
     def test_empty(self):
         assert block_list_list(["a", ], []) == []
@@ -323,10 +323,10 @@ class TestEmentalTests():
         assert block_list_list([], []) == []
 
     def test_1_3(self):
-        assert block_list_list(["a", "b", "c"], [1, 3]) == [["a"], ["c"]]
+        assert block_list_list(["a", "b", "c"], [1, 3]) == [["a"], ["c", END_OF_FILE_MARK]]
 
     def test_1_34(self):
-        assert block_list_list(["a", "b", "c", "d"], [1, 3, 4]) == [["a"], ["c", "d"]]
+        assert block_list_list(["a", "b", "c", "d"], [1, 3, 4]) == [["a"], ["c", "d", END_OF_FILE_MARK]]
         pass
 
 

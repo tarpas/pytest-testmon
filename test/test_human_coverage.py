@@ -32,9 +32,9 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
         # Nothing here
         d = 6
         """,
-        [1,2,4,6],
-        fingerprints = [['a = 1', 'b = 2', 'c = 4', 'd = 6']],
-        report="4 0 0 0 100%")
+                                  [1, 2, 4, 6],
+                                  fingerprints=[['a = 1', 'b = 2', 'c = 4', 'd = 6', '=END OF FILE=']],
+                                  report="4 0 0 0 100%")
 
     def test_indentation_wackiness(self):
         # Partial final lines are OK.
@@ -74,9 +74,10 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
                 pass
             c = 1
             """,
-            [1,2,4],
-            fingerprints=[['a = 1', 'def b():'], ['c = 1']],
-            report = "")
+                                  [1, 2, 4],
+                                  fingerprints=[['a = 1', 'def b():', '    pass'],
+                                                ['    pass', 'c = 1', '=END OF FILE=']],
+                                  report="")
 
 
 class SimpleStatementTest(TestmonCoverageTest):
