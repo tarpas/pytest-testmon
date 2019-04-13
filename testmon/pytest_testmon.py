@@ -185,9 +185,11 @@ class TestmonDeselect(object):
             self.collection_ignored.update(self.testmon_data.f_tests[strpath])
             return True
 
-    @pytest.mark.trylast
+    @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_collection_modifyitems(self, session, config, items):
         self.testmon_data.collect_garbage(retain=self.collection_ignored.union(set([item.nodeid for item in items])))
+
+        yield
 
         for item in items:
             assert item.nodeid not in self.collection_ignored, (item.nodeid, self.collection_ignored)
