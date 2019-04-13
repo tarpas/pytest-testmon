@@ -21,17 +21,20 @@ class TestCoverageSubprocess(CoverageTest):
         output = self.run_command('{} {}'.format(sys.executable, path1))
         assert output == "{}\n".format('TEST_VALUE')
 
-    @pytest.mark.xfail
     def test_coverage_expected_fail(self):
         path1 = self.make_file("subprocesstest.py", """\
         a=1
         """)
-        os.environ['COVERAGE_PROCESS_START'] = 'nonexistent_file'
+        os.environ['COV_CORE_SOURCE'] = 'yes'
+        os.environ['COV_CORE_CONFIG'] = 'nonexistent_file'
+        os.environ['COV_CORE_DATAFILE'] = 'bla'
         output = self.run_command('python {}'.format(path1))
-        del os.environ['COVERAGE_PROCESS_START']
+        del os.environ['COV_CORE_SOURCE']
+        del os.environ['COV_CORE_CONFIG']
+        del os.environ['COV_CORE_DATAFILE']
+
         assert "Couldn't read 'nonexistent_file' as a config file" in output
 
-    @pytest.mark.xfail
     def test_subprocess(self):
         path1 = self.make_file("subprocesstest.py", """\
         a=1
@@ -41,8 +44,11 @@ class TestCoverageSubprocess(CoverageTest):
 
             data_file = {}/.testmoncoverage
         """.format(os.getcwd()))
-        os.environ['COVERAGE_PROCESS_START']='{}/.testmoncoveragerc'.format(os.getcwd())
+        os.environ['COV_CORE_SOURCE'] = 'yes'
+        os.environ['COV_CORE_CONFIG']='{}/.testmoncoveragerc'.format(os.getcwd())
+        os.environ['COV_CORE_DATAFILE'] = '.testmoncoverage'
         self.run_command('python {}'.format(path1))
-        subprocess_coverage_exists = os.path.exists('.testmoncoverage')
-        assert subprocess_coverage_exists, "Dir: {}".format(os.listdir(os.getcwd()))
-        del os.environ['COVERAGE_PROCESS_START']
+        assert '.testmoncoverage' in "{}".format(os.listdir(os.getcwd())), os.listdir(os.getcwd())
+        del os.environ['COV_CORE_SOURCE']
+        del os.environ['COV_CORE_CONFIG']
+        del os.environ['COV_CORE_DATAFILE']

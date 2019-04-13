@@ -48,7 +48,7 @@ class Block():
 
 
 class Module(object):
-    def __init__(self, source_code=None, filename='<unknown>', rootdir='', fingerprints=None):
+    def __init__(self, source_code=None, file_name='<unknown>', rootdir='', fingerprints=None):
         self.blocks = []
         self.counter = 0
         if fingerprints is not None:
@@ -56,13 +56,13 @@ class Module(object):
         else:
             self._fingerprints = None
             if source_code is None:
-                source_code, _ = read_file_with_checksum(os.path.join(rootdir, filename))
+                source_code, _ = read_file_with_checksum(os.path.join(rootdir, file_name))
             else:
                 source_code = textwrap.dedent(source_code)
             self.lines = source_code.splitlines()
             try:
-                tree = ast.parse(source_code, filename)
-                self.dump_and_block(tree, len(self.lines), name=filename)
+                tree = ast.parse(source_code, file_name)
+                self.dump_and_block(tree, len(self.lines), name=file_name)
             except SyntaxError as e:
                 pass
 

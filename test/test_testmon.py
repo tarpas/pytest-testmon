@@ -2,21 +2,17 @@ import os
 import sys
 
 import pytest
+import testmon.process_code
 from test.coveragepy import coveragetest
 from testmon.process_code import Module, checksum_coverage, human_coverage, END_OF_FILE_MARK
-from testmon.testmon_core import eval_variant, TestmonData as CoreTestmonData
+from testmon.testmon_core import eval_variant, TestmonData as CoreTestmonData, NodesData
 from testmon.testmon_core import Testmon as CoreTestmon
+from testmon.testmon_core import TestmonData as CoreTestmonData
+from test.test_process_code import CodeSample
 
 pytest_plugins = "pytester",
 
 datafilename = os.environ.get('TESTMON_DATAFILE', '.testmondata')
-
-
-class CodeSample():
-    def __init__(self, source_code, expected_coverage=None, possible_lines=None):
-        self.source_code = source_code
-        self.expected_coverage = expected_coverage or {}
-        self.possible_lines = possible_lines or []
 
 
 class TestVariant:
@@ -31,7 +27,7 @@ class TestVariant:
         testmon2_data.write_common_data()
 
         testmon_check_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
-        assert testmon1_data.node_data['node1'] == {'a.py': 1}
+        assert testmon1_data.node_data['node1'] == NodesData({'a.py': 1})
 
     def test_header(self, testdir):
         testdir.makeini("""
@@ -323,6 +319,30 @@ def test_add():
             testdir.runpytest("--testmon", )
         except:
             pass
+        # interrupted run shouldn't save .testmondata
+        assert 1800000000 == os.path.getmtime(datafilename)
+
+    def test_outcomes_exit(self, testdir):
+        testdir.makepyfile(test_a="""
+             def test_1():
+                 1
+
+             def test_2():
+                 2
+         """)
+        testdir.runpytest("--testmon")
+
+        tf = testdir.makepyfile(test_a="""
+             def test_1():
+                 import pytest
+                 pytest.exit("pytest_exit")
+
+             def test_2():
+                 3
+         """)
+        os.utime(datafilename, (1800000000, 1800000000))
+        tf.setmtime(1800000000)
+        testdir.runpytest("--testmon", )
         # interrupted run shouldn't save .testmondata
         assert 1800000000 == os.path.getmtime(datafilename)
 
@@ -637,7 +657,7 @@ def test_add():
         # os.environ.pop('COVERAGE_TEST_TRACER', None)
 
         assert {os.path.abspath(a.strpath):
-                    checksum_coverage(Module(filename=a.strpath).blocks, [2])} == deps
+                    checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
 
     def test_run_dissapearing(self, testdir):
         a = testdir.makepyfile(a="""\
@@ -660,16 +680,11 @@ def test_add():
         del sys.modules['a']
 
     def test_report_roundtrip(self, testdir):
-        class PlugWrite:
-            def pytest_runtest_logreport(self, report):
-                global global_reports
-                global_reports.append(report)
 
         class PlugRereport:
             def pytest_runtest_protocol(self, item, nextitem):
                 hook = getattr(item.ihook, 'pytest_runtest_logreport')
-                for g in global_reports:
-                    hook(report=g)
+                #hook(report=)
                 return True
 
         testdir.makepyfile("""
@@ -677,14 +692,9 @@ def test_add():
             raise Exception('exception from test_a')
         """)
 
-        testdir.runpytest_inprocess(plugins=[PlugWrite()])
+        result = testdir.runpytest_inprocess("-s", "-v", plugins=[PlugRereport()], )
 
-        testdir.makepyfile("""
-        def test_a():
-            pass
-        """)
-
-        testdir.runpytest_inprocess(plugins=[PlugRereport()])
+        result.stdout.fnmatch_lines(["*no tests ran*", ])
 
     def test_dependent_testmodule2(self, testdir):
         testdir.makepyfile(test_a="""
@@ -886,14 +896,14 @@ class TestXdist(object):
 
     def test_xdist_4(self, testdir):
         pytest.importorskip("xdist")
-        testdir.makepyfile(test_a="""\
+        testdir.makepyfile(test_a="""
             import pytest
             @pytest.mark.parametrize("a", [
                                     ("test0", ),
                                     ("test1", ),
                                     ("test2", ),
                                     ("test3", )
-    ])
+            ])
             def test_1(a):
                 print(a)
             """)

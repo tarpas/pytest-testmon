@@ -1,3 +1,0 @@
-pytest>=3,<4
-coverage>=4
-pytest-xdist

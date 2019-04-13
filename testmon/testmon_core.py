@@ -13,7 +13,6 @@ import random
 import sqlite3
 import sys
 import textwrap
-from testmon import import_mtimes
 
 import coverage
 
@@ -261,18 +260,6 @@ class TestmonData(object):
                                                         self.source_tree.get_changed_files())
 
 
-
-class CoverageData:
-
-    def __init__(self, ):
-        self.files = dict()
-
-
-    def from_cov_data(self, covdata):
-        pass
-
-
-
 class Testmon(object):
     def __init__(self, project_dirs, testmon_labels=set()):
         self.project_dirs = project_dirs
@@ -364,6 +351,10 @@ def get_variant_inifile(inifile):
     return eval_variant(run_variant_expression)
 
 
+def parse_file(filename, rootdir, source_code):
+    return Module(source_code=source_code, file_name=filename, rootdir=rootdir)
+
+
 class SourceTree():
     def __init__(self, rootdir, mtimes, checksums):
         self.rootdir = rootdir
@@ -382,7 +373,7 @@ class SourceTree():
                     code, fs_checksum = read_file_with_checksum(absfilename)
                     if self.checksums.get(filename) != fs_checksum:
                         self.checksums[filename] = fs_checksum
-                        self.changed_files[filename] = Module(filename=filename, rootdir=self.rootdir,
+                        self.changed_files[filename] = parse_file(filename=filename, rootdir=self.rootdir,
                                                                   source_code=code)
 
             except OSError:
@@ -394,7 +385,7 @@ class SourceTree():
     def get_file(self, filename):
         if filename not in self.changed_files:
             code, checksum = read_file_with_checksum(os.path.join(self.rootdir, filename))
-            self.mtimes[filename] = import_mtimes.get(os.path.join(self.rootdir, filename))
+            self.mtimes[filename] = os.path.getmtime(os.path.join(self.rootdir, filename))
             self.checksums[filename] = checksum
-            self.changed_files[filename] = Module(filename=filename, rootdir=self.rootdir, source_code=code)
+            self.changed_files[filename] = parse_file(filename=filename, rootdir=self.rootdir, source_code=code)
         return self.changed_files[filename]

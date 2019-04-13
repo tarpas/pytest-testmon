@@ -98,7 +98,8 @@ def init_testmon_data(config, read_source=True):
 
 
 def is_active(config):
-    return (config.getoption('testmon') or config.getoption('testmon_readonly')) and not (config.getoption("testmon_off"))
+    return (config.getoption('testmon') or config.getoption('testmon_readonly')) and not (
+        config.getoption("testmon_off"))
 
 
 def pytest_configure(config):
@@ -232,6 +233,36 @@ class TestmonSelect():
         for nodeid in ignored_deselected:
             self.report_if_failed(nodeid)
 
+    @pytest.mark.hookwrapper
+    def pytest_runtest_protocol(self, item, nextitem):
+        if self.config.getoption('testmon_readonly'):
+            yield
+        else:
+            self.testmon.start()
+            result = yield
+            if result.excinfo and issubclass(result.excinfo[0], (
+                    KeyboardInterrupt, pytest.exit.Exception)):
+                self.testmon.stop()
+            else:
+                self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
+                                           self.reports[item.nodeid])
+
+    def pytest_runtest_logreport(self, report):
+        assert report.when not in self.reports, \
+            "{} {} {}".format(report.nodeid, report.when, self.reports)
+        self.reports[report.nodeid][report.when] = serialize_report(report)
+
     class FakeItemFromTestmon(object):
         def __init__(self, config):
             self.config = config
+
+    def pytest_internalerror(self, excrepr, excinfo):
+        self.testmon_save = False
+
+    def pytest_keyboard_interrupt(self, excinfo):
+        self.testmon_save = False
+
+    def pytest_sessionfinish(self, session):
+        if self.testmon_save and not self.config.getoption('collectonly') and not self.config.getoption('testmon_readonly'):
+            self.testmon_data.write_common_data()
+        self.testmon.close()

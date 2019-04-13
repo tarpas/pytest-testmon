@@ -3,7 +3,6 @@ from test.coveragepy.coveragetest import CoverageTest
 
 import pytest
 
-from test.test_testmon import CodeSample
 from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum, create_emental, \
     block_list_list, file_has_lines, DoesntHaveException, END_OF_FILE_MARK, the_rest_after
 
@@ -17,7 +16,7 @@ from pytest import raises
 
 
 def parse(source_code, file_name='a.py'):
-    return Module(source_code=source_code, filename=file_name).blocks
+    return Module(source_code=source_code, file_name=file_name).blocks
 
 
 class TestReadSrc:
@@ -145,6 +144,13 @@ class TestchecksumCoverage(object):
         assert checksum_coverage([GLOBAL_BLOCK, Block(2, 3, 101), Block(5, 6, 102)], lines) == ['1000', ]
 
 
+class CodeSample():
+    def __init__(self, source_code, expected_coverage=None, possible_lines=None):
+        self.source_code = source_code
+        self.expected_coverage = expected_coverage or {}
+        self.possible_lines = possible_lines or []
+
+
 code_samples = {
     1: CodeSample("""\
         def add(a, b):
@@ -152,7 +158,7 @@ code_samples = {
     
         assert add(1, 2) == 3
             """,
-                  {1, 2, 4}),
+                  [1, 2, 4]),
 
     2: CodeSample("""\
         def add(a, b):
@@ -163,19 +169,19 @@ code_samples = {
 
         assert add(1, 2) == 3
             """,
-                  {1, 2, 4, 7}),
+                  [1, 2, 4, 7]),
     '3': CodeSample("""\
         class A(object):
             def add(self, a, b):
                 return a + b
         """,
-                    {1, 2}),
+                    [1, 2]),
     '3b': CodeSample("""\
         class A(object):
             def add(self, a, b):
                 return a - b
         """,
-                     {1, 2}),
+                     [1, 2]),
     'classes': CodeSample("""\
         class A(object):
             def add(self, a, b):
@@ -183,7 +189,7 @@ code_samples = {
             def subtract(self, a, b):
                 return a - b
         """,
-                          {1, 2, 4}),
+                          [1, 2, 4]),
 
     'classes_b': CodeSample("""\
         class A(object):
@@ -192,7 +198,7 @@ code_samples = {
             def subtract(self, a, b):
                 return a - b - 1
         """,
-                            {1, 2, 4}),
+                            [1, 2, 4]),
     'classes_c': CodeSample("""\
         class A(object):
             def add1(self, a, b):
@@ -200,7 +206,7 @@ code_samples = {
             def subtract(self, a, b):
                 return a - b
         """,
-                            {1, 2, 4}),
+                            [1, 2, 4]),
 }
 
 
@@ -373,7 +379,8 @@ class TestFileHasLines():
 class TestCoverageAssumptions(CoverageTest):
 
     def test_easy(self):
-        mod_cov = code_samples[2]
-        self.tm_check_coverage(mod_cov.source_code,
-                               tm_lines=mod_cov.expected_coverage,
-                               msg="This is for code_sample['{}']".format(2))
+        for name, mod_cov in code_samples.items():
+            if mod_cov.expected_coverage:
+                self.tm_check_coverage(mod_cov.source_code,
+                                    tm_lines=mod_cov.expected_coverage,
+                                    msg="This is for code_sample['{}']".format(name))

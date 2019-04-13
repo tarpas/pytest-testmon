@@ -1,0 +1,44 @@
+<idea-plugin>
+    <id>sk.infinit.testmon</id>
+    <name>runtime-info</name>
+    <version>0.0.5</version>
+    <vendor email="tibor.arpas@infinit.sk" url="http://www.infinit.sk/">Infinit</vendor>
+
+    <description>
+        <![CDATA[We add description of the project in build.gradle file]]>
+    </description>
+
+    <change-notes>
+        <![CDATA[We add change notes of the project in build.gradle file]]>
+    </change-notes>
+
+    <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
+    <idea-version since-build="173.0"/>
+
+    <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html
+         on how to target different products -->
+    <!-- uncomment to enable plugin in all products -->
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.python</depends>
+
+    <project-components>
+        <component>
+            <implementation-class>sk.infinit.testmon.RuntimeInfoProjectComponent</implementation-class>
+        </component>
+    </project-components>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <externalAnnotator language="Python" implementationClass="sk.infinit.testmon.extensions.RedUnderlineDecorationExternalAnnotator"/>
+
+        <editor.linePainter implementation="sk.infinit.testmon.extensions.SuffixEditorLinePainter"/>
+
+        <codeInsight.lineMarkerProvider language="Python" implementationClass="sk.infinit.testmon.extensions.GutterIconRelatedItemLineMarkerProvider"/>
+
+        <toolWindow id="Runtime Info" anchor="right" factoryClass="sk.infinit.testmon.toolWindow.RuntimeInfoToolWindowFactory"/>
+
+        <projectService serviceInterface="sk.infinit.testmon.services.cache.Cache" serviceImplementation="sk.infinit.testmon.services.cache.CacheService" />
+    </extensions>
+
+    <actions>
+    </actions>
+</idea-plugin>

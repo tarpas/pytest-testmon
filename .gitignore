@@ -43,10 +43,11 @@ nosetests.xml
 # Exclude Intellij Idea plugin project hidden files.
 !pycharm/.idea/**
 
-# PyCharm files
-/pycharm/.*
-/pycharm/gradle/**
-/pycharm/build/**
-/pycharm/gradlew
-/pycharm/gradlew.bat
-/pycharm/settings.gradle
+# Intellij files
+/io.intellij/.*
+/io.intellij/gradle/**
+/io.intellij/build/**
+/io.intellij/gradlew
+/io.intellij/gradlew.bat
+/io.intellij/settings.gradle
+/io.intellij/out/

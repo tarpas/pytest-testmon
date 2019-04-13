@@ -367,7 +367,7 @@ class CoverageTest(TestCase):
 
 
         if tm_lines is not None:
-            self.assertEqual(analysis.statements - analysis.missing, tm_lines)
+            self.assertEqual(analysis.statements - analysis.missing, set(tm_lines))
 
         if lines is not None:
             if isinstance(lines[0], int):
