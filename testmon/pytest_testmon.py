@@ -137,11 +137,14 @@ def by_test_count(config, session):
 
 
 class TestmonDeselect(object):
+    _ignore_own_pytest_deselected = False
+
     def __init__(self, config, testmon_data):
         self.testmon_data = testmon_data
         self.testmon = Testmon(config.project_dirs, testmon_labels=testmon_options(config))
 
         self.collection_ignored = set()
+        self.deselected_through_pytest = set()
         self.testmon_save = True
         self.config = config
         self.reports = defaultdict(lambda: {})
@@ -187,7 +190,10 @@ class TestmonDeselect(object):
 
     @pytest.mark.trylast
     def pytest_collection_modifyitems(self, session, config, items):
-        self.testmon_data.collect_garbage(retain=self.collection_ignored.union(set([item.nodeid for item in items])))
+        retain = self.collection_ignored.union(
+            set([item.nodeid for item in items])
+        ).union(self.deselected_through_pytest)
+        self.testmon_data.collect_garbage(retain=retain)
 
         for item in items:
             assert item.nodeid not in self.collection_ignored, (item.nodeid, self.collection_ignored)
@@ -199,9 +205,18 @@ class TestmonDeselect(object):
                 self.deselected.add(item.nodeid)
         items[:] = self.selected
 
+        self._ignore_own_pytest_deselected = True
         session.config.hook.pytest_deselected(
             items=([self.FakeItemFromTestmon(session.config)] *
                    len(self.collection_ignored.union(self.deselected))))
+        self._ignore_own_pytest_deselected = False
+
+    def pytest_deselected(self, items):
+        if not self._ignore_own_pytest_deselected:
+            for item in items:
+                nodeid = item.nodeid
+                assert nodeid not in self.collection_ignored
+                self.deselected_through_pytest.add(nodeid)
 
     def pytest_runtestloop(self, session):
         ignored_deselected = self.collection_ignored.union(self.deselected)
