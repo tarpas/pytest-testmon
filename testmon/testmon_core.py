@@ -229,7 +229,8 @@ class TestmonData(object):
             # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)
             # therefore we pick the last (which should be the outermost AST level) checksum
             relfilename = os.path.relpath(os.path.join(self.rootdir, nodeid).split("::", 1)[0], self.rootdir)
-            result[relfilename] = [self.source_tree.get_file(relfilename).blocks[-1].checksum]
+            result[relfilename] = [['THIS_DOESNT_EXIST_IN_THE_FILE_SO_WE_ALWAYS_TRIGGER_THIS_TEST_BUT_ITS_PROBABLY'
+                                    '_SKIPPED_ANYWAY']]
         return result
 
     def set_dependencies(self, nodeid, cov, result=None):
