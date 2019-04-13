@@ -3,7 +3,7 @@ import sys
 
 import pytest
 from test.coveragepy import coveragetest
-from testmon.process_code import Module, checksum_coverage, human_coverage
+from testmon.process_code import Module, checksum_coverage, human_coverage, END_OF_FILE_MARK
 from testmon.testmon_core import eval_variant, TestmonData as CoreTestmonData
 from testmon.testmon_core import Testmon as CoreTestmon
 
@@ -621,7 +621,7 @@ def test_add():
 
         deps = track_it(testdir, func)
 
-        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath): [['def test_1():', '    a=1']]} == deps
+        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath): [['def test_1():', '    a=1', END_OF_FILE_MARK]]} == deps
 
     @pytest.mark.xfail
     def test_testmon_recursive(self, testdir, monkeypatch):
@@ -842,6 +842,7 @@ class TestLineAlgEssentialProblems:
             "*1 failed*",
         ])
 
+    @pytest.mark.xfail(True, reason="False positive.")
     def test_add_method(self, testdir):
         testdir.makepyfile(test_a="""
                    def test_a():

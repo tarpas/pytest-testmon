@@ -51,7 +51,7 @@ class Module(object):
     def __init__(self, source_code=None, filename='<unknown>', rootdir='', fingerprints=None):
         self.blocks = []
         self.counter = 0
-        if fingerprints:
+        if fingerprints is not None:
             self._fingerprints = fingerprints
         else:
             self._fingerprints = None
@@ -119,7 +119,7 @@ class Module(object):
 
     @property
     def fingerprints(self):
-        if self._fingerprints:
+        if self._fingerprints is not None:
             return self._fingerprints
         else:
             return self.lines

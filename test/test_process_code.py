@@ -5,7 +5,7 @@ import pytest
 
 from test.test_testmon import CodeSample
 from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum, create_emental, \
-    block_list_list, file_has_lines, DoesntHaveException, END_OF_FILE_MARK
+    block_list_list, file_has_lines, DoesntHaveException, END_OF_FILE_MARK, the_rest_after
 
 try:
     from StringIO import StringIO as MemFile
@@ -306,15 +306,15 @@ class TestEmentalTests():
 
     def test_block_list_list_simple(self):
         afile = ['a', 'b', ]
-        assert block_list_list(afile, {2}) == [['b', END_OF_FILE_MARK], ]
+        assert block_list_list(afile, {2}) == [['a', 'b', END_OF_FILE_MARK], ]
 
     def test_block_1_block(self):
         afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
-        assert block_list_list(afile, {1, 2, 4, 6, 7}) == [['a', 'b'], ['d'], ['f', 'g']]
+        assert block_list_list(afile, {1, 2, 4, 6, 7}) == [['a', 'b', 'c'], ['c', 'd', 'e'], ['e', 'f', 'g', 'h']]
 
     def test_ignore_empty(self):
         afile = ['a', '\n', 'b', 'c', 'd', 'e']
-        assert block_list_list(afile, {1, 3, 5, 6}) == [['a', 'b'], ['d', 'e', END_OF_FILE_MARK]]
+        assert block_list_list(afile, {1, 3, 5, 6}) == [['a', 'b', 'c'], ['c', 'd', 'e', END_OF_FILE_MARK]]
 
     def test_empty(self):
         assert block_list_list(["a", ], []) == []
@@ -323,10 +323,10 @@ class TestEmentalTests():
         assert block_list_list([], []) == []
 
     def test_1_3(self):
-        assert block_list_list(["a", "b", "c"], [1, 3]) == [["a"], ["c", END_OF_FILE_MARK]]
+        assert block_list_list(['a', 'b', 'c'], [1, 3]) == [['a', 'b'], ['b', 'c', END_OF_FILE_MARK]]
 
     def test_1_34(self):
-        assert block_list_list(["a", "b", "c", "d"], [1, 3, 4]) == [["a"], ["c", "d", END_OF_FILE_MARK]]
+        assert block_list_list(['a', 'b', 'c', 'd'], [1, 3, 4]) == [['a', 'b'], ['b', 'c', 'd', END_OF_FILE_MARK]]
         pass
 
 
@@ -334,40 +334,40 @@ class TestFileHasLines():
 
     def test_rest1(self):
         with raises(DoesntHaveException):
-            therest_after([], [1])
+            the_rest_after([], [1])
 
     def test_rest2(self):
         with raises(DoesntHaveException):
-            therest_after([1], [2])
+            the_rest_after([1], [2])
 
     def test_rest3(self):
-        assert therest_after([1], [1]) == []
+        assert the_rest_after([1], [1]) == [1]
 
     def test_rest4(self):
-        assert therest_after([1, 2, 3], [2]) == [3]
+        assert the_rest_after([1, 2, 3], [2]) == [2, 3]
 
     def test_matches(self):
-        required_fingerprints = [[2], [1, 0]]
-        file_fingerprints = [2, 'a', 'b', 1, 0]
+        required_fingerprints = [['2'], ['1', '0']]
+        file_fingerprints = ['2', 'a', 'b', '1', '0']
 
         assert file_has_lines(file_fingerprints, required_fingerprints)
 
     def test_one_couple(self):
-        required_fingerprints = [[1, 0]]
-        file_fingerprints = [2, 'a', 'b', 1, 0]
+        required_fingerprints = [['1', '0']]
+        file_fingerprints = ['2', 'a', 'b', '1', '0']
         assert file_has_lines(file_fingerprints, required_fingerprints)
 
     def test_two_singles(self):
-        required_fingerprints = [[1], [3]]
-        file_fingerprints = [0, 1, 2, 3, 4]
+        required_fingerprints = [['1'], ['3']]
+        file_fingerprints = ['0', '1', '2', '3', '4']
 
         assert file_has_lines(file_fingerprints, required_fingerprints)
 
     def test_one_doesnt(self):
-        fps = [[2], [1, 7]]
-        filep = [0, 1, 2, 3, 4]
+        fingerprints = [['2'], ['1', '7']]
+        filep = ['0', '1', '2', '3', '4']
 
-        assert file_has_lines(filep, fps) is False
+        assert file_has_lines(filep, fingerprints) is False
 
 
 class TestCoverageAssumptions(CoverageTest):
