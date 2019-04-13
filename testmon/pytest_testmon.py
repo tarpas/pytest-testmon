@@ -131,7 +131,7 @@ class TestmonCollect(object):
             self.f_to_ignore -= self.testmon_data.f_last_failed
 
 
-    @pytest.mark.hookwrapper
+    @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_protocol(self, item, nextitem):
         if self.config.getoption('testmon_readonly'):
             yield
