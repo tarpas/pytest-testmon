@@ -807,6 +807,39 @@ def test_add():
         assert result.reprec.countoutcomes() == [0, 0, 1]
         result.stdout.fnmatch_lines(["*1 error*", ])
 
+    def test_with_deselected(self, testdir):
+        testdir.makepyfile(test_a="""
+            import pytest
+
+            def test_fail():
+                assert 0
+
+            def test_pass():
+                pass
+        """)
+        result = testdir.runpytest_inprocess("--testmon")
+        assert result.reprec.countoutcomes() == [1, 0, 1]
+        result.stdout.fnmatch_lines(["*= 1 failed, 1 passed in*", ])
+
+        # Change test_fail.
+        testdir.makepyfile(test_a="""
+            import pytest
+
+            def test_fail():
+                assert 0, "changed"
+
+            def test_pass():
+                pass
+        """)
+        result = testdir.runpytest_inprocess("--testmon", "-s", "-k", "fail")
+        assert result.reprec.countoutcomes() == [0, 0, 1]
+        result.stdout.fnmatch_lines(["*= 1 failed, 1 deselected in*", ])
+
+        # Testmon should not have forgotten about test_pass.
+        result = testdir.runpytest_inprocess("--testmon", "-s")
+        assert result.reprec.countoutcomes() == [0, 0, 1]
+        result.stdout.fnmatch_lines(["*= 1 failed, 2 deselected in*", ])
+
 
 class TestXdist(object):
 
