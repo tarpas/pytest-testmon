@@ -150,6 +150,10 @@ class TestmonDeselect(object):
         self.f_to_ignore = self.testmon_data.stable_files
         if self.config.getoption('tlf'):
             self.f_to_ignore -= self.testmon_data.f_last_failed
+        self.has_possibly_filtering_args = any(
+            x for x in config._origargs
+            if x in ("-k", "-m")
+        )
 
     def test_should_run(self, nodeid):
         if self.config.getoption('tlf'):
@@ -180,6 +184,8 @@ class TestmonDeselect(object):
             return active_message + "."
 
     def pytest_ignore_collect(self, path, config):
+        if self.has_possibly_filtering_args:
+            return
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
         if strpath in (self.f_to_ignore):
             self.collection_ignored.update(self.testmon_data.f_tests[strpath])
