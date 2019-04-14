@@ -62,13 +62,10 @@ def flip_dictionary(node_data):
     return files
 
 
-def stable(node_data, changed_files, unknown_nodeids):
+def stable(node_data, changed_files):
     file_data = flip_dictionary(node_data)
     stable_nodes = dict(node_data)
     stable_files = set(file_data)
-    for nodeid in unknown_nodeids:
-        fname = nodeid.split("::")[0]
-        stable_files.discard(fname)
 
     for file in set(changed_files) & set(file_data):
         for nodeid, checksums in file_data[file].items():
@@ -255,13 +252,14 @@ class TestmonData(object):
                              nodedata])
 
     def track_unknown_nodeids(self, nodeids):
+        unknown = nodeids - self.node_data.keys()
         with self.connection as con:
             con.executemany(
                 "INSERT INTO node (variant, name, failed) "
                 "VALUES (?, ?, ?)",
                 [
                     (self.variant, nodeid, None)
-                    for nodeid in nodeids
+                    for nodeid in unknown
                 ]
             )
 
@@ -273,8 +271,15 @@ class TestmonData(object):
         self.stable_nodeids, self.stable_files = stable(
             self.node_data,
             self.source_tree.get_changed_files(),
-            self.unknown_nodeids
         )
+
+        # Discard stable files based on unknown nodeids.
+        if self.unknown_nodeids:
+            for nodeid in self.unknown_nodeids:
+                # Not in there, because not added to node_file.
+                assert nodeid not in self.stable_nodeids
+                fname = nodeid.split("::")[0]
+                self.stable_files.discard(fname)
 
 
 class Testmon(object):

@@ -262,6 +262,39 @@ def test_add():
         assert result.reprec.countoutcomes() == [0, 0, 1]
         result.stdout.fnmatch_lines(["*= 1 failed, 3 deselected*", ])
 
+    def test_maxfail_with_deselected(self, testdir):
+        testdir.makepyfile(test_a="""
+            import pytest
+
+            def test_fail():
+                assert 0
+
+            def test_pass():
+                pass
+
+            def test_pass_again():
+                pass
+        """)
+        result = testdir.runpytest_inprocess("--testmon", "-x", "-k", "test_fail", "-vv")
+        assert result.reprec.countoutcomes() == [0, 0, 1]
+        result.stdout.fnmatch_lines([
+            "testmon=True, changed files: 0, skipping collection of 0 files*",
+            "*collected 3 items / 2 deselected*",
+            "*= 1 failed, 2 deselected in*",
+        ])
+
+        result = testdir.runpytest_inprocess("--testmon", "-x", "-vv")
+        assert result.reprec.countoutcomes() == [2, 0, 1]
+        result.stdout.fnmatch_lines([
+            "testmon=True, changed files: 0, skipping collection of 0 files*",
+            # NOTE: pytest currently does not report our deselected items
+            # here (https://github.com/pytest-dev/pytest/pull/5113).
+            "collected 3 items*",
+            "*= FAILURES =*",
+            "*_ test_fail _*",
+            "*= 1 failed, 2 passed, 1 deselected*",
+        ])
+
     def test_wrong_result_processing(self, testdir):
         tf = testdir.makepyfile(test_a="""
             def test_add():
