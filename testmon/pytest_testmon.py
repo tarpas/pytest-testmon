@@ -203,7 +203,11 @@ class TestmonDeselect(object):
             items=([self.FakeItemFromTestmon(session.config)] *
                    len(self.collection_ignored.union(self.deselected))))
 
+    @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtestloop(self, session):
+        yield
+
+        # Report known failures in the end.
         ignored_deselected = self.collection_ignored.union(self.deselected)
         for nodeid in ignored_deselected:
             self.report_if_failed(nodeid)
