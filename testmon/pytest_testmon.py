@@ -187,7 +187,10 @@ class TestmonDeselect(object):
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_collection_modifyitems(self, session, config, items):
-        self.testmon_data.collect_garbage(retain=self.collection_ignored.union(set([item.nodeid for item in items])))
+        self.all_item_nodeids = set([item.nodeid for item in items])
+        self.testmon_data.collect_garbage(
+            retain=self.collection_ignored.union(self.all_item_nodeids)
+        )
 
         yield
 
@@ -199,6 +202,7 @@ class TestmonDeselect(object):
                 self.selected.append(item)
             else:
                 self.deselected.add(item.nodeid)
+                self.all_item_nodeids.remove(item.nodeid)
         items[:] = self.selected
 
         session.config.hook.pytest_deselected(
@@ -226,6 +230,7 @@ class TestmonDeselect(object):
                 KeyboardInterrupt, pytest.exit.Exception)):
             self.testmon.stop()
         else:
+            self.all_item_nodeids.remove(item.nodeid)
             self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
                                        self.reports[item.nodeid])
 
@@ -246,5 +251,6 @@ class TestmonDeselect(object):
 
     def pytest_sessionfinish(self, session):
         if self.testmon_save and not self.config.getoption('collectonly') and not self.config.getoption('testmon_readonly'):
+            self.testmon_data.track_unknown_nodeids(self.all_item_nodeids)
             self.testmon_data.write_data()
         self.testmon.close()
