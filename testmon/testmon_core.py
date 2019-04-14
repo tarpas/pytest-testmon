@@ -287,15 +287,6 @@ class Testmon(object):
             subprocess_rc.write(rc_content)
         os.environ['COVERAGE_PROCESS_START'] = self.sub_cov_file + "_rc"
 
-    def track_dependencies(self, callable_to_track, testmon_data, rootdir, nodeid):
-        self.start()
-        try:
-            callable_to_track()
-        except:
-            raise
-        finally:
-            self.stop_and_save(testmon_data, rootdir, nodeid)
-
     def start(self):
         self.cov.erase()
         self.cov.start()
