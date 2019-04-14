@@ -177,7 +177,7 @@ class TestmonDeselect(object):
             changed_files = len(self.testmon_data.source_tree.changed_files)
         active_message = "testmon={}, changed files: {}, skipping collection of {} files".format(
             config.getoption('testmon'),
-            changed_files, len(self.testmon_data.stable_files))
+            changed_files, len(self.f_to_ignore))
         if self.testmon_data.variant:
             return active_message + ", run variant: {}".format(self.testmon_data.variant)
         else:
@@ -191,9 +191,14 @@ class TestmonDeselect(object):
             self.collection_ignored.update(self.testmon_data.f_tests[strpath])
             return True
 
-    @pytest.mark.trylast
+    @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_collection_modifyitems(self, session, config, items):
-        self.testmon_data.collect_garbage(retain=self.collection_ignored.union(set([item.nodeid for item in items])))
+        self.all_item_nodeids = set([item.nodeid for item in items])
+        self.testmon_data.collect_garbage(
+            retain=self.collection_ignored.union(self.all_item_nodeids)
+        )
+
+        yield
 
         for item in items:
             assert item.nodeid not in self.collection_ignored, (item.nodeid, self.collection_ignored)
@@ -203,13 +208,18 @@ class TestmonDeselect(object):
                 self.selected.append(item)
             else:
                 self.deselected.add(item.nodeid)
+                self.all_item_nodeids.remove(item.nodeid)
         items[:] = self.selected
 
         session.config.hook.pytest_deselected(
             items=([self.FakeItemFromTestmon(session.config)] *
                    len(self.collection_ignored.union(self.deselected))))
 
+    @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtestloop(self, session):
+        yield
+
+        # Report known failures in the end.
         ignored_deselected = self.collection_ignored.union(self.deselected)
         for nodeid in ignored_deselected:
             self.report_if_failed(nodeid)
@@ -218,15 +228,17 @@ class TestmonDeselect(object):
     def pytest_runtest_protocol(self, item, nextitem):
         if self.config.getoption('testmon_readonly'):
             yield
+            return
+
+        self.testmon.start()
+        result = yield
+        if result.excinfo and issubclass(result.excinfo[0], (
+                KeyboardInterrupt, pytest.exit.Exception)):
+            self.testmon.stop()
         else:
-            self.testmon.start()
-            result = yield
-            if result.excinfo and issubclass(result.excinfo[0], (
-                    KeyboardInterrupt, pytest.exit.Exception)):
-                self.testmon.stop()
-            else:
-                self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
-                                           self.reports[item.nodeid])
+            self.all_item_nodeids.remove(item.nodeid)
+            self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
+                                       self.reports[item.nodeid])
 
     def pytest_runtest_logreport(self, report):
         assert report.when not in self.reports, \
@@ -245,5 +257,6 @@ class TestmonDeselect(object):
 
     def pytest_sessionfinish(self, session):
         if self.testmon_save and not self.config.getoption('collectonly') and not self.config.getoption('testmon_readonly'):
+            self.testmon_data.track_unknown_nodeids(self.all_item_nodeids)
             self.testmon_data.write_data()
         self.testmon.close()

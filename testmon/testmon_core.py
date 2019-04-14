@@ -148,12 +148,18 @@ class TestmonData(object):
             dependencies[row[0]][row[1]] = blob_to_checksums(row[2])
 
         fail_reports = defaultdict(lambda: {})
+        unknown_nodeids = set()
+        for row in self.connection.execute(
+            "SELECT name, result, failed FROM node WHERE variant=? AND (failed IS NULL OR failed=1)",
+            (self.variant,),
+        ):
+            failed = row[2]
+            if failed is None:
+                unknown_nodeids.add(row[0])
+            else:
+                fail_reports[row[0]] = json.loads(row[1])
 
-        for row in self.connection.execute('SELECT name, result FROM node WHERE variant=? AND failed=1',
-                                           (self.variant,)):
-            fail_reports[row[0]] = json.loads(row[1])
-
-        return dependencies, fail_reports
+        return dependencies, fail_reports, unknown_nodeids
 
     def _write_attribute(self, attribute, data, variant=None):
         dataid = (variant if variant else self.variant) + ':' + attribute
@@ -187,7 +193,9 @@ class TestmonData(object):
         self._write_attribute('__data_version', str(self.DATA_VERSION), variant='default')
 
     def read_data(self):
-        self.node_data, self.fail_reports = self._fetch_node_data()
+        self.node_data, self.fail_reports, self.unknown_nodeids = (
+            self._fetch_node_data()
+        )
         self.f_last_failed = set(nodeid.split("::", 1)[0] for nodeid in self.fail_reports)
         self.f_tests = node_data_to_test_files(self.node_data)
 
@@ -243,13 +251,35 @@ class TestmonData(object):
                             [(cursor.lastrowid, filename, checksums_to_blob(nodedata[filename])) for filename in
                              nodedata])
 
+    def track_unknown_nodeids(self, nodeids):
+        unknown = nodeids - self.node_data.keys()
+        with self.connection as con:
+            con.executemany(
+                "INSERT INTO node (variant, name, failed) "
+                "VALUES (?, ?, ?)",
+                [
+                    (self.variant, nodeid, None)
+                    for nodeid in unknown
+                ]
+            )
+
     def read_source(self):
         mtimes = self._fetch_attribute('mtimes', default={})
         checksums = self._fetch_attribute('file_checksums', default={})
 
         self.source_tree = SourceTree(rootdir=self.rootdir, mtimes=mtimes, checksums=checksums)
-        self.stable_nodeids, self.stable_files = stable(self.node_data,
-                                                        self.source_tree.get_changed_files())
+        self.stable_nodeids, self.stable_files = stable(
+            self.node_data,
+            self.source_tree.get_changed_files(),
+        )
+
+        # Discard stable files based on unknown nodeids.
+        if self.unknown_nodeids:
+            for nodeid in self.unknown_nodeids:
+                # Not in there, because not added to node_file.
+                assert nodeid not in self.stable_nodeids
+                fname = nodeid.split("::")[0]
+                self.stable_files.discard(fname)
 
 
 class Testmon(object):

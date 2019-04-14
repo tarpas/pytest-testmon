@@ -93,6 +93,7 @@ def track_it(testdir, func):
     testmon = CoreTestmon(project_dirs=[testdir.tmpdir.strpath],
                           testmon_labels=set())
     testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
+    testmon_data.read_data()  # TODO
     testmon_data.read_source()
     testmon.start()
     func()
@@ -211,6 +212,89 @@ def test_add():
 
         fname = os.path.sep.join(['tests', 'test_a.py'])
         assert testmon_data.node_data['tests/test_a.py::test_add'][fname]
+
+    def test_maxfail(self, testdir):
+        testdir.makepyfile(test_a="""
+            import pytest
+
+            def test_fail():
+                assert 0
+
+            def test_pass():
+                pass
+
+            def test_pass_again():
+                pass
+        """)
+        result = testdir.runpytest_inprocess("--testmon", "-x")
+        assert result.reprec.countoutcomes() == [0, 0, 1]
+        result.stdout.fnmatch_lines([
+            "testmon=True, changed files: 0, skipping collection of 0 files*",
+            "*= 1 failed in*",
+        ])
+
+        result = testdir.runpytest_inprocess("--testmon", "-x")
+        assert result.reprec.countoutcomes() == [2, 0, 1]
+        result.stdout.fnmatch_lines([
+            "testmon=True, changed files: 0, skipping collection of 0 files*",
+            "*= FAILURES =*",
+            "*_ test_fail _*",
+            "*= 1 failed, 2 passed, 1 deselected*",
+        ])
+
+    def test_maxfail_after_full_run(self, testdir):
+        testdir.makepyfile(test_a="""
+            import pytest
+
+            def test_fail():
+                assert 0
+
+            def test_pass():
+                pass
+
+            def test_pass_again():
+                pass
+        """)
+        result = testdir.runpytest_inprocess("--testmon")
+        assert result.reprec.countoutcomes() == [2, 0, 1]
+        result.stdout.fnmatch_lines(["*= 1 failed, 2 passed in*", ])
+
+        result = testdir.runpytest_inprocess("--testmon", "-x")
+        assert result.reprec.countoutcomes() == [0, 0, 1]
+        result.stdout.fnmatch_lines(["*= 1 failed, 3 deselected*", ])
+
+    def test_maxfail_with_deselected(self, testdir):
+        testdir.makepyfile(test_a="""
+            import pytest
+
+            def test_fail():
+                assert 0
+
+            def test_pass():
+                pass
+
+            def test_pass_again():
+                pass
+        """)
+        result = testdir.runpytest_inprocess("--testmon", "-x", "-k", "test_fail", "-vv")
+        assert result.reprec.countoutcomes() == [0, 0, 1]
+        result.stdout.fnmatch_lines([
+            "testmon=True, changed files: 0, skipping collection of 0 files*",
+            "*collected 3 items / 2 deselected*",
+            "*= 1 failed, 2 deselected in*",
+        ])
+
+        result = testdir.runpytest_inprocess("--testmon", "-x", "-vv")
+        assert result.reprec.countoutcomes() == [2, 0, 1]
+        result.stdout.fnmatch_lines([
+            "testmon=True, changed files: 0, skipping collection of 0 files*",
+            # NOTE: pytest currently does not report our deselected items
+            # here (https://github.com/pytest-dev/pytest/pull/5113).
+            "*collected 3 items*",
+            "*= FAILURES =*",
+            "*_ test_fail _*",
+            "*= 1 failed, 2 passed, 1 deselected*",
+        ])
 
     def test_wrong_result_processing(self, testdir):
         tf = testdir.makepyfile(test_a="""
@@ -806,6 +890,39 @@ def test_add():
         result = testdir.runpytest("--testmon")
         assert result.reprec.countoutcomes() == [0, 0, 1]
         result.stdout.fnmatch_lines(["*1 error*", ])
+
+    def test_with_deselected(self, testdir):
+        testdir.makepyfile(test_a="""
+            import pytest
+
+            def test_fail():
+                assert 0
+
+            def test_pass():
+                pass
+        """)
+        result = testdir.runpytest_inprocess("--testmon")
+        assert result.reprec.countoutcomes() == [1, 0, 1]
+        result.stdout.fnmatch_lines(["*= 1 failed, 1 passed in*", ])
+
+        # Change test_fail.
+        testdir.makepyfile(test_a="""
+            import pytest
+
+            def test_fail():
+                assert 0, "changed"
+
+            def test_pass():
+                pass
+        """)
+        result = testdir.runpytest_inprocess("--testmon", "-s", "-k", "fail")
+        assert result.reprec.countoutcomes() == [0, 0, 1]
+        result.stdout.fnmatch_lines(["*= 1 failed, 1 deselected in*", ])
+
+        # Testmon should not have forgotten about test_pass.
+        result = testdir.runpytest_inprocess("--testmon", "-s")
+        assert result.reprec.countoutcomes() == [0, 0, 1]
+        result.stdout.fnmatch_lines(["*= 1 failed, 2 deselected in*", ])
 
 
 class TestXdist(object):
