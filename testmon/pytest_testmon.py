@@ -173,7 +173,7 @@ class TestmonDeselect(object):
             changed_files = len(self.testmon_data.source_tree.changed_files)
         active_message = "testmon={}, changed files: {}, skipping collection of {} files".format(
             config.getoption('testmon'),
-            changed_files, len(self.testmon_data.stable_files))
+            changed_files, len(self.f_to_ignore))
         if self.testmon_data.variant:
             return active_message + ", run variant: {}".format(self.testmon_data.variant)
         else:
