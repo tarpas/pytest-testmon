@@ -212,6 +212,56 @@ def test_add():
         fname = os.path.sep.join(['tests', 'test_a.py'])
         assert testmon_data.node_data['tests/test_a.py::test_add'][fname]
 
+    def test_maxfail(self, testdir):
+        testdir.makepyfile(test_a="""
+            import pytest
+
+            def test_fail():
+                assert 0
+
+            def test_pass():
+                pass
+
+            def test_pass_again():
+                pass
+        """)
+        result = testdir.runpytest_inprocess("--testmon", "-x")
+        assert result.reprec.countoutcomes() == [0, 0, 1]
+        result.stdout.fnmatch_lines([
+            "testmon=True, changed files: 0, skipping collection of 0 files*",
+            "*= 1 failed in*",
+        ])
+
+        result = testdir.runpytest_inprocess("--testmon", "-x")
+        assert result.reprec.countoutcomes() == [2, 0, 1]
+        result.stdout.fnmatch_lines([
+            "testmon=True, changed files: 0, skipping collection of 0 files*",
+            "*= FAILURES =*",
+            "*_ test_fail _*",
+            "*= 1 failed, 2 passed, 1 deselected*",
+        ])
+
+    def test_maxfail_after_full_run(self, testdir):
+        testdir.makepyfile(test_a="""
+            import pytest
+
+            def test_fail():
+                assert 0
+
+            def test_pass():
+                pass
+
+            def test_pass_again():
+                pass
+        """)
+        result = testdir.runpytest_inprocess("--testmon")
+        assert result.reprec.countoutcomes() == [2, 0, 1]
+        result.stdout.fnmatch_lines(["*= 1 failed, 2 passed in*", ])
+
+        result = testdir.runpytest_inprocess("--testmon", "-x")
+        assert result.reprec.countoutcomes() == [0, 0, 1]
+        result.stdout.fnmatch_lines(["*= 1 failed, 3 deselected*", ])
+
     def test_wrong_result_processing(self, testdir):
         tf = testdir.makepyfile(test_a="""
             def test_add():
