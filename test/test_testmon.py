@@ -290,7 +290,7 @@ def test_add():
             "testmon=True, changed files: 0, skipping collection of 0 files*",
             # NOTE: pytest currently does not report our deselected items
             # here (https://github.com/pytest-dev/pytest/pull/5113).
-            "collected 3 items*",
+            "*collected 3 items*",
             "*= FAILURES =*",
             "*_ test_fail _*",
             "*= 1 failed, 2 passed, 1 deselected*",
