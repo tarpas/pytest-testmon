@@ -93,6 +93,7 @@ def track_it(testdir, func):
     testmon = CoreTestmon(project_dirs=[testdir.tmpdir.strpath],
                           testmon_labels=set())
     testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
+    testmon_data.read_data()  # TODO
     testmon_data.read_source()
     testmon.start()
     func()
