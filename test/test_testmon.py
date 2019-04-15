@@ -234,11 +234,11 @@ def test_add():
         ])
 
         result = testdir.runpytest_inprocess("--testmon", "-x")
-        assert result.reprec.countoutcomes() == [2, 0, 1]
+        assert result.reprec.countoutcomes() == [2, 0, 0]  # looks at hook calls.
         result.stdout.fnmatch_lines([
             "testmon=True, changed files: 0, skipping collection of 0 files*",
             "*= FAILURES =*",
-            "*_ test_fail _*",
+            "*_ test_fail (cached) _*",
             "*= 1 failed, 2 passed, 1 deselected*",
         ])
 
@@ -260,7 +260,7 @@ def test_add():
         result.stdout.fnmatch_lines(["*= 1 failed, 2 passed in*", ])
 
         result = testdir.runpytest_inprocess("--testmon", "-x")
-        assert result.reprec.countoutcomes() == [0, 0, 1]
+        assert result.reprec.countoutcomes() == [0, 0, 0]  # looks at hook calls.
         result.stdout.fnmatch_lines(["*= 1 failed, 3 deselected*", ])
 
     def test_maxfail_with_deselected(self, testdir):
@@ -285,14 +285,14 @@ def test_add():
         ])
 
         result = testdir.runpytest_inprocess("--testmon", "-x", "-vv")
-        assert result.reprec.countoutcomes() == [2, 0, 1]
+        assert result.reprec.countoutcomes() == [2, 0, 0]  # looks at hook calls.
         result.stdout.fnmatch_lines([
             "testmon=True, changed files: 0, skipping collection of 0 files*",
             # NOTE: pytest currently does not report our deselected items
             # here (https://github.com/pytest-dev/pytest/pull/5113).
             "*collected 3 items*",
             "*= FAILURES =*",
-            "*_ test_fail _*",
+            "*_ test_fail (cached) _*",
             "*= 1 failed, 2 passed, 1 deselected*",
         ])
 
@@ -870,7 +870,12 @@ def test_add():
 
         result = testdir.runpytest("-v", "--testmon")
 
-        result.stdout.fnmatch_lines(["*test_collection_not_abort.py::test_2 FAILED*", ])
+        result.stdout.fnmatch_lines([
+            "*test_collection_not_abort.py::test_1 PASSED*",
+            "*= FAILURES =*",
+            "*_ test_2 (cached) _*",
+            "*= 1 failed, 1 passed, 1 deselected in*",
+        ])
 
     def test_failures_storage_retrieve(self, testdir):
         testdir.makepyfile(test_a="""
@@ -888,8 +893,8 @@ def test_add():
         assert hook_recorder.reprec.countoutcomes() == [0, 0, 1]
 
         result = testdir.runpytest("--testmon")
-        assert result.reprec.countoutcomes() == [0, 0, 1]
-        result.stdout.fnmatch_lines(["*1 error*", ])
+        assert result.reprec.countoutcomes() == [0, 0, 0]  # looks at hook calls.
+        result.stdout.fnmatch_lines(["*= 1 deselected, 1 error*"])
 
     def test_with_deselected(self, testdir):
         testdir.makepyfile(test_a="""
@@ -921,7 +926,7 @@ def test_add():
 
         # Testmon should not have forgotten about test_pass.
         result = testdir.runpytest_inprocess("--testmon", "-s")
-        assert result.reprec.countoutcomes() == [0, 0, 1]
+        assert result.reprec.countoutcomes() == [0, 0, 0]  # looks at hook calls.
         result.stdout.fnmatch_lines(["*= 1 failed, 2 deselected in*", ])
 
 

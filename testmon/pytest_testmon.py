@@ -136,6 +136,14 @@ def by_test_count(config, session):
         print("%s: %s" % (len(nodeids), os.path.relpath(filename)))
 
 
+class TestmonReport(runner.TestReport):
+    @property
+    def head_line(self):
+        """Extend headline (experimental API)"""
+        orig_head_line = super(TestmonReport, self).head_line
+        return "%s (cached)" % orig_head_line
+
+
 class TestmonDeselect(object):
     def __init__(self, config, testmon_data):
         self.testmon_data = testmon_data
@@ -163,13 +171,6 @@ class TestmonDeselect(object):
             return False
         else:
             return True
-
-    def report_if_failed(self, nodeid):
-        node_reports = self.testmon_data.fail_reports.get(nodeid, {})
-        for phase in ('setup', 'call', 'teardown'):
-            if phase in node_reports:
-                test_report = runner.TestReport(**node_reports[phase])
-                self.config.hook.pytest_runtest_logreport(report=test_report)
 
     def pytest_report_header(self, config):
         changed_files = ",".join(self.testmon_data.source_tree.changed_files)
@@ -219,10 +220,12 @@ class TestmonDeselect(object):
     def pytest_runtestloop(self, session):
         yield
 
-        # Report known failures in the end.
         ignored_deselected = self.collection_ignored.union(self.deselected)
-        for nodeid in ignored_deselected:
-            self.report_if_failed(nodeid)
+        fail_reports = self.testmon_data.fail_reports
+        self.report_skipped_nodeids = fail_reports.keys() & ignored_deselected
+        if self.report_skipped_nodeids:
+            session.testsfailed = True  # Trigger EXIT_TESTSFAILED
+
 
     @pytest.mark.hookwrapper
     def pytest_runtest_protocol(self, item, nextitem):
@@ -255,7 +258,48 @@ class TestmonDeselect(object):
     def pytest_keyboard_interrupt(self, excinfo):
         self.testmon_save = False
 
+    def _report_deselected_failures(self, config):
+        """Report deselected known failures in the end.
+
+        This avoids problems with pytest's progress reporting, and
+        allows to more easily distinguish between cached and updated
+        results.  Code based on pytest_runtest_logreport, in the pytest
+        terminal plugin.
+        """
+        if not self.report_skipped_nodeids:
+            return
+        tr = config.pluginmanager.get_plugin("terminalreporter")
+        if not tr:
+            return
+
+        append_cached_suffix = False  # TODO: wanted?  (needs test adjustments)
+
+        had_failure = False
+        for nodeid in self.report_skipped_nodeids:
+            node_reports = self.testmon_data.fail_reports.get(nodeid, {})
+            for phase in ('setup', 'call', 'teardown'):
+                if phase in node_reports:
+                    rep = TestmonReport(**node_reports[phase])
+                    if rep.outcome == "passed":
+                        continue
+                    res = config.hook.pytest_report_teststatus(
+                        report=rep, config=config
+                    )
+                    category, _letter, _word = res
+                    if append_cached_suffix:
+                        category += " (cached)"
+                    tr.stats.setdefault(category, []).append(rep)
+                    had_failure = True
+
+        # Hack to trigger red color (since we append " (cached)" to "failed"),
+        # and build_summary_stats_line checks for "'failed' in stats".
+        assert had_failure
+        if append_cached_suffix:
+            tr.stats.setdefault("failed", [])
+
     def pytest_sessionfinish(self, session):
+        self._report_deselected_failures(session.config)
+
         if self.testmon_save and not self.config.getoption('collectonly') and not self.config.getoption('testmon_readonly'):
             self.testmon_data.track_unknown_nodeids(self.all_item_nodeids)
             self.testmon_data.write_data()
