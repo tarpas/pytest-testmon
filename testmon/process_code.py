@@ -175,7 +175,7 @@ def human_coverage(analysis):
         if i < len(statements) and statements[i] == lineno:
             covered = j >= len(missing) or missing[j] > lineno
         if blank_re.match(line):
-            continue
+            result.add(lineno)
         if else_finally_re.match(line):
             # Special logic for lines containing only 'else:'.
             if i >= len(statements) or j >= len(missing):
@@ -202,34 +202,29 @@ def create_emental(blocks):
 
 
 def block_list_list(afile, coverage):
-    previous = 'N/A'
-    nonempty = {}
-    i = 0
-    for (lineno, line) in enumerate(afile, start=1):
-        if not blank_re.match(line):
-            nonempty[lineno] = i
-            i += 1
-
     l2 = []
     l1 = []
-    for i in sorted(coverage):
-        current_nonempty_line = nonempty[i]
-        previous_non_empty_line = nonempty.get(previous, current_nonempty_line - 1)
+    list_coverage = sorted(coverage)
+    for (cov_idx, cov_line_number) in enumerate(list_coverage):
 
-        if not (previous_non_empty_line == current_nonempty_line - 1):
-            add_non_executed_line_in_the_end(l2, afile, previous)
-            l1.append(l2)
-            l2 = []
+        if blank_re.match(afile[cov_line_number-1]):
+            continue
 
         if not l2:
-            add_non_executed_line_in_the_beginning(l2, afile, i - 2)
+            add_non_executed_line_in_the_beginning(l2, afile, cov_line_number - 2)
 
-        l2.append(afile[i - 1])
-        previous = i
+        if not (cov_idx == 0 or list_coverage[cov_idx-1] == cov_line_number-1):
+            add_non_executed_line_in_the_end(l2, afile, list_coverage[cov_idx - 1])
+            l1.append(l2)
+            l2 = []
+            add_non_executed_line_in_the_beginning(l2, afile, cov_line_number - 2)
+
+        l2.append(afile[cov_line_number - 1])
 
     if l2:
-        add_non_executed_line_in_the_end(l2, afile, previous)
         l1.append(l2)
+        add_non_executed_line_in_the_end(l2, afile, list_coverage[-1])
+
     return l1
 
 

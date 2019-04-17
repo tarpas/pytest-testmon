@@ -320,7 +320,7 @@ class TestEmentalTests():
 
     def test_ignore_empty(self):
         afile = ['a', '\n', 'b', 'c', 'd', 'e']
-        assert block_list_list(afile, {1, 3, 5, 6}) == [['a', 'b', 'c'], ['c', 'd', 'e', END_OF_FILE_MARK]]
+        assert block_list_list(afile, {1, 2, 3, 5, 6}) == [['a', 'b', 'c'], ['c', 'd', 'e', END_OF_FILE_MARK]]
 
     def test_empty(self):
         assert block_list_list(["a", ], []) == []
