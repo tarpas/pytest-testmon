@@ -32,7 +32,7 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
         # Nothing here
         d = 6
         """,
-                                  [1, 2, 4, 6],
+                                  [1, 2, 3, 4, 5, 6],
                                   fingerprints=[['a = 1', 'b = 2', 'c = 4', 'd = 6', '=END OF FILE=']],
                                   report="4 0 0 0 100%")
 
@@ -55,7 +55,7 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
 
             e = { 'foo': 1, 'bar': 2 }
             """,
-            [1,2,3,4,5,7], "")
+            [1, 2, 3, 4, 5, 6, 7], "")
 
     def test_list_comprehension(self):
         self.check_human_coverage("""\
@@ -255,7 +255,7 @@ class SimpleStatementTest(TestmonCoverageTest):
             x = fn()
             assert(x == 1)
             """,
-            [1,2,3,5,6], "")
+            [1, 2, 3, 4, 5, 6,], "")
         self.check_human_coverage("""\
             def fn():
                 a = 1
@@ -266,7 +266,7 @@ class SimpleStatementTest(TestmonCoverageTest):
             x = fn()
             assert(x == 2)
             """,
-            [1,2,3,4,5,7,8], "")
+            [1,2,3,4,5, 6, 7,8], "")
         self.check_human_coverage("""\
             def fn():
                 a = 1
@@ -277,7 +277,7 @@ class SimpleStatementTest(TestmonCoverageTest):
             x,y,z = fn()
             assert x == 1 and y == 2 and z == 3
             """,
-            [1,2,3,4,5,7,8], "")
+            [1,2,3,4,5, 6, 7,8], "")
 
     def test_yield(self):
         self.check_human_coverage("""\
