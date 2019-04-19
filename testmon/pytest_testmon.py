@@ -295,8 +295,7 @@ class TestmonDeselect(object):
 
         # Hack to trigger red color (since we append " (cached)" to "failed"),
         # and build_summary_stats_line checks for "'failed' in stats".
-        assert had_failure
-        if append_cached_suffix:
+        if had_failure and append_cached_suffix:
             tr.stats.setdefault("failed", [])
 
     def pytest_sessionfinish(self, session):
