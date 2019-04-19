@@ -143,6 +143,14 @@ class TestmonReport(runner.TestReport):
         orig_head_line = super(TestmonReport, self).head_line
         return "%s (cached)" % orig_head_line
 
+    def _get_verbose_word(self, *args, **kwargs):
+        """Append "[C]" to the verbose word / prefix in summaries.
+
+        Uses private API (https://github.com/pytest-dev/pytest/pull/5126).
+        """
+        orig = super(TestmonReport, self)._get_verbose_word(*args, **kwargs)
+        return orig + "[C]"
+
 
 class TestmonDeselect(object):
     def __init__(self, config, testmon_data):
