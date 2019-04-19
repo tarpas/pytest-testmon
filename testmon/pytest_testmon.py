@@ -266,7 +266,9 @@ class TestmonDeselect(object):
         results.  Code based on pytest_runtest_logreport, in the pytest
         terminal plugin.
         """
-        if not self.report_skipped_nodeids:
+        if not hasattr(self, "report_skipped_nodeids"):
+            # Might happen with e.g. UsageError, where this is not being set
+            # via pytest_runtestloop.
             return
         tr = config.pluginmanager.get_plugin("terminalreporter")
         if not tr:
