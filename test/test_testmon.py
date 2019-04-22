@@ -296,6 +296,44 @@ def test_add():
             "*= 1 failed, 2 passed, 1 deselected*",
         ])
 
+    def test_deselected_through_plugin(self, testdir):
+        """Unknown items being deselected should not cause IntegrityError."""
+        testdir.makepyfile(
+            test_a="""
+            import pytest
+
+            def test_pass():
+                pass
+        """,
+            myplugin="""
+        def pytest_collection_modifyitems(items, config):
+            config.hook.pytest_deselected(items=items)
+            items[:] = []
+        """,
+        )
+
+        result = testdir.runpytest_inprocess(
+            "--testmon", "-p", "myplugin", syspathinsert=True
+        )
+        assert result.reprec.countoutcomes() == [0, 0, 0]
+        result.stdout.fnmatch_lines(
+            [
+                "testmon=True, changed files: 0, skipping collection of 0 files*",
+                "*= 2 deselected in*",
+            ]
+        )
+
+        result = testdir.runpytest_inprocess(
+            "--testmon", "-p", "myplugin", syspathinsert=True
+        )
+        assert result.reprec.countoutcomes() == [0, 0, 0]
+        result.stdout.fnmatch_lines(
+            [
+                "testmon=True, changed files: 0, skipping collection of 0 files*",
+                "*= 2 deselected in*",
+            ]
+        )
+
     def test_wrong_result_processing(self, testdir):
         tf = testdir.makepyfile(test_a="""
             def test_add():
