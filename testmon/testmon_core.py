@@ -255,7 +255,7 @@ class TestmonData(object):
         unknown = nodeids - self.node_data.keys()
         with self.connection as con:
             con.executemany(
-                "INSERT INTO node (variant, name, failed) "
+                "INSERT OR IGNORE INTO node (variant, name, failed) "
                 "VALUES (?, ?, ?)",
                 [
                     (self.variant, nodeid, None)
