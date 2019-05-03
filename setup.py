@@ -2,13 +2,16 @@ from setuptools import setup
 
 setup(
     name='pytest-testmon',
-    description='take TDD to a new level with py.test and testmon',
+    description='find bugs 10x faster',
     long_description=''.join(open('README.rst').readlines()),
-    version='0.9.15',
+    version='0.9.16',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
     packages=['testmon'],
-    url='https://github.com/tarpas/pytest-testmon/',
+    url='https://testmon.org',
+    project_urls={
+        "Source Code": 'https://github.com/tarpas/pytest-testmon/',
+    },
     author_email='tibor.arpas@infinit.sk',
     author='Tibor Arpas, Jozef Knaperek, Martin Riesz, Daniel Hahler',
     entry_points={
