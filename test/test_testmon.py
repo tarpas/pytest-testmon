@@ -808,6 +808,20 @@ def test_add():
         result.stdout.fnmatch_lines(["*1 error*", ])
 
 
+    @pytest.mark.xfail # re https://github.com/tarpas/pytest-testmon/issues/31
+    def test_exit_code5(self, testdir):
+        result = testdir.runpytest("--testmon")
+        assert result.ret == 5
+        testdir.makepyfile(test_a="""
+            def test_pass():
+                assert True
+        """)
+        result = testdir.runpytest("--testmon")
+        assert result.ret == 0
+        result = testdir.runpytest("--testmon")
+        assert result.ret == 0
+
+
 class TestXdist(object):
 
     def test_xdist_4(self, testdir):
