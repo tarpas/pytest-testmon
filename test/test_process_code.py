@@ -50,8 +50,7 @@ class TestReadSrc:
 
     def test_module_with_1250(self):
         code_repr = Module(None, 'test/samples/print1250r.py').blocks[0].code
-        assert "Str('\\xc5\\xa1')" in code_repr or "Str('š')" in Module(None, 'test/samples/print1250r.py').blocks[
-            0].code
+        assert "Str('\\xc5\\xa1')" in code_repr or "Str('š')" in code_repr or "Constant('š', None)" in code_repr
 
 
 class TestSourceIntoBlocks(object):
