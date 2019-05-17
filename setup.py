@@ -4,7 +4,7 @@ setup(
     name='pytest-testmon',
     description='find bugs 10x faster',
     long_description=''.join(open('README.rst').readlines()),
-    version='0.9.16',
+    version='0.9.17',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
     packages=['testmon'],
