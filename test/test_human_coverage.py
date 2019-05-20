@@ -1,15 +1,15 @@
 #  -- coding:utf8 --
 from test.coveragepy.coveragetest import CoverageTest
 from coverage import env
-from testmon.process_code import human_coverage, Module, GAP_MARK
+from testmon_dev.process_code import human_coverage, Module, GAP_MARK
 import textwrap
 from coverage import coverage
 from coverage.parser import PythonParser
 import sys
 from os.path import abspath
 
-class TestmonCoverageTest(CoverageTest):
 
+class TestmonCoverageTest(CoverageTest):
 
     def write_and_run(self, text):
         modname = self.get_module_name()
@@ -22,7 +22,6 @@ class TestmonCoverageTest(CoverageTest):
         del sys.modules[modname]
         coverage_lines = cov.get_data().lines(abspath(modname + ".py"))
         return coverage_lines
-
 
     def check_human_coverage(self, text, lines=None, fingerprints=None):
 

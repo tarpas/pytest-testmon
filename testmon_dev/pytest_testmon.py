@@ -8,10 +8,10 @@ from collections import defaultdict
 
 import pytest
 
-from testmon.testmon_core import Testmon, eval_variant, TestmonData
+from testmon_dev.testmon_core import Testmon, eval_variant, TestmonData
 from _pytest import runner
 
-PLUGIN_NAME='testmon'
+PLUGIN_NAME = 'testmon-dev'
 TLF_OPTION = 'tlf'
 OFF_OPTION = 'off'
 SINGLE_PROCESS_OPTION = 'singleprocess'

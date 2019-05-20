@@ -1,9 +1,9 @@
 import pytest
 from collections import namedtuple
 
-from testmon.process_code import Module, read_file_with_checksum
+from testmon_dev.process_code import Module, read_file_with_checksum
 from test.test_process_code import CodeSample
-from testmon.testmon_core import TestmonData as CoreTestmonData, SourceTree, flip_dictionary, stable, \
+from testmon_dev.testmon_core import TestmonData as CoreTestmonData, SourceTree, flip_dictionary, stable, \
     checksums_to_blob, CHECKUMS_ARRAY_TYPE, blob_to_checksums, node_data_to_test_files, NodesData
 
 import sqlite3
@@ -17,6 +17,7 @@ from array import array
 class TestGeneral(object):
 
     def test_flip(self):
+        pass
         node_data = {'X': {'a': [1, 2, 3], 'b': [3, 4, 5]}, 'Y': {'b': [3, 6, 7]}}
         files = flip_dictionary(node_data)
         assert files == {'a': {'X': [1, 2, 3]}, 'b': {'X': [3, 4, 5], 'Y': [3, 6, 7]}}

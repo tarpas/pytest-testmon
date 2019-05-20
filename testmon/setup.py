@@ -1,22 +1,22 @@
 from setuptools import setup
 
 setup(
-    name='pytest-testmon-dev',
+    name='pytest-testmon',
     description='take TDD to a new level with py.test and testmon',
-    long_description=''.join(open('README.rst').readlines()),
+    long_description=''.join(open('../README.rst').readlines()),
     version='0.9.16',
     license='MIT',
     platforms=['linux', 'osx', 'win32'],
-    packages=['testmon_dev',],
+    
     url='https://github.com/tarpas/pytest-testmon/',
     author_email='tibor.arpas@infinit.sk',
     author='Tibor Arpas, Jozef Knaperek, Martin Riesz, Daniel Hahler',
     entry_points={
         'pytest11': [
-            'testmon_dev = testmon_dev.pytest_testmon',
+            'testmon = pytest_testmon',
         ],
         'tox': [
-            'testmon_dev = testmon_dev.tox_testmon',
+            'testmon = tox_testmon',
         ],
     },
     install_requires=['pytest>=3.3.0,<4', 'coverage>=4'],
