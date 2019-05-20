@@ -2,10 +2,9 @@ import os
 import sys
 
 import pytest
-import testmon.process_code
 from test.coveragepy import coveragetest
-from testmon.process_code import Module, checksum_coverage, human_coverage, END_OF_FILE_MARK
-from testmon.testmon_core import eval_variant, TestmonData as CoreTestmonData, NodesData
+from testmon.process_code import Module, checksum_coverage
+from testmon.testmon_core import eval_variant, NodesData
 from testmon.testmon_core import Testmon as CoreTestmon
 from testmon.testmon_core import TestmonData as CoreTestmonData
 from test.test_process_code import CodeSample
@@ -378,7 +377,7 @@ def test_add():
         test_a.setmtime(1424880935)
         result = testdir.runpytest("-v", "--collectonly", "--testmon")
         result.stdout.fnmatch_lines([
-            "*test_one*",
+            "*1 deselected*",
         ])
 
     def test_strange_argparse_handling(self, testdir):
@@ -641,7 +640,7 @@ def test_add():
 
         deps = track_it(testdir, func)
 
-        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath): [['def test_1():', '    a=1', END_OF_FILE_MARK]]} == deps
+        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath): [['def test_1():', '    a=1']]} == deps
 
     @pytest.mark.xfail
     def test_testmon_recursive(self, testdir, monkeypatch):

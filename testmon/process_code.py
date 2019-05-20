@@ -5,12 +5,15 @@ import zlib
 import os
 
 import re
+
+from coverage.parser import PythonParser
 from coverage.python import get_python_source
 
 END_OF_FILE_MARK = '=END OF FILE='
+GAP_MARK = '=GAP='
 
 blank_re = re.compile(r"\s*(#|$)")
-coding_re = re.compile(b'coding[=:]\s*([-\w.]+)')
+
 
 class Block():
     def __init__(self, start, end, code=0, name=''):
@@ -51,6 +54,7 @@ class Module(object):
     def __init__(self, source_code=None, file_name='<unknown>', rootdir='', fingerprints=None):
         self.blocks = []
         self.counter = 0
+        self.source_code = source_code
         if fingerprints is not None:
             self._fingerprints = fingerprints
         else:
@@ -157,12 +161,8 @@ blank_re = re.compile(r"\s*(#|$)")
 else_finally_re = re.compile(r"\s*(else|finally)\s*:\s*(#|$)")
 
 
-def human_coverage(analysis):
+def human_coverage(source, statements, missing):
     result = set()
-
-    source = analysis.file_reporter.source()
-    statements = sorted(analysis.statements)
-    missing = sorted(analysis.missing)
 
     i = 0
     j = 0
@@ -201,54 +201,86 @@ def create_emental(blocks):
     return line_numbers
 
 
-def block_list_list(afile, coverage):
+def is_end_of_block(line_indent, indents):
+    # Cycle is needed due to 'test_block_end_with_more_indents2'
+    while line_indent < indents[-1]:
+        indents.pop()
+        if not indents:
+            return True
+    return False
+
+
+def block_list_list(afile, coverage, multilines=None):
     l2 = []
     l1 = []
-    list_coverage = sorted(coverage)
-    for (cov_idx, cov_line_number) in enumerate(list_coverage):
+    if not coverage:
+        return l1
 
-        if blank_re.match(afile[cov_line_number-1]):
+    indents = []
+
+    if multilines is None:
+        multilines = {}
+
+    for (line_idx, line) in enumerate(afile, 1):
+        line_indent = get_indent_spaces_count(line)
+
+        # Skip blank lines
+        if blank_re.match(line):
             continue
 
-        if not l2:
-            add_non_executed_line_in_the_beginning(l2, afile, cov_line_number - 2)
-
-        if not (cov_idx == 0 or list_coverage[cov_idx-1] == cov_line_number-1):
-            add_non_executed_line_in_the_end(l2, afile, list_coverage[cov_idx - 1])
+        # Check for end of block if we are inside one
+        if l2 and multilines.get(line_idx) is None and is_end_of_block(line_indent, indents):
             l1.append(l2)
             l2 = []
-            add_non_executed_line_in_the_beginning(l2, afile, cov_line_number - 2)
+            continue
 
-        l2.append(afile[cov_line_number - 1])
+        # Skip non-covered lines
+        if not (line_idx in coverage) or blank_re.match(line):
+            continue
+
+        # Start of new covered block
+        if not l2:
+            add_previous_line(l2, afile, line_idx)
+            indents.append(line_indent)
+            l2.append(line)
+            continue
+
+        # Check for GAP -> previous line is not covered
+        if not (line_idx - 1) in coverage:
+            l2.append(GAP_MARK)
+
+        # Check indentation
+        if line_indent > indents[-1]:  # Line is from new block
+            indents.append(line_indent)
+
+        l2.append(line)
 
     if l2:
         l1.append(l2)
-        add_non_executed_line_in_the_end(l2, afile, list_coverage[-1])
 
     return l1
 
 
-def add_non_executed_line_in_the_beginning(l2, afile, i):
+def get_indent_spaces_count(line):
+    space_count = 0
+    for c in line:
+        if c == ' ':
+            space_count += 1
+            continue
+        elif c == '\t':
+            space_count += 8 - (space_count % 8)
+        else:
+            return space_count
+
+
+def add_previous_line(l2, afile, i):
+    i = i - 2
     if i < 0:
         return
 
     while blank_re.match(afile[i]):
         i -= 1
         if i < 0:
-            return
-
-    l2.append(afile[i])
-
-
-def add_non_executed_line_in_the_end(l2, afile, i):
-    if i > len(afile) - 1:
-        l2.append(END_OF_FILE_MARK)
-        return
-
-    while blank_re.match(afile[i]):
-        i += 1
-        if i > len(afile) - 1:
-            l2.append(END_OF_FILE_MARK)
             return
 
     l2.append(afile[i])
@@ -266,27 +298,46 @@ def get_real_subblock_length(subblock):
         return subblock_length
 
 
-def the_rest_after(act_file_lines, subblock):
+def match_fingerprints(file_lines, fingerprints):
+    def get_indent(line_idx):
+        return get_indent_spaces_count(file_lines[line_idx])
 
-    if len(act_file_lines) < get_real_subblock_length(subblock):
+    def gap_ends(line_idx):
+        indent_before_gap = get_indent(line_idx - 1)
+        while line_idx < file_lines_count and (get_indent(line_idx) > indent_before_gap):
+            line_idx += 1
+        return line_idx
+
+    if len(file_lines) < get_real_subblock_length(fingerprints):
         raise DoesntHaveException()
 
-    i = 0
+    line_idx = 0
+    first_line_indent = 0
+    file_lines_count = len(file_lines)
+    subblock_idx = 0
 
-    for subblock_line in subblock:
-        # This fix case when user add line at the end of file
-        # TODO It create antoher false positives when non-executed line is added
-        if subblock_line == END_OF_FILE_MARK and i >= len(act_file_lines):
-            i += 1
-            continue
+    while True:
+        # Skip all gap lines or stop at the end of file
+        if fingerprints[subblock_idx] == GAP_MARK:
+            line_idx = gap_ends(line_idx)
 
-        if subblock_line == act_file_lines[i]:
-            i += 1
+        elif fingerprints[subblock_idx] == file_lines[line_idx]:  # Found block line
+            if line_idx == 0:
+                first_line_indent = get_indent(line_idx)
+            line_idx += 1
+        else:
+            return match_fingerprints(file_lines[1:], fingerprints)
 
-    if i == len(subblock):
-        return act_file_lines[i-1:]
-    else:
-        return the_rest_after(act_file_lines[1:], subblock)
+        subblock_idx += 1
+        if subblock_idx == len(fingerprints):
+            if (line_idx == file_lines_count or
+                    # Check correct dedent - see 'test_new_line_after_indent' and
+                    # 'test_new_line_after_gap' in 'test_process_code.py'
+                    get_indent_spaces_count(file_lines[line_idx]) <= first_line_indent):
+
+                return file_lines[line_idx:]
+            else:
+                return match_fingerprints(file_lines[1:], fingerprints)
 
 
 def file_has_lines(file_fingerprints, required_fingerprints):
@@ -297,7 +348,7 @@ def file_has_lines(file_fingerprints, required_fingerprints):
 
     try:
         for rf in required_fingerprints:
-            non_empty_lines = the_rest_after(non_empty_lines, rf)
+            non_empty_lines = match_fingerprints(non_empty_lines, rf)
         return True
     except DoesntHaveException:
         return False

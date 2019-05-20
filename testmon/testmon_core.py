@@ -2,6 +2,8 @@ from collections import defaultdict
 
 from array import array
 
+from coverage.parser import PythonParser
+
 try:
     import configparser
 except ImportError:
@@ -217,12 +219,25 @@ class TestmonData(object):
     def file_data(self):
         return flip_dictionary(self.node_data)
 
+    def _parse_source(self, covered, source_code):
+        parser = PythonParser(text=source_code)
+        parser.parse_source()
+        return parser.statements, parser.translate_lines(covered), parser._multiline
+
     def get_nodedata(self, cov, nodeid):
         result = {}
         for filename in cov.get_data().measured_files():
             relfilename = os.path.relpath(filename, self.rootdir)
             if os.path.exists(filename):
-                result[relfilename] = block_list_list(self.source_tree.get_file(relfilename).lines, human_coverage(cov._analyze(filename)))  #checksum_coverage(self.source_tree.get_file(relfilename).blocks, lines)
+                module = self.source_tree.get_file(relfilename)
+                covered = set(cov.get_data().lines(filename))
+                statements, executed, multiline = self._parse_source(covered, module.source_code)
+
+                result[relfilename] = block_list_list(module.lines,
+                                                      human_coverage(module.source_code,
+                                                                     sorted(statements),
+                                                                     sorted(statements - executed)),  #checksum_coverage(self.source_tree.get_file(relfilename).blocks, lines)
+                                                      multiline)
         if not result:  # when testmon kicks-in the test module is already imported. If the test function is skipped
             # coverage_data is empty. However, we need to write down, that we depend on the
             # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)

@@ -1,20 +1,48 @@
 #  -- coding:utf8 --
-from coverage.backward import StringIO
-
-from coverage.python import get_python_source
 from test.coveragepy.coveragetest import CoverageTest
 from coverage import env
-from testmon.process_code import human_coverage, Module
-
+from testmon.process_code import human_coverage, Module, GAP_MARK
+import textwrap
+from coverage import coverage
+from coverage.parser import PythonParser
+import sys
+from os.path import abspath
 
 class TestmonCoverageTest(CoverageTest):
 
-    def check_human_coverage(self, text, lines=None, fingerprints=None, *args, **kwargs):
-        analysis = self.tm_check_coverage(text)
+
+    def write_and_run(self, text):
+        modname = self.get_module_name()
+        self.make_file(modname + ".py", text)
+        # Start up coverage.py.
+        cov = coverage()
+        cov.erase()
+        mod = self.start_import_stop(cov, modname)
+        # Clean up our side effects
+        del sys.modules[modname]
+        coverage_lines = cov.get_data().lines(abspath(modname + ".py"))
+        return coverage_lines
+
+
+    def check_human_coverage(self, text, lines=None, fingerprints=None):
+
+        text = textwrap.dedent(text)
+
+        coverage_lines = self.write_and_run(text)
 
         m = Module(source_code=text)
 
-        hc = sorted(human_coverage(analysis))
+        parser = PythonParser(text=text)
+        parser.parse_source()
+
+        statements = parser.statements
+
+        # Identify missing statements.
+        executed = coverage_lines
+        executed = parser.translate_lines(executed)
+
+        hc = sorted(human_coverage(text, sorted(statements), sorted(statements - executed)))
+
         assert hc == lines
         if fingerprints:
             assert m.coverage_to_fingerprints(hc) == fingerprints
@@ -33,8 +61,7 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
         d = 6
         """,
                                   [1, 2, 3, 4, 5, 6],
-                                  fingerprints=[['a = 1', 'b = 2', 'c = 4', 'd = 6', '=END OF FILE=']],
-                                  report="4 0 0 0 100%")
+                                  fingerprints=[['a = 1', 'b = 2', 'c = 4', 'd = 6',]],)
 
     def test_indentation_wackiness(self):
         # Partial final lines are OK.
@@ -57,6 +84,17 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
             """,
             [1, 2, 3, 4, 5, 6, 7], "")
 
+    def test_multiline_with_class(self):
+        self.check_human_coverage("""\
+            class a:
+                def a1():
+                    a = [1,
+            2]
+            
+            a.a1()
+            """,
+                                  [1, 2, 3, 4, 5, 6], "")
+
     def test_list_comprehension(self):
         self.check_human_coverage("""\
             l = [
@@ -75,9 +113,8 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
             c = 1
             """,
                                   [1, 2, 4],
-                                  fingerprints=[['a = 1', 'def b():', '    pass'],
-                                                ['    pass', 'c = 1', '=END OF FILE=']],
-                                  report="")
+                                  fingerprints=[['a = 1', 'def b():', GAP_MARK, 'c = 1', ]],
+                                  )
 
 
 class SimpleStatementTest(TestmonCoverageTest):

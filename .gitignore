@@ -51,3 +51,6 @@ nosetests.xml
 /io.intellij/gradlew.bat
 /io.intellij/settings.gradle
 /io.intellij/out/
+
+# Pipenv
+Pipfile.lock

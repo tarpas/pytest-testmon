@@ -1,10 +1,13 @@
 #  -- coding:utf8 --
-from test.coveragepy.coveragetest import CoverageTest
+from _pytest import unittest
+
+from test.test_human_coverage import TestmonCoverageTest
 
 import pytest
 
 from testmon.process_code import Block, Module, checksum_coverage, read_file_with_checksum, create_emental, \
-    block_list_list, file_has_lines, DoesntHaveException, END_OF_FILE_MARK, the_rest_after
+    block_list_list, file_has_lines, DoesntHaveException, END_OF_FILE_MARK, match_fingerprints, \
+    get_indent_spaces_count, GAP_MARK
 
 try:
     from StringIO import StringIO as MemFile
@@ -307,20 +310,36 @@ class TestEmentalTests():
         assert create_emental([b(2, 2), b(6, 8), b(1, 10)]) == set((1, 3, 4, 5, 9, 10))
 
     def test_block_list_list(self):
-        afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
-        assert block_list_list(afile, {1, 3, 4, 5, 9, 10}) == [['a', 'b'], ['b', 'c', 'd', 'e', 'f'], ['h', 'i', 'j', END_OF_FILE_MARK]]
+        afile = ['a', ' b', ' c', 'd', ' e', 'f', '  g', '  h', '    i', '  j']
+        assert block_list_list(afile, {2, 3, 7, 8, 10}) == [['a', ' b', ' c'], ['f', '  g', '  h', GAP_MARK, '  j'], ]
 
     def test_block_list_list_simple(self):
-        afile = ['a', 'b', ]
-        assert block_list_list(afile, {2}) == [['a', 'b', END_OF_FILE_MARK], ]
+        afile = ['a', '  b', ]
+        assert block_list_list(afile, {2}) == [['a', '  b'], ]
 
-    def test_block_1_block(self):
-        afile = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
-        assert block_list_list(afile, {1, 2, 4, 6, 7}) == [['a', 'b', 'c'], ['c', 'd', 'e'], ['e', 'f', 'g', 'h']]
+    def test_block_list_list_no_method(self):
+        afile = ['a', 'b', 'c']
+        assert block_list_list(afile, {1, 2}) == [['a', 'b', ], ]
+
+    def test_block_list_list_gap(self):
+        afile = ['a', ' b', '  c', ' d']
+        assert block_list_list(afile, {2, 4}) == [['a', ' b', GAP_MARK, ' d'], ]
+
+    def test_block_block_not_cov_method(self):
+        afile = ['a', 'b', 'm1', ' d', 'm2', '  f', '   g', '  h', 'm3', ' j']
+        assert block_list_list(afile, {4, 6, 7, 8}) == [['m1', ' d'], ['m2', '  f', '   g', '  h']]
+
+    def test_block_block_not_cov_method2(self):
+        afile = ['a', 'b', 'm1', ' d', 'm2', '  f', '   g', '  h', 'm3', ' j']
+        assert block_list_list(afile, {4, 10}) == [['m1', ' d'], ['m3', ' j']]
 
     def test_ignore_empty(self):
-        afile = ['a', '\n', 'b', 'c', 'd', 'e']
-        assert block_list_list(afile, {1, 2, 3, 5, 6}) == [['a', 'b', 'c'], ['c', 'd', 'e', END_OF_FILE_MARK]]
+        afile = ['a', '\taa', '\n', 'b', ' c', '  d', '   e']
+        assert block_list_list(afile, {2, 3, 5, 6, 7}) == [['a', '\taa'], ['b', ' c', '  d', '   e']]
+
+    def test_ignore_empty2(self):
+        afile = ['\n', '\n', 'a', '   b', '   c']
+        assert block_list_list(afile, {1, 2, 4, 5}) == [['a', '   b', '   c', ]]
 
     def test_empty(self):
         assert block_list_list(["a", ], []) == []
@@ -329,58 +348,191 @@ class TestEmentalTests():
         assert block_list_list([], []) == []
 
     def test_1_3(self):
-        assert block_list_list(['a', 'b', 'c'], [1, 3]) == [['a', 'b'], ['b', 'c', END_OF_FILE_MARK]]
+        assert block_list_list(['a', ' b', 'c'], [1, 3]) == [['a', GAP_MARK, 'c']]
 
     def test_1_34(self):
-        assert block_list_list(['a', 'b', 'c', 'd'], [1, 3, 4]) == [['a', 'b'], ['b', 'c', 'd', END_OF_FILE_MARK]]
-        pass
+        assert block_list_list(['0', ' a', ' b', 'c', 'd'], [2, 4, 5]) == [['0', ' a'], ['c', 'd']]
+
+    def test_mutliline_no_indent(self):
+        afile = ['c', ' m', '  1.1', '1.2', '1.3']
+        multiline = {3: 3, 4: 3, 5: 3}
+        assert block_list_list(afile, [3, 4, 5], multiline) == [[' m', '  1.1', '1.2', '1.3']]
+
+    def test_block_end_with_more_indents(self):
+        afile = ['m', ' 1', '  2', 't1', ' 1', 't2', ' 1']
+        assert block_list_list(afile, [2, 3, 7]) == [['m', ' 1', '  2'], ['t2', ' 1']]
+
+    def test_block_end_with_more_indents2(self):
+        afile = ['m', ' 1', '  2', 't1', ' 1']
+        assert block_list_list(afile, [2, 3, 5]) == [['m', ' 1', '  2'], ['t1', ' 1']]
+
+    def test_class_and_global_method_with_more_indents(self):
+        afile = ['gm', ' 1', '  2', 'c', ' cm', '  1']
+        assert block_list_list(afile, [2, 3, 6]) == [['gm', ' 1', '  2'], [' cm', '  1']]
+
+    def test_indentation_spaces_count(self):
+        assert get_indent_spaces_count('    a  b  ') == 4
+        assert get_indent_spaces_count('  \ta  b  ') == 8
+        assert get_indent_spaces_count('\t  a  b  ') == 10
+        assert get_indent_spaces_count('  \t  a  b  ') == 10
+        assert get_indent_spaces_count('\ta  b  ') == 8
+        assert get_indent_spaces_count('\t\ta  b  ') == 16
 
 
-class TestFileHasLines():
+class TestTheRestAfter():
 
-    def test_rest1(self):
+    def test_doesnthave1(self):
         with raises(DoesntHaveException):
-            the_rest_after([], [1])
+            match_fingerprints([], [1])
 
-    def test_rest2(self):
+    def test_doesnthave2(self):
         with raises(DoesntHaveException):
-            the_rest_after([1], [2])
+            match_fingerprints([1], [2])
 
-    def test_rest3(self):
-        assert the_rest_after([1], [1]) == [1]
+    def test_empty(self):
+        assert match_fingerprints(['1'], ['1']) == []
 
-    def test_rest4(self):
-        assert the_rest_after([1, 2, 3], [2]) == [2, 3]
+    def test_1(self):
+        assert match_fingerprints(['1', '2', '3'], ['2']) == ['3']
+
+    def test_gap(self):
+        assert match_fingerprints(['1', ' 2', ' 3', '4'], ['1', GAP_MARK]) == ['4']
+
+    def test_after_gap(self):
+        assert match_fingerprints([' 1', '2'], ['2']) == []
+
+    def test_6(self):
+        assert match_fingerprints([' 1', ' 2'], [' 2']) == []
+
+    def test_7(self):
+        assert match_fingerprints(['  1', '2', ' 3', '4'], ['2', GAP_MARK, '4']) == []
+
+    def test_9(self):
+        assert match_fingerprints(['m', '1', '2', '3'], ['m', '1', '2']) == ['3']
+
+    def test_gap_until_eof(self):
+        assert match_fingerprints(['1', ' 2'], ['1', GAP_MARK]) == []
+
+    def test_multiline_no_indent(self):
+        assert match_fingerprints(['m', '  1.1', '1.2', '  2'], ['m', '  1.1', '1.2', '  2']) == []
 
     def test_matches(self):
         required_fingerprints = [['2'], ['1', '0']]
         file_fingerprints = ['2', 'a', 'b', '1', '0']
 
-        assert file_has_lines(file_fingerprints, required_fingerprints)
+        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['a', 'b', '1', '0']
+        assert match_fingerprints(file_fingerprints, required_fingerprints[1]) == []
 
     def test_one_couple(self):
         required_fingerprints = [['1', '0']]
         file_fingerprints = ['2', 'a', 'b', '1', '0']
-        assert file_has_lines(file_fingerprints, required_fingerprints)
+        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == []
 
     def test_two_singles(self):
         required_fingerprints = [['1'], ['3']]
         file_fingerprints = ['0', '1', '2', '3', '4']
 
-        assert file_has_lines(file_fingerprints, required_fingerprints)
+        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['2', '3', '4']
+        assert match_fingerprints(file_fingerprints, required_fingerprints[1]) == ['4']
 
     def test_one_doesnt(self):
-        fingerprints = [['2'], ['1', '7']]
-        filep = ['0', '1', '2', '3', '4']
+        required_fingerprints = [['2'], ['1', '7']]
+        file_fingerprints = ['0', '1', '2', '3', '4']
 
-        assert file_has_lines(filep, fingerprints) is False
+        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['3', '4']
+        with pytest.raises(DoesntHaveException) as _:
+            match_fingerprints(file_fingerprints, required_fingerprints[1])
+
+    def test_no_change(self):
+        required_fingerprints = [['m', ' 1', ' 2']]
+        file_fingerprints = ['m', ' 1', ' 2']
+
+        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == []
+
+    def test_new_line_simple(self):
+        required_fingerprints = [['m', ' 1', ' 2']]
+        file_fingerprints = ['m', ' 1', ' 2', ' 3']
+
+        with pytest.raises(DoesntHaveException) as _:
+            match_fingerprints(file_fingerprints, required_fingerprints[0])
+
+    def test_more_methods(self):
+        required_fingerprints = [['m1', ' 1', ' 2', ]]
+        file_fingerprints = ['m1', ' 1', ' 2', ' 3', 'm2', ' 3']
+
+        with pytest.raises(DoesntHaveException) as _:
+            match_fingerprints(file_fingerprints, required_fingerprints[0])
+
+    def test_more_cov_methods(self):
+        required_fingerprints = [['m1', ' 1', ' 2'], ['m2', ' 3']]
+        file_fingerprints = ['m1', ' 1', ' 2', ' 3', 'm2', ' 3']
+
+        assert file_has_lines(file_fingerprints, required_fingerprints) is False
+        with pytest.raises(DoesntHaveException) as _:
+            match_fingerprints(file_fingerprints, required_fingerprints[0])
+        assert match_fingerprints(file_fingerprints, required_fingerprints[1]) == []
+
+    def test_more_cov_methods_reverse(self):
+        required_fingerprints = [['m1', ' 1', ' 2'], ['m2', ' 3']]
+        file_fingerprints = ['m1', ' 1', ' 2', 'm2']
+
+        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['m2']
+        with pytest.raises(DoesntHaveException) as _:
+            match_fingerprints(file_fingerprints, required_fingerprints[1])
+
+    def test_more_cov_methods_no_change(self):
+        required_fingerprints = [['m1', ' 1', ' 2'], ['m2', ' 3']]
+        file_fingerprints = ['m1', ' 1', ' 2', 'm2', ' 3']
+
+        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['m2', ' 3']
+        assert match_fingerprints(file_fingerprints, required_fingerprints[1]) == []
+
+    def test_nested_method(self):
+        required_fingerprints = [['\tm2', '\t 1', '\t 2']]
+        file_fingerprints = ['m1', '\tm2', '\t 1', '\t 2', '\t 3', '\tm3', '\t 4']
+
+        with pytest.raises(DoesntHaveException) as _:
+            match_fingerprints(file_fingerprints, required_fingerprints[0])
+
+    def test_new_line_after_indent(self):
+        required_fingerprints = [['m', ' 1', '  2']]
+        file_fingerprints = ['m', ' 1', '  2', ' 3']
+
+        with pytest.raises(DoesntHaveException) as _:
+            match_fingerprints(file_fingerprints, required_fingerprints[0])
+
+    def test_gap_no_change(self):
+        required_fingerprints = [['m', ' 1', ' 2', GAP_MARK]]
+        file_fingerprints = ['m', ' 1', ' 2', '  g1', '  g2']
+
+        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == []
+
+    def test_gap_no_change2(self):
+        required_fingerprints = [['m', ' 1', ' 2', GAP_MARK]]
+        file_fingerprints = ['m', ' 1', ' 2', '  g1', '  g2', 'm2', ' 1', ' 2']
+
+        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['m2', ' 1', ' 2']
+
+    def test_new_line_after_gap(self):
+        required_fingerprints = [['m', ' 1', ' 2', GAP_MARK]]
+        file_fingerprints = ['m', ' 1', ' 2', '  g1', '  g2', ' 3']
+
+        with pytest.raises(DoesntHaveException) as _:
+            match_fingerprints(file_fingerprints, required_fingerprints[0])
 
 
-class TestCoverageAssumptions(CoverageTest):
+class TestFileHasLines():
+    def test_remove_empty_lines(self):
+        required_fingerprints = [['m', ' 1', ' 2']]
+        file_fingerprints = ['', 'm', '     ', ' 1', ' ', '', ' 2']
+
+        assert file_has_lines(file_fingerprints, required_fingerprints) is True
+
+
+class TestCoverageAssumptions(TestmonCoverageTest):
 
     def test_easy(self):
         for name, mod_cov in code_samples.items():
             if mod_cov.expected_coverage:
-                self.tm_check_coverage(mod_cov.source_code,
-                                    tm_lines=mod_cov.expected_coverage,
-                                    msg="This is for code_sample['{}']".format(name))
+                coverage_lines = self.write_and_run(mod_cov.source_code)
+                assert sorted(coverage_lines) == mod_cov.expected_coverage, "This is for code_sample['{}']".format(name)

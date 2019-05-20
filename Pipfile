@@ -6,12 +6,14 @@ name = "pypi"
 [packages]
 pytest = "*"
 pytest-cov = "*"
-pytest-testmon = {editable = true, path = "."}
-runtime-info = {editable = true, path = "io.pyri/" }
+pytest-testmon = {path = ".",editable = true}
+runtime-info = {path = "io.pyri/",editable = true}
 
 [dev-packages]
 tox = "*"
 pydevd-pycharm = "*"
+unittest-mixins = "==1.6"
+
 
 [requires]
 python_version = "3.7"
