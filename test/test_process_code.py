@@ -370,6 +370,14 @@ class TestEmentalTests():
         afile = ['gm', ' 1', '  2', 'c', ' cm', '  1']
         assert block_list_list(afile, [2, 3, 6]) == [['gm', ' 1', '  2'], [' cm', '  1']]
 
+    def test_end_of_block_gap(self):
+        afile = ['m1', ' 1', ' 2', '  g', 'm2', ' 1']
+        assert block_list_list(afile, [2, 3]) == [['m1', ' 1', ' 2', GAP_MARK]]
+
+    def test_empty_line_after_gap(self):
+        afile = ['m1', ' 1', '  g1', '  g2', '', ' 2']
+        assert block_list_list(afile, [2, 5]) == [['m1', ' 1', GAP_MARK, ' 2']]
+
     def test_indentation_spaces_count(self):
         assert get_indent_spaces_count('    a  b  ') == 4
         assert get_indent_spaces_count('  \ta  b  ') == 8
@@ -519,6 +527,12 @@ class TestTheRestAfter():
 
         with pytest.raises(DoesntHaveException) as _:
             match_fingerprints(file_fingerprints, required_fingerprints[0])
+
+    def test_end_block_gap(self):
+        required_fingerprints = [['m1', ' 1', ' 2', GAP_MARK]]
+        file_fingerprints = ['m', ' 1', ' 2', '  g1', 'm2', ' 1', ' 2']
+
+        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['m2', ' 1', ' 2']
 
 
 class TestFileHasLines():
