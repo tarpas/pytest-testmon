@@ -209,6 +209,13 @@ def is_end_of_block(line_indent, indents):
             return True
     return False
 
+def check_end_of_gap(l2, is_last_non_blank_line_covered):
+    """
+    Check for GAP -> last non blank line is not covered
+    For reason to use 'is_last_non_blank_line_covered' see 'test_two_empty_lines_after_gap'
+    """
+    if not is_last_non_blank_line_covered:
+        l2.append(GAP_MARK)
 
 def block_list_list(afile, coverage, multilines=None):
     l2 = []
@@ -230,6 +237,7 @@ def block_list_list(afile, coverage, multilines=None):
 
         # Check for end of block if we are inside one
         if l2 and multilines.get(line_idx) is None and is_end_of_block(line_indent, indents):
+            check_end_of_gap(l2, is_last_non_blank_line_covered)
             l1.append(l2)
             l2 = []
             continue
@@ -247,10 +255,7 @@ def block_list_list(afile, coverage, multilines=None):
             is_last_non_blank_line_covered = True
             continue
 
-        # Check for GAP -> last non blank line is not covered
-        # For reason to use 'is_last_non_blank_line_covered' see 'test_two_empty_lines_after_gap'
-        if not is_last_non_blank_line_covered:
-            l2.append(GAP_MARK)
+        check_end_of_gap(l2, is_last_non_blank_line_covered)
 
         # Check indentation
         if line_indent > indents[-1]:  # Line is from new block

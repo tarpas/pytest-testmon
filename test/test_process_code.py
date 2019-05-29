@@ -351,7 +351,8 @@ class TestEmentalTests():
         assert block_list_list(['a', ' b', 'c'], [1, 3]) == [['a', GAP_MARK, 'c']]
 
     def test_1_34(self):
-        assert block_list_list(['0', ' a', ' b', 'c', 'd'], [2, 4, 5]) == [['0', ' a'], ['c', 'd']]
+        print(block_list_list(['0', ' a', '  b', 'c', 'd'], [2, 4, 5]))
+        assert block_list_list(['0', ' a', '  b', 'c', 'd'], [2, 4, 5]) == [['0', ' a', GAP_MARK], ['c', 'd']]
 
     def test_mutliline_no_indent(self):
         afile = ['c', ' m', '  1.1', '1.2', '1.3']
@@ -372,7 +373,7 @@ class TestEmentalTests():
 
     def test_end_of_block_gap(self):
         afile = ['m1', ' 1', ' 2', '  g', 'm2', ' 1']
-        assert block_list_list(afile, [2, 3]) == [['m1', ' 1', ' 2', GAP_MARK]]
+        assert [['m1', ' 1', ' 2', GAP_MARK]] == block_list_list(afile, [2, 3])
 
     def test_empty_line_after_gap(self):
         afile = ['m1', ' 1', '  g1', '  g2', '', ' 2']
@@ -534,7 +535,7 @@ class TestTheRestAfter():
 
     def test_end_block_gap(self):
         required_fingerprints = [['m1', ' 1', ' 2', GAP_MARK]]
-        file_fingerprints = ['m', ' 1', ' 2', '  g1', 'm2', ' 1', ' 2']
+        file_fingerprints = ['m1', ' 1', ' 2', '  g1', 'm2', ' 1', ' 2']
 
         assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['m2', ' 1', ' 2']
 
