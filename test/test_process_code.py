@@ -376,7 +376,11 @@ class TestEmentalTests():
 
     def test_empty_line_after_gap(self):
         afile = ['m1', ' 1', '  g1', '  g2', '', ' 2']
-        assert block_list_list(afile, [2, 5]) == [['m1', ' 1', GAP_MARK, ' 2']]
+        assert block_list_list(afile, [2, 5, 6]) == [['m1', ' 1', GAP_MARK, ' 2']]
+
+    def test_two_empty_lines_after_gap(self):
+        afile = ['m1', ' 1', '  g1', '  g2', '', '', ' 2']
+        assert  [['m1', ' 1', GAP_MARK, ' 2']] == block_list_list(afile, [2, 5, 6, 7])
 
     def test_indentation_spaces_count(self):
         assert get_indent_spaces_count('    a  b  ') == 4

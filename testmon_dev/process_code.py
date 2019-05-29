@@ -217,9 +217,9 @@ def block_list_list(afile, coverage, multilines=None):
         return l1
 
     indents = []
-
     if multilines is None:
         multilines = {}
+    is_last_non_blank_line_covered = False
 
     for (line_idx, line) in enumerate(afile, 1):
         line_indent = get_indent_spaces_count(line)
@@ -235,7 +235,8 @@ def block_list_list(afile, coverage, multilines=None):
             continue
 
         # Skip non-covered lines
-        if not (line_idx in coverage) or blank_re.match(line):
+        if not (line_idx in coverage):
+            is_last_non_blank_line_covered = False
             continue
 
         # Start of new covered block
@@ -243,10 +244,12 @@ def block_list_list(afile, coverage, multilines=None):
             add_previous_line(l2, afile, line_idx)
             indents.append(line_indent)
             l2.append(line)
+            is_last_non_blank_line_covered = True
             continue
 
-        # Check for GAP -> previous line is not covered
-        if not (line_idx - 1) in coverage:
+        # Check for GAP -> last non blank line is not covered
+        # For reason to use 'is_last_non_blank_line_covered' see 'test_two_empty_lines_after_gap'
+        if not is_last_non_blank_line_covered:
             l2.append(GAP_MARK)
 
         # Check indentation
