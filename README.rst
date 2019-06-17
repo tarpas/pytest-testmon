@@ -1,3 +1,6 @@
+.. image:: https://img.shields.io/pypi/v/pytest-testmon.svg
+    :target: https://pypi.python.org/pypi/pytest-testmon/
+
 .. image:: https://secure.travis-ci.org/tarpas/pytest-testmon.png?branch=master
    :alt: Build Status
    :target: https://travis-ci.org/tarpas/pytest-testmon
