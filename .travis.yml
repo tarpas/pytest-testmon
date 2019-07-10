@@ -10,6 +10,8 @@ cache:
 
 matrix:
   include:
+    - env: TOXENV=py37-pytest50
+      python: 3.7
     - env: TOXENV=py37-pytest45
       python: 3.7
     - env: TOXENV=py37-pytest41
