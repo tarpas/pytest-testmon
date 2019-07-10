@@ -22,7 +22,10 @@ setup(
             'testmon = testmon.tox_testmon',
         ],
     },
-    install_requires=['pytest>=2.8.0,<5', 'coverage>=4,<5'],
+    install_requires=[
+        'pytest>=2.8.0,<6',
+        'coverage>=4,<5',
+    ],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
@@ -32,5 +35,6 @@ setup(
         'Topic :: Software Development :: Testing',
         'Topic :: Software Development :: Libraries',
         'Topic :: Utilities',
-        'Programming Language :: Python', ],
+        'Programming Language :: Python',
+    ],
 )
