@@ -259,7 +259,7 @@ def test_add():
 
         result = testdir.runpytest("--testmon", "-v", "--tlf")
         result.stdout.fnmatch_lines([
-            "*1 failed in*",
+            "*1 failed*",
         ])
 
     def test_easy(self, testdir):
