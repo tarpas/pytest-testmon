@@ -14,17 +14,13 @@ matrix:
       python: 3.7
     - env: TOXENV=py37-pytest45
       python: 3.7
-    - env: TOXENV=py37-pytest41
-      python: 3.7
     - env: TOXENV=py37-pytest45-xdist
       python: 3.7
     - env: TOXENV=py37-pytestmaster
       python: 3.7
     - env: TOXENV=py37-pytestfeatures
       python: 3.7
-    - env: TOXENV=py35-pytest41
-      python: 3.5
-    - env: TOXENV=py27-pytest41
+    - env: TOXENV=py27-pytest45
       python: 2.7
 
 install:
