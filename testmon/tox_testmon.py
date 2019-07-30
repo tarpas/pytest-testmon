@@ -23,7 +23,7 @@ hookimpl = pluggy.HookimplMarker("tox")
 def _uses_testmon(envconfig):
     """Test if an envconfig uses testmon by looking at the command(s)."""
     for command in envconfig.commands:
-        if '--testmon' in command:
+        if '--testmon-dev' in command:
             return True
     return False
 
