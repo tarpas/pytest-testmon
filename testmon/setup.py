@@ -19,7 +19,7 @@ setup(
             'testmon = tox_testmon',
         ],
     },
-    install_requires=['pytest>=3.3.0,<4', 'coverage>=4'],
+    install_requires=['pytest>=5,<6', 'coverage>=4'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',

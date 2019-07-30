@@ -147,7 +147,7 @@ class TestmonCollect(object):
         else:
             self.testmon.start()
             result = yield
-            if result.excinfo and issubclass(result.excinfo[0], KeyboardInterrupt):
+            if result.excinfo and issubclass(result.excinfo[0], BaseException):
                 self.testmon.stop()
             else:
                 self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,

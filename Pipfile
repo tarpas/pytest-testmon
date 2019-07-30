@@ -4,11 +4,11 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-pytest = "*"
+pytest = ">=5"
 pytest-cov = "*"
-pytest-testmon-dev = {editable = true, path = "."}
-pytest-testmon = {editable = true, path = "testmon/"}
-runtime-info = {editable = true, path = "io.pyri/" }
+pytest-testmon-dev = {editable = true,path = "."}
+pytest-testmon = {editable = true,path = "testmon/"}
+runtime-info = {editable = true,path = "io.pyri/"}
 
 [dev-packages]
 tox = "*"
