@@ -392,7 +392,14 @@ class TestEmentalTests():
         assert get_indent_spaces_count('\t\ta  b  ') == 16
 
 
+UNTIL_EOF = '-1EOF'
+UNTIL_INDENT0 = '0UI'
+UNTIL_INDENT1 = '1UI'
+UNTIL_INDENT4 = '4UI'
+UNTIL_INDENT8 = '8UI'
+
 class TestTheRestAfter():
+
 
     def test_doesnthave1(self):
         with raises(DoesntHaveException):
@@ -402,142 +409,18 @@ class TestTheRestAfter():
         with raises(DoesntHaveException):
             match_fingerprints([1], [2])
 
-    def test_empty(self):
+    def test_identical(self):
         assert match_fingerprints(['1'], ['1']) == []
 
-    def test_1(self):
-        assert match_fingerprints(['1', '2', '3'], ['2']) == ['3']
+    def test_1line_dedent(self):
+        assert match_fingerprints(['1', ' 2', '3'],['1', UNTIL_INDENT0, '3'])  == []
 
-    def test_gap(self):
-        assert match_fingerprints(['1', ' 2', ' 3', '4'], ['1', GAP_MARK]) == ['4']
+    def test_2line_dedent(self):
+        assert match_fingerprints(['1', ' 2', ' 2.5', '3'],['1', UNTIL_INDENT0, '3'])  == []
 
-    def test_after_gap(self):
-        assert match_fingerprints([' 1', '2'], ['2']) == []
+    def test_eof(self):
+        assert match_fingerprints(['1', '2', '3'], ['1', UNTIL_EOF]) == []
 
-    def test_6(self):
-        assert match_fingerprints([' 1', ' 2'], [' 2']) == []
-
-    def test_7(self):
-        assert match_fingerprints(['  1', '2', ' 3', '4'], ['2', GAP_MARK, '4']) == []
-
-    def test_9(self):
-        assert match_fingerprints(['m', '1', '2', '3'], ['m', '1', '2']) == ['3']
-
-    def test_gap_until_eof(self):
-        assert match_fingerprints(['1', ' 2'], ['1', GAP_MARK]) == []
-
-    def test_multiline_no_indent(self):
-        assert match_fingerprints(['m', '  1.1', '1.2', '  2'], ['m', '  1.1', '1.2', '  2']) == []
-
-    def test_matches(self):
-        required_fingerprints = [['2'], ['1', '0']]
-        file_fingerprints = ['2', 'a', 'b', '1', '0']
-
-        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['a', 'b', '1', '0']
-        assert match_fingerprints(file_fingerprints, required_fingerprints[1]) == []
-
-    def test_one_couple(self):
-        required_fingerprints = [['1', '0']]
-        file_fingerprints = ['2', 'a', 'b', '1', '0']
-        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == []
-
-    def test_two_singles(self):
-        required_fingerprints = [['1'], ['3']]
-        file_fingerprints = ['0', '1', '2', '3', '4']
-
-        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['2', '3', '4']
-        assert match_fingerprints(file_fingerprints, required_fingerprints[1]) == ['4']
-
-    def test_one_doesnt(self):
-        required_fingerprints = [['2'], ['1', '7']]
-        file_fingerprints = ['0', '1', '2', '3', '4']
-
-        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['3', '4']
-        with pytest.raises(DoesntHaveException) as _:
-            match_fingerprints(file_fingerprints, required_fingerprints[1])
-
-    def test_no_change(self):
-        required_fingerprints = [['m', ' 1', ' 2']]
-        file_fingerprints = ['m', ' 1', ' 2']
-
-        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == []
-
-    def test_new_line_simple(self):
-        required_fingerprints = [['m', ' 1', ' 2']]
-        file_fingerprints = ['m', ' 1', ' 2', ' 3']
-
-        with pytest.raises(DoesntHaveException) as _:
-            match_fingerprints(file_fingerprints, required_fingerprints[0])
-
-    def test_more_methods(self):
-        required_fingerprints = [['m1', ' 1', ' 2', ]]
-        file_fingerprints = ['m1', ' 1', ' 2', ' 3', 'm2', ' 3']
-
-        with pytest.raises(DoesntHaveException) as _:
-            match_fingerprints(file_fingerprints, required_fingerprints[0])
-
-    def test_more_cov_methods(self):
-        required_fingerprints = [['m1', ' 1', ' 2'], ['m2', ' 3']]
-        file_fingerprints = ['m1', ' 1', ' 2', ' 3', 'm2', ' 3']
-
-        assert file_has_lines(file_fingerprints, required_fingerprints) is False
-        with pytest.raises(DoesntHaveException) as _:
-            match_fingerprints(file_fingerprints, required_fingerprints[0])
-        assert match_fingerprints(file_fingerprints, required_fingerprints[1]) == []
-
-    def test_more_cov_methods_reverse(self):
-        required_fingerprints = [['m1', ' 1', ' 2'], ['m2', ' 3']]
-        file_fingerprints = ['m1', ' 1', ' 2', 'm2']
-
-        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['m2']
-        with pytest.raises(DoesntHaveException) as _:
-            match_fingerprints(file_fingerprints, required_fingerprints[1])
-
-    def test_more_cov_methods_no_change(self):
-        required_fingerprints = [['m1', ' 1', ' 2'], ['m2', ' 3']]
-        file_fingerprints = ['m1', ' 1', ' 2', 'm2', ' 3']
-
-        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['m2', ' 3']
-        assert match_fingerprints(file_fingerprints, required_fingerprints[1]) == []
-
-    def test_nested_method(self):
-        required_fingerprints = [['\tm2', '\t 1', '\t 2']]
-        file_fingerprints = ['m1', '\tm2', '\t 1', '\t 2', '\t 3', '\tm3', '\t 4']
-
-        with pytest.raises(DoesntHaveException) as _:
-            match_fingerprints(file_fingerprints, required_fingerprints[0])
-
-    def test_new_line_after_indent(self):
-        required_fingerprints = [['m', ' 1', '  2']]
-        file_fingerprints = ['m', ' 1', '  2', ' 3']
-
-        with pytest.raises(DoesntHaveException) as _:
-            match_fingerprints(file_fingerprints, required_fingerprints[0])
-
-    def test_gap_no_change(self):
-        required_fingerprints = [['m', ' 1', ' 2', GAP_MARK]]
-        file_fingerprints = ['m', ' 1', ' 2', '  g1', '  g2']
-
-        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == []
-
-    def test_gap_no_change2(self):
-        required_fingerprints = [['m', ' 1', ' 2', GAP_MARK]]
-        file_fingerprints = ['m', ' 1', ' 2', '  g1', '  g2', 'm2', ' 1', ' 2']
-
-        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['m2', ' 1', ' 2']
-
-    def test_new_line_after_gap(self):
-        required_fingerprints = [['m', ' 1', ' 2', GAP_MARK]]
-        file_fingerprints = ['m', ' 1', ' 2', '  g1', '  g2', ' 3']
-
-        with pytest.raises(DoesntHaveException) as _:
-            match_fingerprints(file_fingerprints, required_fingerprints[0])
-
-    def test_end_block_gap(self):
-        required_fingerprints = [['m1', ' 1', ' 2', GAP_MARK]]
-        file_fingerprints = ['m1', ' 1', ' 2', '  g1', 'm2', ' 1', ' 2']
-
-        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['m2', ' 1', ' 2']
 
 
 class TestFileHasLines():
