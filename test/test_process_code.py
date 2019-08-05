@@ -392,14 +392,11 @@ class TestEmentalTests():
         assert get_indent_spaces_count('\t\ta  b  ') == 16
 
 
-UNTIL_EOF = '-1EOF'
-UNTIL_INDENT0 = '0UI'
-UNTIL_INDENT1 = '1UI'
-UNTIL_INDENT4 = '4UI'
-UNTIL_INDENT8 = '8UI'
+GAP_UNTIL_DEDENT = '-1GAP'
+INDETED_GAP = '0GAP'
+
 
 class TestTheRestAfter():
-
 
     def test_doesnthave1(self):
         with raises(DoesntHaveException):
@@ -413,14 +410,19 @@ class TestTheRestAfter():
         assert match_fingerprints(['1'], ['1']) == []
 
     def test_1line_dedent(self):
-        assert match_fingerprints(['1', ' 2', '3'],['1', UNTIL_INDENT0, '3'])  == []
+        assert match_fingerprints(['1', ' 2', '3'], ['1', INDETED_GAP, '3']) == []
 
     def test_2line_dedent(self):
-        assert match_fingerprints(['1', ' 2', ' 2.5', '3'],['1', UNTIL_INDENT0, '3'])  == []
+        assert match_fingerprints(['1', ' 2', ' 2.5', '3'], ['1', INDETED_GAP, '3']) == []
 
-    def test_eof(self):
-        assert match_fingerprints(['1', '2', '3'], ['1', UNTIL_EOF]) == []
+    def test_gap_until_dedent(self):
+        assert match_fingerprints(['1', ' 2', ' 3', '4'], ['1', ' 2', GAP_UNTIL_DEDENT, '4']) == []
 
+    def test_eof_i(self):
+        assert match_fingerprints(['1', '2', '3'], ['1', GAP_UNTIL_DEDENT]) == []
+
+    def test_eof_d(self):
+        assert match_fingerprints(['1', ' 2'], ['1', INDETED_GAP]) == []
 
 
 class TestFileHasLines():
