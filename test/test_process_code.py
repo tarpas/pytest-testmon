@@ -393,7 +393,7 @@ class TestEmentalTests():
 
 
 GAP_UNTIL_DEDENT = '-1GAP'
-INDETED_GAP = '0GAP'
+INDENTED_GAP = '0GAP'
 
 
 class TestTheRestAfter():
@@ -410,10 +410,10 @@ class TestTheRestAfter():
         assert match_fingerprints(['1'], ['1']) == []
 
     def test_1line_dedent(self):
-        assert match_fingerprints(['1', ' 2', '3'], ['1', INDETED_GAP, '3']) == []
+        assert match_fingerprints(['1', ' 2', '3'], ['1', INDENTED_GAP, '3']) == []
 
     def test_2line_dedent(self):
-        assert match_fingerprints(['1', ' 2', ' 2.5', '3'], ['1', INDETED_GAP, '3']) == []
+        assert match_fingerprints(['1', ' 2', ' 2.5', '3'], ['1', INDENTED_GAP, '3']) == []
 
     def test_gap_until_dedent(self):
         assert match_fingerprints(['1', ' 2', ' 3', '4'], ['1', ' 2', GAP_UNTIL_DEDENT, '4']) == []
@@ -422,7 +422,7 @@ class TestTheRestAfter():
         assert match_fingerprints(['1', '2', '3'], ['1', GAP_UNTIL_DEDENT]) == []
 
     def test_eof_d(self):
-        assert match_fingerprints(['1', ' 2'], ['1', INDETED_GAP]) == []
+        assert match_fingerprints(['1', ' 2'], ['1', INDENTED_GAP]) == []
 
 
 class TestFileHasLines():
