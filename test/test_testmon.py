@@ -641,7 +641,7 @@ def test_add():
 
         deps = track_it(testdir, func)
 
-        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath): [['def test_1():', '    a=1']]} == deps
+        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath): ['def test_1():', '    a=1']} == deps
 
     @pytest.mark.xfail
     def test_testmon_recursive(self, testdir, monkeypatch):

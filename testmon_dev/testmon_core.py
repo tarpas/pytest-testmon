@@ -231,13 +231,8 @@ class TestmonData(object):
             if os.path.exists(filename):
                 module = self.source_tree.get_file(relfilename)
                 covered = set(cov.get_data().lines(filename))
-                statements, executed, multiline = self._parse_source(covered, module.source_code)
-
                 result[relfilename] = block_list_list(module.lines,
-                                                      human_coverage(module.source_code,
-                                                                     sorted(statements),
-                                                                     sorted(statements - executed)),  #checksum_coverage(self.source_tree.get_file(relfilename).blocks, lines)
-                                                      multiline)
+                                                      covered)
         if not result:  # when testmon kicks-in the test module is already imported. If the test function is skipped
             # coverage_data is empty. However, we need to write down, that we depend on the
             # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)

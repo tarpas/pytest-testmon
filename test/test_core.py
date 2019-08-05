@@ -76,17 +76,15 @@ class TestGeneral(object):
 
 class TestDepGraph():
     def test_dep_graph1(self):
-        assert is_dependent({'a.py': [['1', '2']]}, {'a.py': ['1', '2', '3']}) == False
+        assert is_dependent({'a.py': ['1', '2', '3']}, {'a.py': ['1', '2', '3']}) == False
 
     def test_dep_graph_new(self):
-        assert is_dependent({'a.py': [['101', '102']]}, {'new.py': get_modules(['101', '102', '3']),
-                                                   'a.py': get_modules(['101', '102', '3'])}) == False
+        assert is_dependent({'a.py': ['101', '102', '3']},
+                            {'new.py': get_modules(['101', '102', '3']),
+                             'a.py': get_modules(['101', '102', '3'])}) == False
 
     def test_dep_graph2(self):
-        assert is_dependent({'a.py': [['101', '102']]}, {'a.py': get_modules(['101', '102'])}) == False
-
-    def test_dep_graph3(self):
-        assert is_dependent({'a.py': [['101', '102']]}, {'a.py': get_modules(['101', '102', '103'])}) == False
+        assert is_dependent({'a.py': ['101', '102']}, {'a.py': get_modules(['101', '102'])}) == False
 
     def test_dep_graph4(self):
         assert is_dependent({'a.py': [['101', '102']]}, {'a.py': get_modules(['101', '103'])}) == True
@@ -148,9 +146,9 @@ class TestDepGraph():
         changes = {'test_a.py': ['102', '103']}
 
         td = CoreTestmonData(testdir.tmpdir.strpath)
-        td.node_data = NodesData({'node1': {'test_a.py': [['101', '102']]},
-                                  'node2': {'test_a.py': [['102', '103']],
-                                            'test_b.py': [['200', '201']]}})
+        td.node_data = NodesData({'node1': {'test_a.py': ['101', '102']},
+                                  'node2': {'test_a.py': ['102', '103'],
+                                            'test_b.py': ['200', '201']}})
 
         assert set(td.file_data()) == set(['test_a.py', 'test_b.py'])
 
@@ -178,13 +176,13 @@ def get_changed_files(dependencies, changes):
 class TestStable():
     def test_nothing_changed(self):
         changed = {'a.py': ['101', '102', '103']}
-        dependencies = {'test_a.py::node1': {'test_a.py': [['201', '202']], 'a.py': [['101', '102', '103']]}}
+        dependencies = {'test_a.py::node1': {'test_a.py': [['201', '202']], 'a.py': ['101', '102', '103']}}
         assert stable(NodesData(dependencies), blockify(changed))[0] == dependencies.keys()
 
     def test_simple_change(self):
         changed = {'a.py': ['101', '102', '151']}
-        dependencies = {'test_a.py::node1': {'test_a.py': [['201', '202']], 'a.py': [['101', '102', '103']]},
-                        'test_b.py::node2': {'test_b.py': [['301', '302']], 'a.py': [['151']]}}
+        dependencies = {'test_a.py::node1': {'test_a.py': ['201', '202'], 'a.py': ['101', '102', '103']},
+                        'test_b.py::node2': {'test_b.py': ['301', '302'], 'a.py': ['101', '102', '151']}}
 
         nodes, files = stable(NodesData(dependencies), blockify(changed))
 

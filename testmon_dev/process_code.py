@@ -10,7 +10,7 @@ from coverage.parser import PythonParser
 from coverage.python import get_python_source
 
 END_OF_FILE_MARK = '=END OF FILE='
-GAP_MARK = '=GAP='
+GAP_UNTIL_INDENT = '=GAP='
 
 blank_re = re.compile(r"\s*(#|$)")
 
@@ -128,13 +128,9 @@ class Module(object):
         else:
             return self.lines
 
-    def coverage_to_fingerprints(self, coverage):
-
-        return block_list_list(self.fingerprints, coverage)
 
 
 def function_lines(node, end, name='unknown'):
-
     def _next_lineno(i, end):
         try:
             return node[i + 1].lineno - 1
@@ -154,7 +150,7 @@ def function_lines(node, end, name='unknown'):
     elif isinstance(node, list):
         for i, item in enumerate(node):
             result.extend(function_lines(item, _next_lineno(i, end)))
-        if node and name=='FunctionDef':
+        if node and name == 'FunctionDef':
             result.append((node[0].lineno, end))
     return result
 
@@ -218,37 +214,17 @@ def human_coverage(source, statements, missing):
     return result
 
 
-def create_emental(blocks):
-    blocks = blocks.copy()
-    module_level_block = blocks.pop()
-    line_numbers = set(range(1, module_level_block.end + 1))
-    for block in blocks:
-        line_numbers.difference_update(set(range(block.start, block.end + 1)))
-    return line_numbers
-
-
-def is_end_of_block(line_indent, indents):
-    # Cycle is needed due to 'test_block_end_with_more_indents2'
-    while line_indent < indents[-1]:
-        indents.pop()
-        if not indents:
-            return True
-    return False
-
-def check_end_of_gap(l2, is_last_non_blank_line_covered):
-    """
-    Check for GAP -> last non blank line is not covered
-    For reason to use 'is_last_non_blank_line_covered' see 'test_two_empty_lines_after_gap'
-    """
-    if not is_last_non_blank_line_covered:
-        l2.append(GAP_MARK)
-
-
-
 def block_list_list(afile, coverage):
     def gap_marks_until(body_start, body_end):
-        #TODO implement for real
-        return [GAP_MARK], body_end
+        while body_end < len(afile) and blank_re.match(afile[body_end]):
+            body_end += 1
+
+        # TODO implement check for subindeted multilines
+        if body_end < len(afile):
+            indent = get_indent_spaces_count(afile[body_end])
+        else:
+            indent = -1
+        return [GAP_UNTIL_INDENT, indent], body_end
 
     function_begin_ends = dict(function_lines(ast.parse("\n".join(afile)), len(afile)))
 
@@ -260,9 +236,6 @@ def block_list_list(afile, coverage):
         line_idx += 1
         line = afile[line_idx - 1]
 
-#        line_indent = get_indent_spaces_count(line)
-
-        # Skip blank lines
         if blank_re.match(line):
             continue
 
@@ -272,7 +245,6 @@ def block_list_list(afile, coverage):
             result.extend(fingerprints)
         else:
             result.append(line)
-
 
     return result
 
@@ -289,82 +261,29 @@ def get_indent_spaces_count(line):
             return space_count
 
 
-def add_previous_line(l2, afile, i):
-    i = i - 2
-    if i < 0:
-        return
+def file_has_lines(afile, fingerprints):
+    file_idx = 0
+    fingerprint_idx = 0
 
-    while blank_re.match(afile[i]):
-        i -= 1
-        if i < 0:
-            return
+    while file_idx < len(afile) and fingerprint_idx < len(fingerprints):
 
-    l2.append(afile[i])
+        if blank_re.match(afile[file_idx]):
+            file_idx += 1
+            continue
 
-
-class DoesntHaveException(Exception):
-    pass
-
-
-def get_real_subblock_length(subblock):
-    subblock_length = len(subblock)
-    if END_OF_FILE_MARK in subblock:
-        return subblock_length - 1
-    else:
-        return subblock_length
-
-
-def match_fingerprints(file_lines, fingerprints):
-    def get_indent(line_idx):
-        return get_indent_spaces_count(file_lines[line_idx])
-
-    def gap_ends(line_idx):
-        indent_before_gap = get_indent(line_idx - 1)
-        while line_idx < file_lines_count and (get_indent(line_idx) > indent_before_gap):
-            line_idx += 1
-        return line_idx
-
-    if len(file_lines) < get_real_subblock_length(fingerprints):
-        raise DoesntHaveException()
-
-    line_idx = 0
-    first_line_indent = 0
-    file_lines_count = len(file_lines)
-    subblock_idx = 0
-
-    while True:
-        # Skip all gap lines or stop at the end of file
-        if fingerprints[subblock_idx] == GAP_MARK:
-            line_idx = gap_ends(line_idx)
-
-        elif fingerprints[subblock_idx] == file_lines[line_idx]:  # Found block line
-            if line_idx == 0:
-                first_line_indent = get_indent(line_idx)
-            line_idx += 1
+        if fingerprints[fingerprint_idx] == GAP_UNTIL_INDENT:
+            fingerprint_idx += 1
+            while file_idx < len(afile) and get_indent_spaces_count(afile[file_idx]) != fingerprints[fingerprint_idx]:
+                file_idx += 1
+            fingerprint_idx += 1
         else:
-            return match_fingerprints(file_lines[1:], fingerprints)
+            if afile[file_idx] != fingerprints[fingerprint_idx]:
+                return False
 
-        subblock_idx += 1
-        if subblock_idx == len(fingerprints):
-            if (line_idx == file_lines_count or
-                    # Check correct dedent - see 'test_new_line_after_indent' and
-                    # 'test_new_line_after_gap' in 'test_process_code.py'
-                    get_indent_spaces_count(file_lines[line_idx]) <= first_line_indent):
+        file_idx += 1
+        fingerprint_idx += 1
 
-                return file_lines[line_idx:]
-            else:
-                return match_fingerprints(file_lines[1:], fingerprints)
-
-
-def file_has_lines(file_fingerprints, required_fingerprints):
-    non_empty_lines = []
-    for e in file_fingerprints:
-        if not blank_re.match(e):
-            non_empty_lines.append(e)
-
-    try:
-        for rf in required_fingerprints:
-            non_empty_lines = match_fingerprints(non_empty_lines, rf)
+    if file_idx >= len(afile) and fingerprint_idx >= len(fingerprints):
         return True
-    except DoesntHaveException:
+    else:
         return False

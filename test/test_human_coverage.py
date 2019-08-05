@@ -3,7 +3,7 @@ import ast
 
 from test.coveragepy.coveragetest import CoverageTest
 from coverage import env
-from testmon_dev.process_code import human_coverage, Module, GAP_MARK, function_lines
+from testmon_dev.process_code import human_coverage, Module, GAP_UNTIL_INDENT, function_lines, block_list_list
 import textwrap
 from coverage import coverage
 from coverage.parser import PythonParser
@@ -46,7 +46,7 @@ class TestmonCoverageTest(CoverageTest):
 
         assert hc == lines
         if fingerprints:
-            assert m.coverage_to_fingerprints(hc) == fingerprints
+            assert block_list_list(m.lines, hc) == fingerprints
 
 
 class BasicTestmonCoverageTest(TestmonCoverageTest):
@@ -62,7 +62,7 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
         d = 6
         """,
                                   [1, 2, 3, 4, 5, 6],
-                                  fingerprints=[['a = 1', 'b = 2', 'c = 4', 'd = 6',]],)
+                                  fingerprints=['a = 1', 'b = 2', 'c = 4', 'd = 6',],)
 
     def test_indentation_wackiness(self):
         # Partial final lines are OK.
@@ -114,7 +114,7 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
             c = 1
             """,
                                   [1, 2, 4],
-                                  fingerprints=['a = 1', 'def b():', GAP_MARK, 'c = 1', ],
+                                  fingerprints=['a = 1', 'def b():', GAP_UNTIL_INDENT, 0, 'c = 1', ],
                                   )
 
 
