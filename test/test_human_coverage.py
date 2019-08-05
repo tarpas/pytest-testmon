@@ -3,12 +3,50 @@ import ast
 
 from test.coveragepy.coveragetest import CoverageTest
 from coverage import env
-from testmon_dev.process_code import human_coverage, Module, GAP_UNTIL_INDENT, function_lines, block_list_list
+from testmon_dev.process_code import Module, GAP_UNTIL_INDENT, function_lines, block_list_list
 import textwrap
 from coverage import coverage
 from coverage.parser import PythonParser
 import sys
 from os.path import abspath
+
+# delete?
+import re
+blank_re = re.compile(r"\s*(#|$)")
+else_finally_re = re.compile(r"\s*(else|finally)\s*:\s*(#|$)")
+
+def human_coverage(source, statements, missing):
+    result = set()
+
+    i = 0
+    j = 0
+    covered = True
+    for lineno, line in enumerate(source.splitlines(True), start=1):
+        while i < len(statements) and statements[i] < lineno:
+            i += 1
+        while j < len(missing) and missing[j] < lineno:
+            j += 1
+        if i < len(statements) and statements[i] == lineno:
+            covered = j >= len(missing) or missing[j] > lineno
+        if blank_re.match(line):
+            result.add(lineno)
+        if else_finally_re.match(line):
+            # Special logic for lines containing only 'else:'.
+            if i >= len(statements) or j >= len(missing):
+                result.add(lineno)
+            elif statements[i] == missing[j]:
+                pass
+            else:
+                result.add(lineno)
+        elif covered:
+            result.add(lineno)
+        else:
+            pass
+
+    return result
+
+
+
 
 
 class TestmonCoverageTest(CoverageTest):

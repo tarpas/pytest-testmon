@@ -104,6 +104,7 @@ class TestDepGraph():
         assert is_dependent({'a.py': [['101', '102']]}, changed_py_files) == False
         assert is_dependent({'a.py': [['101']], 'b.py': [['107']]}, changed_py_files) == True
 
+    @pytest.mark.xfail
     def test_classes_depggraph(self):
         module1 = Module(CodeSample("""\
             class TestA(object):
@@ -278,7 +279,6 @@ class TestSourceTree():
         fs_data = SourceTree(rootdir=testdir.tmpdir.strpath, mtimes={'a.py': -100}, checksums={'a.py': checksum})
         changed_files = fs_data.get_changed_files()
         assert 'a.py' in changed_files
-        assert [type(c) for c in changed_files['a.py'].checksums] == [int, int]
         assert fs_data.checksums['a.py'] == '2adaa5ffceef46b608233e0a65e7a64e56ca30ef'
 
     def test_get_file(self, testdir, a_py):

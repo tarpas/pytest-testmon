@@ -18,7 +18,7 @@ import textwrap
 
 import coverage
 
-from testmon_dev.process_code import checksum_coverage, read_file_with_checksum, human_coverage, block_list_list, \
+from testmon_dev.process_code import read_file_with_checksum, block_list_list, \
     file_has_lines
 from testmon_dev.process_code import Module
 
