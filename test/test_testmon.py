@@ -3,7 +3,7 @@ import sys
 
 import pytest
 from test.coveragepy import coveragetest
-from testmon_dev.process_code import Module, checksum_coverage
+from testmon_dev.process_code import Module
 from testmon_dev.testmon_core import eval_variant, NodesData
 from testmon_dev.testmon_core import Testmon as CoreTestmon
 from testmon_dev.testmon_core import TestmonData as CoreTestmonData

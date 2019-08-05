@@ -5,7 +5,7 @@ from test.test_human_coverage import TestmonCoverageTest
 
 import pytest
 
-from testmon_dev.process_code import Module, checksum_coverage, read_file_with_checksum, \
+from testmon_dev.process_code import Module, read_file_with_checksum, \
     block_list_list, file_has_lines, \
     get_indent_spaces_count, GAP_UNTIL_INDENT
 

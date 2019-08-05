@@ -8,7 +8,6 @@ import re
 
 from coverage.python import get_python_source
 
-END_OF_FILE_MARK = '=END OF FILE='
 GAP_UNTIL_INDENT = '=GAP='
 
 blank_re = re.compile(r"\s*(#|$)")
@@ -41,7 +40,6 @@ class Module(object):
             return self.lines
 
 
-
 def function_lines(node, end, name='unknown'):
     def _next_lineno(i, end):
         try:
@@ -67,28 +65,23 @@ def function_lines(node, end, name='unknown'):
     return result
 
 
-def checksum_coverage(blocks, lines):
-    result = []
-    line_index = 0
-    sorted_lines = sorted(list(lines))
-
-    for current_block in sorted(blocks, key=lambda x: x.start):
-        try:
-            while sorted_lines[line_index] < current_block.start:
-                line_index += 1
-            if sorted_lines[line_index] <= current_block.end:
-                result.append(current_block.checksum)
-        except IndexError:
-            break
-
-    return result
-
-
 def read_file_with_checksum(absfilename):
     hasher = hashlib.sha1()
     source = get_python_source(absfilename)
     hasher.update(source.encode('utf-8'))
     return source, hasher.hexdigest()
+
+
+def get_indent_spaces_count(line):
+    space_count = 0
+    for c in line:
+        if c == ' ':
+            space_count += 1
+            continue
+        elif c == '\t':
+            space_count += 8 - (space_count % 8)
+        else:
+            return space_count
 
 
 def block_list_list(afile, coverage):
@@ -126,18 +119,6 @@ def block_list_list(afile, coverage):
     return result
 
 
-def get_indent_spaces_count(line):
-    space_count = 0
-    for c in line:
-        if c == ' ':
-            space_count += 1
-            continue
-        elif c == '\t':
-            space_count += 8 - (space_count % 8)
-        else:
-            return space_count
-
-
 def file_has_lines(afile, fingerprints):
     file_idx = 0
     fingerprint_idx = 0
@@ -149,7 +130,7 @@ def file_has_lines(afile, fingerprints):
             continue
 
         if fingerprints[fingerprint_idx] == GAP_UNTIL_INDENT:
-            fingerprint_idx += 1
+            fingerprint_idx += 1 # consume the GAP_UNTIL_INDENT parameter (indent_level)
             while file_idx < len(afile) and get_indent_spaces_count(afile[file_idx]) != fingerprints[fingerprint_idx]:
                 file_idx += 1
             fingerprint_idx += 1
