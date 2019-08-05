@@ -1,4 +1,6 @@
 #  -- coding:utf8 --
+import ast
+
 from test.coveragepy.coveragetest import CoverageTest
 from coverage import env
 from testmon_dev.process_code import human_coverage, Module, GAP_MARK
@@ -13,7 +15,7 @@ class TestmonCoverageTest(CoverageTest):
 
     def write_and_run(self, text):
         modname = self.get_module_name()
-        self.make_file(modname + ".py", text)
+        filename = self.make_file(modname + ".py", text)
         # Start up coverage.py.
         cov = coverage()
         cov.erase()
@@ -21,13 +23,13 @@ class TestmonCoverageTest(CoverageTest):
         # Clean up our side effects
         del sys.modules[modname]
         coverage_lines = cov.get_data().lines(abspath(modname + ".py"))
-        return coverage_lines
+        return coverage_lines, filename
 
     def check_human_coverage(self, text, lines=None, fingerprints=None):
 
         text = textwrap.dedent(text)
 
-        coverage_lines = self.write_and_run(text)
+        coverage_lines, _ = self.write_and_run(text)
 
         m = Module(source_code=text)
 
@@ -496,3 +498,47 @@ class SimpleStatementTest(TestmonCoverageTest):
             [1,2,3,4,5,6,9,10,11],
         )
 
+
+def function_lines(node, end, name='unknown'):
+
+    def _next_lineno(i, end):
+        try:
+            return node[i + 1].lineno - 1
+        except IndexError:
+            return end
+        except AttributeError:
+            return None
+
+    result = []
+
+    if isinstance(node, ast.AST):
+        for field_name, field_value in ast.iter_fields(node):
+            result.extend(
+                function_lines(field_value,
+                               end,
+                               name=node.__class__.__name__))
+    elif isinstance(node, list):
+        for i, item in enumerate(node):
+            result.extend(function_lines(item, _next_lineno(i, end)))
+        if node and name=='FunctionDef':
+            result.append((node[0].lineno, end))
+    return result
+
+class NewTestmonCoverageTest(TestmonCoverageTest):
+
+    def parse(self, text):
+        code = textwrap.dedent(text)
+        tree = ast.parse(code)
+        return tree, len(text.splitlines())
+
+
+    def test_function_lines(self):
+        tree, line_count = self.parse(
+        """\
+            def a():
+                1
+                2
+                3
+            2
+        """)
+        assert (function_lines(tree, line_count)) == [(2, 4)]

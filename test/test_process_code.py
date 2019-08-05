@@ -553,5 +553,5 @@ class TestCoverageAssumptions(TestmonCoverageTest):
     def test_easy(self):
         for name, mod_cov in code_samples.items():
             if mod_cov.expected_coverage:
-                coverage_lines = self.write_and_run(mod_cov.source_code)
+                coverage_lines, _ = self.write_and_run(mod_cov.source_code)
                 assert sorted(coverage_lines) == mod_cov.expected_coverage, "This is for code_sample['{}']".format(name)
