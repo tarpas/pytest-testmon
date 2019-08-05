@@ -3,7 +3,7 @@ import ast
 
 from test.coveragepy.coveragetest import CoverageTest
 from coverage import env
-from testmon_dev.process_code import human_coverage, Module, GAP_MARK
+from testmon_dev.process_code import human_coverage, Module, GAP_MARK, function_lines
 import textwrap
 from coverage import coverage
 from coverage.parser import PythonParser
@@ -114,7 +114,7 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
             c = 1
             """,
                                   [1, 2, 4],
-                                  fingerprints=[['a = 1', 'def b():', GAP_MARK, 'c = 1', ]],
+                                  fingerprints=['a = 1', 'def b():', GAP_MARK, 'c = 1', ],
                                   )
 
 
@@ -498,31 +498,6 @@ class SimpleStatementTest(TestmonCoverageTest):
             [1,2,3,4,5,6,9,10,11],
         )
 
-
-def function_lines(node, end, name='unknown'):
-
-    def _next_lineno(i, end):
-        try:
-            return node[i + 1].lineno - 1
-        except IndexError:
-            return end
-        except AttributeError:
-            return None
-
-    result = []
-
-    if isinstance(node, ast.AST):
-        for field_name, field_value in ast.iter_fields(node):
-            result.extend(
-                function_lines(field_value,
-                               end,
-                               name=node.__class__.__name__))
-    elif isinstance(node, list):
-        for i, item in enumerate(node):
-            result.extend(function_lines(item, _next_lineno(i, end)))
-        if node and name=='FunctionDef':
-            result.append((node[0].lineno, end))
-    return result
 
 class NewTestmonCoverageTest(TestmonCoverageTest):
 

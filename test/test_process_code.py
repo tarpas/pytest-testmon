@@ -309,9 +309,20 @@ class TestEmentalTests():
     def test_create_emental(self):
         assert create_emental([b(2, 2), b(6, 8), b(1, 10)]) == set((1, 3, 4, 5, 9, 10))
 
+
+    def test_block_list_list1(self):
+        afile = ['def a():', ' b', ]
+        assert block_list_list(afile, {1, 2}) == ['def a():', ' b']
+
+
+    def test_block_list_list2(self):
+        afile = ['def a():', ' b', ]
+        assert block_list_list(afile, {1}) == ['def a():', GAP_MARK]
+
+
     def test_block_list_list(self):
-        afile = ['a', ' b', ' c', 'd', ' e', 'f', '  g', '  h', '    i', '  j']
-        assert block_list_list(afile, {2, 3, 7, 8, 10}) == [['a', ' b', ' c'], ['f', '  g', '  h', GAP_MARK, '  j'], ]
+        afile = ['def a():', ' b', ' c', 'def d():', ' e', 'def f():', '  g', '  def h():', '    i', '  j']
+        assert block_list_list(afile, {2, 3, 7, 8, 10}) == [['def a()', ' b', ' c', 'def d()', 'f', '  g', '  h', GAP_MARK, '  j'], ]
 
     def test_block_list_list_simple(self):
         afile = ['a', '  b', ]
