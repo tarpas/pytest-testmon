@@ -399,30 +399,31 @@ INDENTED_GAP = '0GAP'
 class TestTheRestAfter():
 
     def test_doesnthave1(self):
-        with raises(DoesntHaveException):
-            match_fingerprints([], [1])
+        assert match_fingerprints([], [1]) is False
 
     def test_doesnthave2(self):
-        with raises(DoesntHaveException):
-            match_fingerprints([1], [2])
+        assert match_fingerprints([1], [2]) is False
+
+    def test_mismatch3(self):
+        assert match_fingerprints([1, 2], [1]) is False
 
     def test_identical(self):
-        assert match_fingerprints(['1'], ['1']) == []
+        assert match_fingerprints(['1'], ['1'])
 
     def test_1line_dedent(self):
-        assert match_fingerprints(['1', ' 2', '3'], ['1', INDENTED_GAP, '3']) == []
+        assert match_fingerprints(['1', ' 2', '3'], ['1', INDENTED_GAP, '3'])
 
     def test_2line_dedent(self):
-        assert match_fingerprints(['1', ' 2', ' 2.5', '3'], ['1', INDENTED_GAP, '3']) == []
+        assert match_fingerprints(['1', ' 2', ' 2.5', '3'], ['1', INDENTED_GAP, '3'])
 
     def test_gap_until_dedent(self):
-        assert match_fingerprints(['1', ' 2', ' 3', '4'], ['1', ' 2', GAP_UNTIL_DEDENT, '4']) == []
+        assert match_fingerprints(['1', ' 2', ' 3', '4'], ['1', ' 2', GAP_UNTIL_DEDENT, '4'])
 
-    def test_eof_i(self):
-        assert match_fingerprints(['1', '2', '3'], ['1', GAP_UNTIL_DEDENT]) == []
+    def test_dedent_eof(self):
+        assert match_fingerprints(['1', '2', '3'], ['1', GAP_UNTIL_DEDENT])
 
-    def test_eof_d(self):
-        assert match_fingerprints(['1', ' 2'], ['1', INDENTED_GAP]) == []
+    def test_indent_eof(self):
+        assert match_fingerprints(['1', ' 2'], ['1', INDENTED_GAP])
 
 
 class TestFileHasLines():
