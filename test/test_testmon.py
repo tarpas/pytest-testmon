@@ -852,25 +852,6 @@ class TestLineAlgEssentialProblems:
             "*1 failed*",
         ])
 
-    @pytest.mark.xfail(True, reason="False positive.")
-    def test_add_method(self, testdir):
-        testdir.makepyfile(test_a="""
-                   def test_a():
-                       assert 1 + 2 == 3
-               """)
-        testdir.runpytest(f"--{PLUGIN_NAME}", )
-        testdir.makepyfile(test_a="""
-                   def test_a():
-                       assert 1 + 2 == 3
-                    
-                   def test_a_new():
-                       assert 2 + 2 == 4
-                """)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", )
-        result.stdout.fnmatch_lines([
-            "*1 passed, 1 deselected*",
-        ])
-
     def test_remove_method_definition(self, testdir):
         testdir.makepyfile(test_a="""
                            def test_1():
