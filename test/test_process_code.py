@@ -33,9 +33,7 @@ class TestReadSrc:
         assert read_file_with_checksum('test/samples/2lines.py')[0] == '# -*- coding: cp1250 -*-\n#2ndline\n'
 
     def test_module_with_1250(self):
-        code_repr = Module(None, 'test/samples/print1250r.py').blocks[0].code
-        assert "Str('\\xc5\\xa1')" in code_repr or "Str('š')" in Module(None, 'test/samples/print1250r.py').blocks[
-            0].code
+        Module(None, 'test/samples/print1250r.py')
 
 @pytest.mark.xfail
 class TestSourceIntoBlocks(object):
