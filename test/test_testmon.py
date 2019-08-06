@@ -1,11 +1,12 @@
 import os
 import sys
-
+from multiprocessing import Queue, Process
 import pytest
+
 from test.coveragepy import coveragetest
-from testmon_dev.process_code import Module, checksum_coverage
+from testmon_dev.process_code import Module
 from testmon_dev.testmon_core import eval_variant, NodesData
-from testmon_dev.testmon_core import Testmon as CoreTestmon
+from testmon_dev.testmon_core import Testmon as CoreTestmon, TestmonData
 from testmon_dev.testmon_core import TestmonData as CoreTestmonData
 from test.test_process_code import CodeSample
 from testmon_dev.pytest_testmon import PLUGIN_NAME
@@ -34,7 +35,7 @@ class TestVariant:
                         [pytest]
                         run_variant_expression='1'
                         """)
-        result = testdir.runpytest("-v", f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess("-v", f"--{PLUGIN_NAME}")
         result.stdout.fnmatch_lines([
             "*testmon=True, *, run variant: 1*",
         ])
@@ -44,7 +45,7 @@ class TestVariant:
                         [pytest]
                         run_variant_expression=int(1)
                         """)
-        result = testdir.runpytest("-v", f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess("-v", f"--{PLUGIN_NAME}")
         result.stdout.fnmatch_lines([
             "*testmon=True, *, run variant: 1*",
         ])
@@ -89,7 +90,7 @@ class TestVariant:
         assert eval_variant(config.getini('run_variant_expression')) == 'TEST_V:JUST_A_TEST'
 
 
-def track_it(testdir, func):
+def _track_it(queue, testdir, func):
     testmon = CoreTestmon(project_dirs=[testdir.tmpdir.strpath],
                           testmon_labels=set())
     testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
@@ -97,7 +98,16 @@ def track_it(testdir, func):
     testmon.start()
     func()
     testmon.stop_and_save(testmon_data, testdir.tmpdir.strpath, 'testnode', {})
-    return testmon_data._fetch_node_data()[0]['testnode']
+
+    queue.put(testmon_data._fetch_node_data()[0]['testnode'])
+
+
+def track_it(testdir, func):
+    queue = Queue()
+    p = Process(target=_track_it, args=(queue, testdir, func))
+    p.start()
+    p.join()
+    return queue.get()
 
 
 class TestmonDeselect(object):
@@ -108,7 +118,7 @@ class TestmonDeselect(object):
             def test_add():
                 pass
         """)
-        testdir.inline_run([f"--{PLUGIN_NAME}", ])
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
 
     def test_simple_change(self, testdir):
         testdir.makepyfile(test_a="""
@@ -116,7 +126,7 @@ class TestmonDeselect(object):
                 assert 1 + 2 == 3
                     """)
 
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", )
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
         result.stdout.fnmatch_lines([
             "*1 passed*",
         ])
@@ -126,7 +136,8 @@ class TestmonDeselect(object):
                 assert 1 + 2 + 3 == 6
                     """)
         test_a.setmtime(1424880935)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", )
+
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
         result.stdout.fnmatch_lines([
             "*passed*",
         ])
@@ -136,9 +147,10 @@ class TestmonDeselect(object):
             def test_add():
                 pass
         """, )
-        reprec = testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
-        res = reprec.countoutcomes()
-        assert tuple(res) == (1, 0, 0), res
+
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
+        result.assert_outcomes(1, 0, 0)
+
         sys.modules.pop('test_a', None)
 
         tf = testdir.makepyfile(test_a="""
@@ -146,9 +158,8 @@ class TestmonDeselect(object):
                 1/0
         """, )
         tf.setmtime(1424880936)
-        reprec = testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
-        res = reprec.countoutcomes()
-        assert tuple(res) == (0, 0, 1), res
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
+        result.assert_outcomes(0, 0, 1)
         sys.modules.pop('test_a', None)
 
         tf = testdir.makepyfile(test_a="""
@@ -156,9 +167,9 @@ class TestmonDeselect(object):
                 blas
         """, )
         tf.setmtime(1424880937)
-        reprec = testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
-        res = reprec.countoutcomes()
-        assert tuple(res) == (0, 0, 1), res
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
+        result.assert_outcomes(0, 0, 1)
+
         sys.modules.pop('test_a', None)
 
         tf = testdir.makepyfile(test_a="""
@@ -166,9 +177,8 @@ class TestmonDeselect(object):
                 pass
         """, )
         tf.setmtime(1424880938)
-        reprec = testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
-        res = reprec.countoutcomes()
-        assert tuple(res) == (1, 0, 0), res
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
+        result.assert_outcomes(1, 0, 0)
         sys.modules.pop('test_a', None)
 
     def test_fantom_failure(self, testdir):
@@ -176,18 +186,17 @@ class TestmonDeselect(object):
             def test_add():
                 1/0
         """, )
-        testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
 
         tf = testdir.makepyfile(test_a="""
             def test_add():
                 pass
         """, )
         tf.setmtime(1)
-        testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
 
-        reprec = testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
-        res = reprec.countoutcomes()
-        assert tuple(res) == (0, 0, 0), res
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
+        result.assert_outcomes(0, 0, 0)
 
     def test_skipped(self, testdir):
         testdir.makepyfile(test_a="""
@@ -196,7 +205,7 @@ class TestmonDeselect(object):
             def test_add():
                 1/0
         """, )
-        testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
         testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
         testmon_data.read_data()
         assert testmon_data.node_data['test_a.py::test_add']['test_a.py']
@@ -209,7 +218,7 @@ class TestmonDeselect(object):
             def test_add():
                 1/0
         """, )
-        testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
         testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
         testmon_data.read_data()
         assert testmon_data.node_data['test_a.py::test_add']['test_a.py']
@@ -225,7 +234,7 @@ def test_add():
     1/0
         """, )
         tf.setmtime(1)
-        testdir.inline_run(f"--{PLUGIN_NAME}", "-v", "tests")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v", "tests")
 
         testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
         testmon_data.read_data()
@@ -238,7 +247,7 @@ def test_add():
             def test_add():
                 1/0
         """, )
-        testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
         testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
         testmon_data.read_data()
         assert len(testmon_data.fail_reports['test_a.py::test_add']) == 3
@@ -250,7 +259,7 @@ def test_add():
                 1/0/0
         """, )
         tf.setmtime(1)
-        testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
 
         testmon_data.read_data()
         assert len(testmon_data.fail_reports['test_a.py::test_add']) == 0
@@ -261,7 +270,7 @@ def test_add():
                 1/0
         """, )
         tf.setmtime(2)
-        testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
 
         testmon_data.read_data()
         assert len(testmon_data.fail_reports['test_a.py::test_add']) == 3
@@ -271,14 +280,14 @@ def test_add():
             def test_add():
                 1/0
         """, )
-        testdir.inline_run(f"--{PLUGIN_NAME}", "-v")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
 
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", "-v")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
         result.stdout.fnmatch_lines([
             "*1 failed, 1 deselected*",
         ])
 
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", "-v", f"--{PLUGIN_NAME}-tlf")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v", f"--{PLUGIN_NAME}-tlf")
         result.stdout.fnmatch_lines([
             "*1 failed in*",
         ])
@@ -291,7 +300,7 @@ def test_add():
             def add(a, b):
                 return a + b
         """)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", "--tb=long", "-v")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "--tb=long", "-v")
         result.stdout.fnmatch_lines([
             "*test_a.py::test_add PASSED*",
         ])
@@ -304,7 +313,7 @@ def test_add():
              def test_2():
                  2
          """)
-        testdir.runpytest(f"--{PLUGIN_NAME}")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
 
         tf = testdir.makepyfile(test_a="""
              def test_1():
@@ -315,10 +324,9 @@ def test_add():
          """)
         os.utime(datafilename, (1800000000, 1800000000))
         tf.setmtime(1800000000)
-        try:
-            testdir.runpytest(f"--{PLUGIN_NAME}", )
-        except:
-            pass
+
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
+
         # interrupted run shouldn't save .testmondata
         assert 1800000000 == os.path.getmtime(datafilename)
 
@@ -330,7 +338,7 @@ def test_add():
              def test_2():
                  2
          """)
-        testdir.runpytest(f"--{PLUGIN_NAME}")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
 
         tf = testdir.makepyfile(test_a="""
              def test_1():
@@ -342,7 +350,7 @@ def test_add():
          """)
         os.utime(datafilename, (1800000000, 1800000000))
         tf.setmtime(1800000000)
-        testdir.runpytest(f"--{PLUGIN_NAME}", )
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         # interrupted run shouldn't save .testmondata
         assert 1800000000 == os.path.getmtime(datafilename)
 
@@ -369,14 +377,14 @@ def test_add():
         Module(cs2.source_code)
 
         test_a = testdir.makepyfile(test_a=cs1.source_code)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", "test_a.py::TestA::test_one", )
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "test_a.py::TestA::test_one", )
         result.stdout.fnmatch_lines([
             "*1 passed*",
         ])
 
         testdir.makepyfile(test_a=cs2.source_code)
         test_a.setmtime(1424880935)
-        result = testdir.runpytest("-v", "--collectonly", f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess("-v", "--collectonly", f"--{PLUGIN_NAME}")
         result.stdout.fnmatch_lines([
             "*1 deselected*",
         ])
@@ -394,7 +402,7 @@ def test_add():
         """)
 
         testdir.makepyfile(test_a=cs1.source_code)
-        result = testdir.runpytest("-v", f"--{PLUGIN_NAME}", "test_a.py::TestA::test_one")
+        result = testdir.runpytest_subprocess("-v", f"--{PLUGIN_NAME}", "test_a.py::TestA::test_one")
         result.stdout.fnmatch_lines([
             "*1 passed*",
         ])
@@ -411,7 +419,7 @@ def test_add():
         """)
         testdir.makepyfile(test_a=cs2.source_code)
 
-        result = testdir.runpytest("-vv", "--collectonly", f"--{PLUGIN_NAME}", )
+        result = testdir.runpytest_subprocess("-vv", "--collectonly", f"--{PLUGIN_NAME}", )
         result.stdout.fnmatch_lines([
             "*test_one*",
         ])
@@ -465,16 +473,16 @@ def test_add():
                 assert add(2, 3) == 5
                 assert multiply(2, 3) == 6
         """)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", )
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         result.stdout.fnmatch_lines([
             "*5 passed*",
         ])
-        result = testdir.runpytest(f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
         result.stdout.fnmatch_lines([
             "*collected 0 items*",
         ])
         a.setmtime(1424880935)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
         result.stdout.fnmatch_lines([
             "*5 deselected*",
         ])
@@ -528,16 +536,16 @@ def test_add():
                 assert add(2, 3) == 5
                 assert multiply(2, 3) == 6
         """)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", )
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         result.stdout.fnmatch_lines([
             "*5 passed*",
         ])
-        result = testdir.runpytest(f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
         result.stdout.fnmatch_lines([
             "*collected 0 items*",
         ])
         a.setmtime(1424880935)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
         result.stdout.fnmatch_lines([
             "*5 deselected*",
         ])
@@ -555,7 +563,7 @@ def test_add():
                 assert add(1, 2) == 3
                     """)
 
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", )
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         result.stdout.fnmatch_lines([
             "*1 passed*",
         ])
@@ -565,7 +573,7 @@ def test_add():
                 return a + b + 0
         """)
         a.setmtime(1424880935)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", )
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         result.stdout.fnmatch_lines([
             "*passed*",
         ])
@@ -579,7 +587,7 @@ def test_add():
                 def test_add(self):
                     pass
         """)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", )
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         result.stdout.fnmatch_lines([
             "*1 skipped*",
         ])
@@ -589,14 +597,13 @@ def test_add():
             def test_pass():
                 pass
         """)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
         assert result.ret == 0
 
         # Now change the data version and check py.test then refuses to run
-        from testmon_dev.testmon_core import TestmonData
         monkeypatch.setattr(TestmonData, 'DATA_VERSION', TestmonData.DATA_VERSION + 1)
-
         result = testdir.runpytest(f"--{PLUGIN_NAME}")
+
         assert result.ret != 0
         result.stderr.fnmatch_lines([
             "*The stored data file *{} version ({}) is not compatible with current version ({}).*".format(
@@ -616,7 +623,7 @@ def test_add():
                 pass
         """)
 
-        result = testdir.runpytest(f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
         assert result.ret == 0
 
         testdir.makepyfile(test_b="""
@@ -626,7 +633,7 @@ def test_add():
                 pass
         """)
 
-        result = testdir.runpytest(f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
         assert result.ret == 0
         result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
 
@@ -640,7 +647,6 @@ def test_add():
             testdir.runpytest("test_a.py")
 
         deps = track_it(testdir, func)
-
         assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath): [['def test_1():', '    a=1']]} == deps
 
     @pytest.mark.xfail
@@ -651,13 +657,12 @@ def test_add():
         """)
 
         def func():
-            testdir.runpytest("test_a.py", f"--{PLUGIN_NAME}", "--capture=no")
+            testdir.runpytest_subprocess("test_a.py", f"--{PLUGIN_NAME}", "--capture=no")
 
         deps = track_it(testdir, func)
         # os.environ.pop('COVERAGE_TEST_TRACER', None)
 
-        assert {os.path.abspath(a.strpath):
-                    checksum_coverage(Module(file_name=a.strpath).blocks, [2])} == deps
+        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath): [['def test_1():', '    a=1']]} == deps
 
     def test_run_dissapearing(self, testdir):
         a = testdir.makepyfile(a="""\
@@ -677,10 +682,7 @@ def test_add():
         assert os.path.relpath(a.strpath, testdir.tmpdir.strpath) in deps
         assert len(deps) == 1
 
-        del sys.modules['a']
-
     def test_report_roundtrip(self, testdir):
-
         class PlugRereport:
             def pytest_runtest_protocol(self, item, nextitem):
                 hook = getattr(item.ihook, 'pytest_runtest_logreport')
@@ -707,7 +709,7 @@ def test_add():
                 pass
         """)
 
-        result = testdir.runpytest(f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
         assert result.ret == 0
 
         testdir.makepyfile(test_b="""
@@ -717,7 +719,7 @@ def test_add():
                 pass
         """)
 
-        result = testdir.runpytest(f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
         assert result.ret == 0
         result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
 
@@ -733,8 +735,8 @@ def test_add():
                 raise Exception()
         """)
 
-        hook_recorder = testdir.runpytest_inprocess(f"--{PLUGIN_NAME}")
-        assert hook_recorder.reprec.countoutcomes() == [1, 0, 1]
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
+        result.assert_outcomes(1, 0, 1)
 
         tf = testdir.makepyfile(test_b="""
             import test_a
@@ -742,9 +744,10 @@ def test_add():
                 pass
         """)
         tf.setmtime(1)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", f"--{PLUGIN_NAME}-tlf")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", f"--{PLUGIN_NAME}-tlf")
         assert result.ret == 0
-        assert result.reprec.countoutcomes() == [1, 0, 0]
+        result.assert_outcomes(1, 0, 0)
+
         result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
 
     def test_dependent_testmodule_collect_ignore_error(self, testdir):
@@ -761,7 +764,7 @@ def test_add():
                 test_a.a()
                 pass
                         """)
-        testdir.runpytest_inprocess(f"--{PLUGIN_NAME}")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
 
         tf = testdir.makepyfile(test_b="""
             import test_a
@@ -771,7 +774,7 @@ def test_add():
                 pass
         """)
         tf.setmtime(1)
-        result = testdir.runpytest_inprocess(f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
         result.stdout.fnmatch_lines(["*1 passed, 1 deselected*", ])
 
     def test_collection_not_abort(self, testdir):
@@ -783,7 +786,7 @@ def test_add():
                 assert False
                 """)
 
-        testdir.runpytest(f"--{PLUGIN_NAME}")
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
 
         tf = testdir.makepyfile(test_collection_not_abort="""
             def test_1():
@@ -794,7 +797,7 @@ def test_add():
         """)
         tf.setmtime(1)
 
-        result = testdir.runpytest("-v", f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess("-v", f"--{PLUGIN_NAME}")
 
         result.stdout.fnmatch_lines(["*test_collection_not_abort.py::test_2 FAILED*", ])
 
@@ -810,11 +813,11 @@ def test_add():
                 assert 1        
         """)
 
-        hook_recorder = testdir.runpytest_inprocess(f"--{PLUGIN_NAME}")
-        assert hook_recorder.reprec.countoutcomes() == [0, 0, 1]
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
+        result.assert_outcomes(passed=0, skipped=0, failed=0, error=1)
 
-        result = testdir.runpytest(f"--{PLUGIN_NAME}")
-        assert result.reprec.countoutcomes() == [0, 0, 1]
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
+        result.assert_outcomes(passed=0, skipped=0, failed=0, error=1)
         result.stdout.fnmatch_lines(["*1 error*", ])
 
 
@@ -825,13 +828,13 @@ class TestLineAlgEssentialProblems:
             def test_a():
                 assert 1 + 2 == 3
         """)
-        testdir.runpytest(f"--{PLUGIN_NAME}", )
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         testdir.makepyfile(test_a="""
             def test_a():
                 1/0
                 assert 1 + 2 == 3
         """)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", )
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         result.stdout.fnmatch_lines([
             "*1 failed*",
         ])
@@ -841,13 +844,13 @@ class TestLineAlgEssentialProblems:
                    def test_a():
                        assert 1 + 2 == 3
                """)
-        testdir.runpytest(f"--{PLUGIN_NAME}", )
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         testdir.makepyfile(test_a="""
                    def test_a():
                        assert 1 + 2 == 3
                        1/0
                 """)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", )
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         result.stdout.fnmatch_lines([
             "*1 failed*",
         ])
@@ -858,7 +861,7 @@ class TestLineAlgEssentialProblems:
                    def test_a():
                        assert 1 + 2 == 3
                """)
-        testdir.runpytest(f"--{PLUGIN_NAME}", )
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         testdir.makepyfile(test_a="""
                    def test_a():
                        assert 1 + 2 == 3
@@ -866,7 +869,7 @@ class TestLineAlgEssentialProblems:
                    def test_a_new():
                        assert 2 + 2 == 4
                 """)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", )
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         result.stdout.fnmatch_lines([
             "*1 passed, 1 deselected*",
         ])
@@ -879,14 +882,14 @@ class TestLineAlgEssentialProblems:
                            def test_2():
                                assert 2 + 2 == 4
                        """)
-        testdir.runpytest(f"--{PLUGIN_NAME}", )
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         testdir.makepyfile(test_a="""
                            def test_1():
                                assert 1 + 2 == 3
 
                                assert 2 + 2 == 4
                         """)
-        result = testdir.runpytest(f"--{PLUGIN_NAME}", )
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         result.stdout.fnmatch_lines([
             "*1 passed*",
         ])
@@ -908,7 +911,7 @@ class TestXdist(object):
                 print(a)
             """)
 
-        result = testdir.runpytest("test_a.py", f"--{PLUGIN_NAME}", "-n 4", "-v")
+        result = testdir.runpytest_subprocess("test_a.py", f"--{PLUGIN_NAME}", "-n 4", "-v")
         result.stdout.fnmatch_lines([
             "*testmon=True, *",
             "*PASSED test_a.py::test_1[a0*"

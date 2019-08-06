@@ -539,6 +539,13 @@ class TestTheRestAfter():
 
         assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == ['m2', ' 1', ' 2']
 
+    @pytest.mark.xfail
+    def test_gap_after_return(self): # This could be also test skip
+        required_fingerprints = [['m1', ' 1', 'skip', GAP_MARK]]
+        file_fingerprints = ['m1', ' 1', '  skip', ' g1', ' g2']
+
+        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == []
+
 
 class TestFileHasLines():
     def test_remove_empty_lines(self):
