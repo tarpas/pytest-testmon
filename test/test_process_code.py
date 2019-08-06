@@ -318,6 +318,11 @@ class TestBlockList():
         assert block_list_list(afile, {1}) == ['def a():', GAP_UNTIL_INDENT, 0, 'c']
 
     @pytest.mark.xfail
+    def test_empty_line_after_gap(self):
+        afile = ['def a():', ' if False:', '  c=1', ' d=1']
+        assert block_list_list(afile, {1, 2, 4}) == ['def a():', ' if False:', GAP_UNTIL_INDENT, 1, ' d=1']
+
+    @pytest.mark.xfail
     def test_block_list_list_no_method(self):
         afile = ['a', 'b', 'c']
         assert block_list_list(afile, {1, 2}) == ['a', 'b', GAP_UNTIL_INDENT, -1]
