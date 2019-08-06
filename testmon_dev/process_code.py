@@ -15,8 +15,6 @@ blank_re = re.compile(r"\s*(#|$)")
 
 class Module(object):
     def __init__(self, source_code=None, file_name='<unknown>', rootdir='', fingerprints=None):
-        self.blocks = []
-        self.counter = 0
         self.source_code = source_code
         if fingerprints is not None:
             self._fingerprints = fingerprints
@@ -27,10 +25,6 @@ class Module(object):
             else:
                 source_code = textwrap.dedent(source_code)
             self.lines = source_code.splitlines()
-
-    @property
-    def checksums(self):
-        return [block.checksum for block in self.blocks]
 
     @property
     def fingerprints(self):
@@ -72,7 +66,7 @@ def read_file_with_checksum(absfilename):
     return source, hasher.hexdigest()
 
 
-def get_indent_spaces_count(line):
+def get_indent_level(line):
     space_count = 0
     for c in line:
         if c == ' ':
@@ -82,6 +76,7 @@ def get_indent_spaces_count(line):
             space_count += 8 - (space_count % 8)
         else:
             return space_count
+    return space_count
 
 
 def block_list_list(afile, coverage):
@@ -89,9 +84,9 @@ def block_list_list(afile, coverage):
         while body_end < len(afile) and blank_re.match(afile[body_end]):
             body_end += 1
 
-        # TODO implement check for subindeted multilines
+        # TODO implement check for subindented multilines
         if body_end < len(afile):
-            indent = get_indent_spaces_count(afile[body_end])
+            indent = get_indent_level(afile[body_end])
         else:
             indent = -1
         return [GAP_UNTIL_INDENT, indent], body_end
@@ -131,7 +126,7 @@ def file_has_lines(afile, fingerprints):
 
         if fingerprints[fingerprint_idx] == GAP_UNTIL_INDENT:
             fingerprint_idx += 1 # consume the GAP_UNTIL_INDENT parameter (indent_level)
-            while file_idx < len(afile) and get_indent_spaces_count(afile[file_idx]) != fingerprints[fingerprint_idx]:
+            while file_idx < len(afile) and get_indent_level(afile[file_idx]) > fingerprints[fingerprint_idx]:
                 file_idx += 1
             fingerprint_idx += 1
         else:

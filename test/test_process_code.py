@@ -7,7 +7,7 @@ import pytest
 
 from testmon_dev.process_code import Module, read_file_with_checksum, \
     block_list_list, file_has_lines, \
-    get_indent_spaces_count, GAP_UNTIL_INDENT
+    get_indent_level, GAP_UNTIL_INDENT
 
 try:
     from StringIO import StringIO as MemFile
@@ -325,12 +325,13 @@ class TestBlockList():
         assert block_list_list(afile, {1, 2}) == ['a', 'b', GAP_UNTIL_INDENT, -1]
 
     def test_indentation_spaces_count(self):
-        assert get_indent_spaces_count('    a  b  ') == 4
-        assert get_indent_spaces_count('  \ta  b  ') == 8
-        assert get_indent_spaces_count('\t  a  b  ') == 10
-        assert get_indent_spaces_count('  \t  a  b  ') == 10
-        assert get_indent_spaces_count('\ta  b  ') == 8
-        assert get_indent_spaces_count('\t\ta  b  ') == 16
+        assert get_indent_level('    a  b  ') == 4
+        assert get_indent_level('  \ta  b  ') == 8
+        assert get_indent_level('\t  a  b  ') == 10
+        assert get_indent_level('  \t  a  b  ') == 10
+        assert get_indent_level('\ta  b  ') == 8
+        assert get_indent_level('\t\ta  b  ') == 16
+        assert get_indent_level('') == 0
 
 
 GAP_UNTIL_DEDENT = '-1GAP'
