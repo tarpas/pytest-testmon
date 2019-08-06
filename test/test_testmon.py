@@ -376,9 +376,9 @@ def test_add():
 
         testdir.makepyfile(test_a=cs2.source_code)
         test_a.setmtime(1424880935)
-        result = testdir.runpytest("-v", "--collectonly", f"--{PLUGIN_NAME}")
+        result = testdir.runpytest("-v", f"--{PLUGIN_NAME}")
         result.stdout.fnmatch_lines([
-            "*1 deselected*",
+            "*2 passed*",
         ])
 
     def test_strange_argparse_handling(self, testdir):
