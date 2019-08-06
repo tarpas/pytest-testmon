@@ -87,7 +87,7 @@ class TestDepGraph():
         assert is_dependent({'a.py': ['101', '102']}, {'a.py': get_modules(['101', '102'])}) == False
 
     def test_dep_graph4(self):
-        assert is_dependent({'a.py': [['101', '102']]}, {'a.py': get_modules(['101', '103'])}) == True
+        assert is_dependent({'a.py': ['101', '102']}, {'a.py': get_modules(['101', '103'])}) == True
 
     def test_dep_graph_two_modules(self):
         changed_py_files = {'b.py': get_modules([])}
@@ -96,13 +96,13 @@ class TestDepGraph():
 
     def test_two_modules_combination(self):
         changed_py_files = {'b.py': get_modules([])}
-        assert is_dependent({'a.py': [[101, 102]]}, changed_py_files) == False
-        assert is_dependent({'a.py': [[105, 106]], 'b.py': [[107, 108]]}, changed_py_files) == True
+        assert is_dependent({'a.py': [101, 102]}, changed_py_files) == False
+        assert is_dependent({'a.py': [105, 106], 'b.py': [107, 108]}, changed_py_files) == True
 
     def test_two_modules_combination2(self):
         changed_py_files = {'b.py': get_modules(['103', '104'])}
-        assert is_dependent({'a.py': [['101', '102']]}, changed_py_files) == False
-        assert is_dependent({'a.py': [['101']], 'b.py': [['107']]}, changed_py_files) == True
+        assert is_dependent({'a.py': ['101', '102']}, changed_py_files) == False
+        assert is_dependent({'a.py': ['101'], 'b.py': ['107']}, changed_py_files) == True
 
     @pytest.mark.xfail
     def test_classes_depggraph(self):
@@ -156,8 +156,8 @@ class TestDepGraph():
         assert stable(td.node_data, blockify(changes))[0] == {'node2'}
 
     def test_affected_list2(self):
-        changes = blockify({'test_a.py': [['102', '103']]})
-        dependencies = NodesData({'node1': {'test_a.py': [['102', '103', '104']]}, })
+        changes = blockify({'test_a.py': ['102', '103']})
+        dependencies = NodesData({'node1': {'test_a.py': ['102', '103', '104']}, })
 
         assert 'node1' not in stable(dependencies, changes)[0]
 

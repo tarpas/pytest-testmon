@@ -3,7 +3,7 @@ import ast
 
 from test.coveragepy.coveragetest import CoverageTest
 from coverage import env
-from testmon_dev.process_code import Module, GAP_UNTIL_INDENT, function_lines, block_list_list
+from testmon_dev.process_code import Module, function_lines, block_list_list, GAP_MARKS
 import textwrap
 from coverage import coverage
 from coverage.parser import PythonParser
@@ -152,7 +152,7 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
             c = 1
             """,
                                   [1, 2, 4],
-                                  fingerprints=['a = 1', 'def b():', GAP_UNTIL_INDENT, 0, 'c = 1', ],
+                                  fingerprints=['a = 1', 'def b():', GAP_MARKS[0], 'c = 1', ],
                                   )
 
 

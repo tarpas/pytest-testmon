@@ -8,7 +8,8 @@ import re
 
 from coverage.python import get_python_source
 
-GAP_UNTIL_INDENT = '=GAP='
+GAP_MARKS = {i: f"{i}GAP" for i in range(-1, 64)}
+INVERTED_GAP_MARKS = {f"{i}GAP": i for i in range(-1, 64)}
 
 blank_re = re.compile(r"\s*(#|$)")
 
@@ -89,7 +90,7 @@ def block_list_list(afile, coverage):
             indent = get_indent_level(afile[body_end])
         else:
             indent = -1
-        return [GAP_UNTIL_INDENT, indent], body_end
+        return [GAP_MARKS[indent]], body_end
 
     function_begin_ends = dict(function_lines(ast.parse("\n".join(afile)), len(afile)))
 
@@ -124,16 +125,17 @@ def file_has_lines(afile, fingerprints):
             file_idx += 1
             continue
 
-        if fingerprints[fingerprint_idx] == GAP_UNTIL_INDENT:
-            fingerprint_idx += 1 # consume the GAP_UNTIL_INDENT parameter (indent_level)
-            while file_idx < len(afile) and get_indent_level(afile[file_idx]) > fingerprints[fingerprint_idx]:
-                file_idx += 1
-            fingerprint_idx += 1
-        else:
-            if afile[file_idx] != fingerprints[fingerprint_idx]:
-                return False
+        fingerprint = fingerprints[fingerprint_idx]
 
-        file_idx += 1
+        if fingerprint in INVERTED_GAP_MARKS:
+            searching_indent = INVERTED_GAP_MARKS[fingerprint]
+            while file_idx < len(afile) and get_indent_level(afile[file_idx]) > searching_indent:
+                file_idx += 1
+        else:
+            if afile[file_idx] != fingerprint:
+                return False
+            file_idx += 1
+
         fingerprint_idx += 1
 
     if file_idx >= len(afile) and fingerprint_idx >= len(fingerprints):
