@@ -311,11 +311,11 @@ class TestBlockList():
 
     def test_gap_mark(self):
         afile = ['def a():', ' b', 'c']
-        assert block_list_list(afile, {1}) == ['def a():', GAP_UNTIL_INDENT, 0, 'c']
+        assert block_list_list(afile, {1, 3}) == ['def a():', GAP_UNTIL_INDENT, 0, 'c']
 
     def test_empty_lines(self):
         afile = ['def a():', ' b', '', 'c']
-        assert block_list_list(afile, {1}) == ['def a():', GAP_UNTIL_INDENT, 0, 'c']
+        assert block_list_list(afile, {1, 4}) == ['def a():', GAP_UNTIL_INDENT, 0, 'c']
 
     @pytest.mark.xfail
     def test_empty_line_after_gap(self):
@@ -337,7 +337,6 @@ class TestBlockList():
         assert get_indent_level('') == 0
 
 
-GAP_UNTIL_DEDENT = '-1GAP'
 INDENTED_GAP = '0GAP'
 
 
@@ -369,9 +368,14 @@ class TestFileHasLines():
     def test_double_dedent(self):
         assert file_has_lines(['def a():', '  def b():', '    1', '  2', ], ['def a():', GAP_UNTIL_INDENT, 0])
 
-    def test_indent_eof(self):
-        assert file_has_lines(['def a():', ' 2'], ['def a():', GAP_UNTIL_INDENT, -1])
+    def test_double_dedent_with_remainder(self):
+        assert file_has_lines(['def a():', '  def b():', '    1', '  2', '3'], ['def a():', GAP_UNTIL_INDENT, 0, '3'])
 
+    def test_indent_eof1(self):
+        assert file_has_lines(['def a():', ' 2'], ['def a():', GAP_UNTIL_INDENT, 0])
+
+    def test_indent_eof2(self):
+        assert file_has_lines(['raise Exception()', 'print(1)'], ['raise Exception()', GAP_UNTIL_INDENT, -1])
 
 class TestCoverageAssumptions(TestmonCoverageTest):
 
