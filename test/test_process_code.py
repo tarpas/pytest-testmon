@@ -6,7 +6,7 @@ import pytest
 from test.test_human_coverage import TestmonCoverageTest
 from testmon_dev.process_code import Module, read_file_with_checksum, \
     file_has_lines, \
-    get_indent_level, GAP_MARKS, create_fingerprints
+    get_indent_level, GAP_MARKS, create_fingerprints, function_lines
 
 try:
     from StringIO import StringIO as MemFile
@@ -33,6 +33,7 @@ class TestReadSrc:
 
     def test_module_with_1250(self):
         Module(None, 'test/samples/print1250r.py')
+
 
 @pytest.mark.xfail
 class TestSourceIntoBlocks(object):
@@ -206,6 +207,7 @@ code_samples = {
                             [1, 2, 4]),
 }
 
+
 @pytest.mark.xfail
 class TestModule(object):
     def test_base_diff(self):
@@ -302,6 +304,18 @@ def create_fingerprint_helper(afile, coverage):
     module = Module("\n".join(afile))
     return create_fingerprints(module.lines, module.special_blocks, coverage)
 
+
+class TestSpecialBlocks():
+
+    def test_decorator(self):
+        m = Module("""\
+                @abs
+                def f1():
+                    pass
+        """)
+        assert function_lines(m.source_code, len(m.lines))
+
+
 class TestBlockList():
 
     def test_simple_everything(self):
@@ -320,12 +334,12 @@ class TestBlockList():
         afile = ['def a():', ' b', '', 'c']
         assert create_fingerprint_helper(afile, {1, 4}) == ['def a():', GAP_MARKS[0], 'c']
 
-    @pytest.mark.xfail # no ifs yet
+    @pytest.mark.xfail  # no ifs yet
     def test_empty_line_after_gap(self):
         afile = ['def a():', ' if False:', '  c=1', ' d=1']
         assert create_fingerprint_helper(afile, {1, 2, 4}) == ['def a():', ' if False:', GAP_MARKS[1], ' d=1']
 
-    @pytest.mark.xfail # no exceptions in block yet
+    @pytest.mark.xfail  # no exceptions in block yet
     def test_block_list_list_no_method(self):
         afile = ['a', 'b', 'c']
         assert create_fingerprint_helper(afile, {1, 2}) == ['a', 'b', GAP_MARKS[-1]]
@@ -376,6 +390,7 @@ class TestFileHasLines():
 
     def test_indent_eof2(self):
         assert file_has_lines(['raise Exception()', 'print(1)'], ['raise Exception()', GAP_MARKS[-1]])
+
 
 class TestCoverageAssumptions(TestmonCoverageTest):
 
