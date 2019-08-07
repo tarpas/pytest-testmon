@@ -317,15 +317,15 @@ class TestBlockList():
         afile = ['def a():', ' b', '', 'c']
         assert block_list_list(afile, {1, 4}) == ['def a():', GAP_MARKS[0], 'c']
 
-    @pytest.mark.xfail
+    @pytest.mark.xfail # no ifs yet
     def test_empty_line_after_gap(self):
         afile = ['def a():', ' if False:', '  c=1', ' d=1']
         assert block_list_list(afile, {1, 2, 4}) == ['def a():', ' if False:', GAP_MARKS[1], ' d=1']
 
-    @pytest.mark.xfail
+    @pytest.mark.xfail # no exceptions in block yet
     def test_block_list_list_no_method(self):
         afile = ['a', 'b', 'c']
-        assert block_list_list(afile, {1, 2}) == ['a', 'b', GAP_UNTIL_INDENT, -1]
+        assert block_list_list(afile, {1, 2}) == ['a', 'b', GAP_MARKS[-1]]
 
     def test_indentation_spaces_count(self):
         assert get_indent_level('    a  b  ') == 4
@@ -335,16 +335,6 @@ class TestBlockList():
         assert get_indent_level('\ta  b  ') == 8
         assert get_indent_level('\t\ta  b  ') == 16
         assert get_indent_level('') == 0
-
-
-INDENTED_GAP = '0GAP'
-
-    @pytest.mark.xfail
-    def test_gap_after_return(self): # This could be also test skip
-        required_fingerprints = [['m1', ' 1', 'skip', GAP_MARK]]
-        file_fingerprints = ['m1', ' 1', '  skip', ' g1', ' g2']
-
-        assert match_fingerprints(file_fingerprints, required_fingerprints[0]) == []
 
 
 class TestFileHasLines():
