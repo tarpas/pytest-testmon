@@ -384,9 +384,9 @@ def test_add():
 
         testdir.makepyfile(test_a=cs2.source_code)
         test_a.setmtime(1424880935)
-        result = testdir.runpytest_subprocess("-v", "--collectonly", f"--{PLUGIN_NAME}")
+        result = testdir.runpytest_subprocess("-v", f"--{PLUGIN_NAME}")
         result.stdout.fnmatch_lines([
-            "*1 deselected*",
+            "*2 passed*",
         ])
 
     def test_strange_argparse_handling(self, testdir):
@@ -647,7 +647,7 @@ def test_add():
             testdir.runpytest("test_a.py")
 
         deps = track_it(testdir, func)
-        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath): [['def test_1():', '    a=1']]} == deps
+        assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath): ['def test_1():', '    a=1']} == deps
 
     @pytest.mark.xfail
     def test_testmon_recursive(self, testdir, monkeypatch):
@@ -853,25 +853,6 @@ class TestLineAlgEssentialProblems:
         result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         result.stdout.fnmatch_lines([
             "*1 failed*",
-        ])
-
-    @pytest.mark.xfail(True, reason="False positive.")
-    def test_add_method(self, testdir):
-        testdir.makepyfile(test_a="""
-                   def test_a():
-                       assert 1 + 2 == 3
-               """)
-        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
-        testdir.makepyfile(test_a="""
-                   def test_a():
-                       assert 1 + 2 == 3
-                    
-                   def test_a_new():
-                       assert 2 + 2 == 4
-                """)
-        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
-        result.stdout.fnmatch_lines([
-            "*1 passed, 1 deselected*",
         ])
 
     def test_remove_method_definition(self, testdir):

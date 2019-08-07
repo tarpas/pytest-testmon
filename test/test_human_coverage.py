@@ -1,19 +1,59 @@
 #  -- coding:utf8 --
+import ast
+
 from test.coveragepy.coveragetest import CoverageTest
 from coverage import env
-from testmon_dev.process_code import human_coverage, Module, GAP_MARK
+from testmon_dev.process_code import Module, function_lines, block_list_list, GAP_MARKS
 import textwrap
 from coverage import coverage
 from coverage.parser import PythonParser
 import sys
 from os.path import abspath
 
+# delete?
+import re
+blank_re = re.compile(r"\s*(#|$)")
+else_finally_re = re.compile(r"\s*(else|finally)\s*:\s*(#|$)")
+
+def human_coverage(source, statements, missing):
+    result = set()
+
+    i = 0
+    j = 0
+    covered = True
+    for lineno, line in enumerate(source.splitlines(True), start=1):
+        while i < len(statements) and statements[i] < lineno:
+            i += 1
+        while j < len(missing) and missing[j] < lineno:
+            j += 1
+        if i < len(statements) and statements[i] == lineno:
+            covered = j >= len(missing) or missing[j] > lineno
+        if blank_re.match(line):
+            result.add(lineno)
+        if else_finally_re.match(line):
+            # Special logic for lines containing only 'else:'.
+            if i >= len(statements) or j >= len(missing):
+                result.add(lineno)
+            elif statements[i] == missing[j]:
+                pass
+            else:
+                result.add(lineno)
+        elif covered:
+            result.add(lineno)
+        else:
+            pass
+
+    return result
+
+
+
+
 
 class TestmonCoverageTest(CoverageTest):
 
     def write_and_run(self, text):
         modname = self.get_module_name()
-        self.make_file(modname + ".py", text)
+        filename = self.make_file(modname + ".py", text)
         # Start up coverage.py.
         cov = coverage()
         cov.erase()
@@ -21,13 +61,13 @@ class TestmonCoverageTest(CoverageTest):
         # Clean up our side effects
         del sys.modules[modname]
         coverage_lines = cov.get_data().lines(abspath(modname + ".py"))
-        return coverage_lines
+        return coverage_lines, filename
 
     def check_human_coverage(self, text, lines=None, fingerprints=None):
 
         text = textwrap.dedent(text)
 
-        coverage_lines = self.write_and_run(text)
+        coverage_lines, _ = self.write_and_run(text)
 
         m = Module(source_code=text)
 
@@ -44,7 +84,7 @@ class TestmonCoverageTest(CoverageTest):
 
         assert hc == lines
         if fingerprints:
-            assert m.coverage_to_fingerprints(hc) == fingerprints
+            assert block_list_list(m.lines, hc) == fingerprints
 
 
 class BasicTestmonCoverageTest(TestmonCoverageTest):
@@ -60,7 +100,7 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
         d = 6
         """,
                                   [1, 2, 3, 4, 5, 6],
-                                  fingerprints=[['a = 1', 'b = 2', 'c = 4', 'd = 6',]],)
+                                  fingerprints=['a = 1', 'b = 2', 'c = 4', 'd = 6',],)
 
     def test_indentation_wackiness(self):
         # Partial final lines are OK.
@@ -112,7 +152,7 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
             c = 1
             """,
                                   [1, 2, 4],
-                                  fingerprints=[['a = 1', 'def b():', GAP_MARK, 'c = 1', ]],
+                                  fingerprints=['a = 1', 'def b():', GAP_MARKS[0], 'c = 1', ],
                                   )
 
 
@@ -496,3 +536,22 @@ class SimpleStatementTest(TestmonCoverageTest):
             [1,2,3,4,5,6,9,10,11],
         )
 
+
+class NewTestmonCoverageTest(TestmonCoverageTest):
+
+    def parse(self, text):
+        code = textwrap.dedent(text)
+        tree = ast.parse(code)
+        return tree, len(text.splitlines())
+
+
+    def test_function_lines(self):
+        tree, line_count = self.parse(
+        """\
+            def a():
+                1
+                2
+                3
+            2
+        """)
+        assert (function_lines(tree, line_count)) == [(2, 4)]
