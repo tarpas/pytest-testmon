@@ -26,7 +26,7 @@ class Module(object):
         self.special_blocks = dict(function_lines(self.ast, len(self.lines)))
 
 
-def function_lines(node, end, name='unknown', parent_field_name=None):
+def function_lines(node, end, name='unknown'):
     def _next_lineno(i, end):
         try:
             return node[i + 1].lineno - 1
@@ -38,17 +38,19 @@ def function_lines(node, end, name='unknown', parent_field_name=None):
     result = []
 
     if isinstance(node, ast.AST):
+        if node.__class__.__name__ == 'FunctionDef':
+            result.append((node.body[0].lineno, end))
+
         for field_name, field_value in ast.iter_fields(node):
             result.extend(
                 function_lines(field_value,
                                end,
-                               name=node.__class__.__name__,
-                               parent_field_name = field_name))
+                               name=node.__class__.__name__))
+
     elif isinstance(node, list):
         for i, item in enumerate(node):
             result.extend(function_lines(item, _next_lineno(i, end)))
-        if node and parent_field_name == 'body' and name == 'FunctionDef':
-            result.append((node[0].lineno, end))
+
     return result
 
 

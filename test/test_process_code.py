@@ -313,7 +313,7 @@ class TestSpecialBlocks():
                 def f1():
                     pass
         """)
-        assert function_lines(m.source_code, len(m.lines))
+        assert m.special_blocks == {3: 3}
 
 
 class TestBlockList():
