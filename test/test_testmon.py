@@ -142,6 +142,35 @@ class TestmonDeselect(object):
             "*passed*",
         ])
 
+    def test_simple_change_1_of_2(self, testdir):
+        testdir.makepyfile(test_a="""
+            def test_add():
+                assert 1 + 2 == 3
+            
+            def test_2():
+                assert True
+                    """)
+
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
+        result.stdout.fnmatch_lines([
+            "*2 passed*",
+        ])
+
+        test_a = testdir.makepyfile(test_a="""
+            def test_add():
+                assert 1 + 2 + 3 == 6
+                            
+            def test_2():
+                assert True
+
+                    """)
+        test_a.setmtime(1424880935)
+
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
+        result.stdout.fnmatch_lines([
+            "*1 passed, 1 deselected*",
+        ])
+
     def test_not_running_after_failure(self, testdir):
         tf = testdir.makepyfile(test_a="""
             def test_add():
