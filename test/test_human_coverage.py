@@ -3,7 +3,7 @@ import ast
 
 from test.coveragepy.coveragetest import CoverageTest
 from coverage import env
-from testmon_dev.process_code import Module, function_lines, block_list_list, GAP_MARKS
+from testmon_dev.process_code import Module, function_lines, GAP_MARKS, create_fingerprints
 import textwrap
 from coverage import coverage
 from coverage.parser import PythonParser
@@ -84,7 +84,7 @@ class TestmonCoverageTest(CoverageTest):
 
         assert hc == lines
         if fingerprints:
-            assert block_list_list(m.lines, hc) == fingerprints
+            assert create_fingerprints(m.lines, m.special_blocks, lines) == fingerprints
 
 
 class BasicTestmonCoverageTest(TestmonCoverageTest):

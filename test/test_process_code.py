@@ -1,13 +1,12 @@
 #  -- coding:utf8 --
-from _pytest import unittest
-
-from test.test_human_coverage import TestmonCoverageTest
+import ast
 
 import pytest
 
+from test.test_human_coverage import TestmonCoverageTest
 from testmon_dev.process_code import Module, read_file_with_checksum, \
-    block_list_list, file_has_lines, \
-    get_indent_level, GAP_MARKS
+    file_has_lines, \
+    get_indent_level, GAP_MARKS, create_fingerprints
 
 try:
     from StringIO import StringIO as MemFile
@@ -299,33 +298,37 @@ class TestModule(object):
 b = namedtuple('FakeBlock', 'start end')
 
 
+def create_fingerprint_helper(afile, coverage):
+    module = Module("\n".join(afile))
+    return create_fingerprints(module.lines, module.special_blocks, coverage)
+
 class TestBlockList():
 
     def test_simple_everything(self):
         afile = ['def a():', ' b', ]
-        assert block_list_list(afile, {1, 2}) == ['def a():', ' b']
+        assert create_fingerprint_helper(afile, {1, 2}) == ['def a():', ' b']
 
     def test_gap_mark_eof(self):
         afile = ['def a():', ' b', ]
-        assert block_list_list(afile, {1}) == ['def a():', GAP_MARKS[-1]]
+        assert create_fingerprint_helper(afile, {1}) == ['def a():', GAP_MARKS[-1]]
 
     def test_gap_mark(self):
         afile = ['def a():', ' b', 'c']
-        assert block_list_list(afile, {1, 3}) == ['def a():', GAP_MARKS[0], 'c']
+        assert create_fingerprint_helper(afile, {1, 3}) == ['def a():', GAP_MARKS[0], 'c']
 
     def test_empty_lines(self):
         afile = ['def a():', ' b', '', 'c']
-        assert block_list_list(afile, {1, 4}) == ['def a():', GAP_MARKS[0], 'c']
+        assert create_fingerprint_helper(afile, {1, 4}) == ['def a():', GAP_MARKS[0], 'c']
 
     @pytest.mark.xfail # no ifs yet
     def test_empty_line_after_gap(self):
         afile = ['def a():', ' if False:', '  c=1', ' d=1']
-        assert block_list_list(afile, {1, 2, 4}) == ['def a():', ' if False:', GAP_MARKS[1], ' d=1']
+        assert create_fingerprint_helper(afile, {1, 2, 4}) == ['def a():', ' if False:', GAP_MARKS[1], ' d=1']
 
     @pytest.mark.xfail # no exceptions in block yet
     def test_block_list_list_no_method(self):
         afile = ['a', 'b', 'c']
-        assert block_list_list(afile, {1, 2}) == ['a', 'b', GAP_MARKS[-1]]
+        assert create_fingerprint_helper(afile, {1, 2}) == ['a', 'b', GAP_MARKS[-1]]
 
     def test_indentation_spaces_count(self):
         assert get_indent_level('    a  b  ') == 4

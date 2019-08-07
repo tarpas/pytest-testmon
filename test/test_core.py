@@ -238,7 +238,7 @@ def affected_nodeids(dependencies, changes):
 
 def blockify(changes):
     for key, value in changes.items():
-            block_changes = {key: Module(fingerprints=[str(v) for v in value])}
+            block_changes = {key: Module(source_code="\n".join([str(v) for v in value]))}
     return block_changes
 
 

@@ -18,8 +18,8 @@ import textwrap
 
 import coverage
 
-from testmon_dev.process_code import read_file_with_checksum, block_list_list, \
-    file_has_lines
+from testmon_dev.process_code import read_file_with_checksum, \
+    file_has_lines, create_fingerprints
 from testmon_dev.process_code import Module
 
 if sys.version_info > (3,):
@@ -64,8 +64,8 @@ def stable(node_data, changed_files):
     changed_files_set = changed_files & file_data.keys()  # changed_files will be a subset of file_data,
     # but we'll make sure anyway
     for file in changed_files_set:
-        for nodeid, lines in file_data[file].items():
-            if not file_has_lines(changed_files[file].fingerprints, lines):
+        for nodeid, fingerprints in file_data[file].items():
+            if not file_has_lines(changed_files[file].lines, fingerprints):
                 changed_nodes.add(nodeid)
                 changed_files2.add(nodeid.split('::', 1)[0])
                 changed_files2.add(file)
@@ -231,8 +231,7 @@ class TestmonData(object):
             if os.path.exists(filename):
                 module = self.source_tree.get_file(relfilename)
                 covered = set(cov.get_data().lines(filename))
-                result[relfilename] = block_list_list(module.lines,
-                                                      covered)
+                result[relfilename] = create_fingerprints(module.lines, module.special_blocks, covered)
         if not result:  # when testmon kicks-in the test module is already imported. If the test function is skipped
             # coverage_data is empty. However, we need to write down, that we depend on the
             # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)

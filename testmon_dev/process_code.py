@@ -1,7 +1,6 @@
 import ast
 import hashlib
 import textwrap
-import zlib
 import os
 
 import re
@@ -15,24 +14,15 @@ blank_re = re.compile(r"\s*(#|$)")
 
 
 class Module(object):
-    def __init__(self, source_code=None, file_name='<unknown>', rootdir='', fingerprints=None):
-        self.source_code = source_code
-        if fingerprints is not None:
-            self._fingerprints = fingerprints
-        else:
-            self._fingerprints = None
-            if source_code is None:
-                source_code, _ = read_file_with_checksum(os.path.join(rootdir, file_name))
-            else:
-                source_code = textwrap.dedent(source_code)
-            self.lines = source_code.splitlines()
+    def __init__(self, source_code=None, file_name='<unknown>', rootdir=''):
 
-    @property
-    def fingerprints(self):
-        if self._fingerprints is not None:
-            return self._fingerprints
+        if source_code is None:
+            source_code, _ = read_file_with_checksum(os.path.join(rootdir, file_name))
         else:
-            return self.lines
+            source_code = textwrap.dedent(source_code)
+        self.ast = ast.parse(source_code)
+        self.lines = source_code.splitlines()
+        self.special_blocks = dict(function_lines(self.ast, len(self.lines)))
 
 
 def function_lines(node, end, name='unknown'):
@@ -80,7 +70,7 @@ def get_indent_level(line):
     return space_count
 
 
-def block_list_list(afile, coverage):
+def create_fingerprints(afile, special_blocks, coverage):
     def gap_marks_until(body_start, body_end):
         while body_end < len(afile) and blank_re.match(afile[body_end]):
             body_end += 1
@@ -92,12 +82,8 @@ def block_list_list(afile, coverage):
             indent = -1
         return [GAP_MARKS[indent]], body_end
 
-    function_begin_ends = dict(function_lines(ast.parse("\n".join(afile)), len(afile)))
-
     line_idx = 0
-
     result = []
-
     while line_idx < len(afile):
         line_idx += 1
         line = afile[line_idx - 1]
@@ -105,13 +91,11 @@ def block_list_list(afile, coverage):
         if blank_re.match(line):
             continue
 
-        if line_idx in function_begin_ends and line_idx not in coverage:
-            # process function
-            fingerprints, line_idx = gap_marks_until(line_idx, function_begin_ends[line_idx])
+        if line_idx in special_blocks and line_idx not in coverage:
+            fingerprints, line_idx = gap_marks_until(line_idx, special_blocks[line_idx])
             result.extend(fingerprints)
         else:
             result.append(line)
-
     return result
 
 
