@@ -391,6 +391,9 @@ class TestFileHasLines():
     def test_indent_eof2(self):
         assert file_has_lines(['raise Exception()', 'print(1)'], ['raise Exception()', GAP_MARKS[-1]])
 
+    def test_empty_line_in_gap(self):
+        assert file_has_lines(['def a():', ' 1', '', ' 2'], ['def a():', GAP_MARKS[0]])
+
 
 class TestCoverageAssumptions(TestmonCoverageTest):
 

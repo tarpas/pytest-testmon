@@ -115,7 +115,8 @@ def file_has_lines(afile, fingerprints):
 
         searching_indent = INVERTED_GAP_MARKS.get(fingerprints[fingerprint_idx])
         if searching_indent is not None:
-            while file_idx < len(afile) and get_indent_level(afile[file_idx]) > searching_indent:
+            while file_idx < len(afile) and \
+                    (get_indent_level(afile[file_idx]) > searching_indent or blank_re.match(afile[file_idx])):
                 file_idx += 1
         else:
             if afile[file_idx] != fingerprints[fingerprint_idx]:
