@@ -715,7 +715,7 @@ def test_add():
         deps = track_it(testdir, func)
         assert {os.path.relpath(a.strpath, testdir.tmpdir.strpath): ['def test_1():', '    a=1']} == deps
 
-    @pytest.mark.xfail
+    @pytest.mark.skip
     def test_testmon_recursive(self, testdir, monkeypatch):
         a = testdir.makepyfile(test_a="""\
         def test_1():

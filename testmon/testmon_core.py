@@ -32,7 +32,6 @@ CHECKUMS_ARRAY_TYPE = 'I'
 
 
 def checksums_to_blob(checksums):
-
     return json.dumps(checksums)
 
 
@@ -225,20 +224,20 @@ class TestmonData(object):
         return parser.statements, parser.translate_lines(covered), parser._multiline
 
     def get_nodedata(self, cov, nodeid):
-        result = {}
-        for filename in cov.get_data().measured_files():
+        def update_result(filename, covered):
             relfilename = os.path.relpath(filename, self.rootdir)
+            module = self.source_tree.get_file(relfilename)
+            result[relfilename] = create_fingerprints(module.lines, module.special_blocks, covered)
+
+        result = {}
+
+        for filename in cov.get_data().measured_files():
             if os.path.exists(filename):
-                module = self.source_tree.get_file(relfilename)
                 covered = set(cov.get_data().lines(filename))
-                result[relfilename] = create_fingerprints(module.lines, module.special_blocks, covered)
-        if not result:  # when testmon kicks-in the test module is already imported. If the test function is skipped
-            # coverage_data is empty. However, we need to write down, that we depend on the
-            # file where the test is stored (so that we notice e.g. when the test is no longer skipped.)
-            # therefore we pick the last (which should be the outermost AST level) checksum
-            relfilename = os.path.relpath(os.path.join(self.rootdir, nodeid).split("::", 1)[0], self.rootdir)
-            result[relfilename] = ['THIS_DOESNT_EXIST_IN_THE_FILE_SO_WE_ALWAYS_TRIGGER_THIS_TEST_BUT_ITS_PROBABLY'
-                                    '_SKIPPED_ANYWAY']
+                update_result(filename, covered)
+        if not result:
+            update_result(filename=os.path.join(self.rootdir, nodeid).split("::", 1)[0],
+                          covered=set())  # all special blocks get a GAP_MARK, the rest literal
         return result
 
     def set_dependencies(self, nodeid, cov, result=None):
@@ -360,10 +359,6 @@ def get_variant_inifile(inifile):
     return eval_variant(run_variant_expression)
 
 
-def parse_file(filename, rootdir, source_code):
-    return Module(source_code=source_code, file_name=filename, rootdir=rootdir)
-
-
 class SourceTree():
     def __init__(self, rootdir, mtimes, checksums):
         self.rootdir = rootdir
@@ -382,8 +377,8 @@ class SourceTree():
                     code, fs_checksum = read_file_with_checksum(absfilename)
                     if self.checksums.get(filename) != fs_checksum:
                         self.checksums[filename] = fs_checksum
-                        self.changed_files[filename] = parse_file(filename=filename, rootdir=self.rootdir,
-                                                                  source_code=code)
+                        self.changed_files[filename] = Module(source_code=code, file_name=filename,
+                                                              rootdir=self.rootdir)
 
             except OSError:
                 pass
@@ -396,5 +391,5 @@ class SourceTree():
             code, checksum = read_file_with_checksum(os.path.join(self.rootdir, filename))
             self.mtimes[filename] = os.path.getmtime(os.path.join(self.rootdir, filename))
             self.checksums[filename] = checksum
-            self.changed_files[filename] = parse_file(filename=filename, rootdir=self.rootdir, source_code=code)
+            self.changed_files[filename] = Module(source_code=code, file_name=filename, rootdir=self.rootdir)
         return self.changed_files[filename]
