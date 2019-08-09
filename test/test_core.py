@@ -103,45 +103,6 @@ class TestDepGraph():
         assert is_dependent({'a.py': ['101', '102']}, changed_py_files) == False
         assert is_dependent({'a.py': ['101'], 'b.py': ['107']}, changed_py_files) == True
 
-    @pytest.mark.xfail
-    def test_classes_depggraph(self):
-        module1 = Module(CodeSample("""\
-            class TestA(object):
-                def test_one(self):
-                    print("1")
-
-                def test_two(self):
-                    print("2")
-        """).source_code)
-        bs1 = module1.blocks
-
-        module2 = Module(CodeSample("""\
-            class TestA(object):
-                def test_one(self):
-                    print("1")
-
-                def test_twob(self):
-                    print("2")
-        """).source_code)
-        bs2 = module2.blocks
-
-        assert bs1[0] == bs2[0]
-        assert bs1[1] != bs2[1]
-        assert bs1[2] != bs2[2]
-
-        assert len(module1.blocks) == len(module2.blocks) == 3
-        assert (bs1[1].start,
-                bs1[1].end,
-                bs1[1].checksum) == (bs2[1].start,
-                                     bs2[1].end,
-                                     bs2[1].checksum)
-        assert (bs1[1].name) != (bs2[1].name)
-
-        assert is_dependent({'test_s.py': [[str(bs1[0].checksum), str(bs1[2].checksum)]]},
-                            {'test_s.py': [str(b.checksum) for b in bs2]}) == True
-        assert is_dependent({'test_s.py': [[bs1[1].checksum, bs1[2].checksum]]},
-                            {'test_s.py': [str(b.checksum) for b in bs2]}) == True
-
     def test_affected_list(self, testdir):
         changes = {'test_a.py': ['102', '103']}
 
