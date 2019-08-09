@@ -1,5 +1,6 @@
 import os
 import sys
+import textwrap
 from multiprocessing import Queue, Process
 import pytest
 
@@ -16,17 +17,35 @@ pytest_plugins = "pytester",
 datafilename = os.environ.get('TESTMON_DATAFILE', '.testmondata')
 
 
+def _track_it(queue, testdir, func):
+    testmon = CoreTestmon(project_dirs=[testdir.tmpdir.strpath],
+                          testmon_labels=set())
+    testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
+    testmon_data.read_source()
+    testmon.start()
+    func()
+    testmon.stop_and_save(testmon_data, testdir.tmpdir.strpath, 'testnode', {})
+
+    queue.put(testmon_data._fetch_node_data()[0]['testnode'])
+
+
+def track_it(testdir, func):
+    queue = Queue()
+    p = Process(target=_track_it, args=(queue, testdir, func))
+    p.start()
+    p.join()
+    return queue.get()
+
+
 class TestVariant:
 
     def test_separation(self, testdir):
         testmon1_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
         testmon1_data.node_data['node1'] = {'a.py': 1}
         testmon1_data.write_common_data()
-
         testmon2_data = CoreTestmonData(testdir.tmpdir.strpath, variant='2')
         testmon2_data.node_data['node1'] = {'a.py': 2}
         testmon2_data.write_common_data()
-
         testmon_check_data = CoreTestmonData(testdir.tmpdir.strpath, variant='1')
         assert testmon1_data.node_data['node1'] == NodesData({'a.py': 1})
 
@@ -90,26 +109,6 @@ class TestVariant:
         assert eval_variant(config.getini('run_variant_expression')) == 'TEST_V:JUST_A_TEST'
 
 
-def _track_it(queue, testdir, func):
-    testmon = CoreTestmon(project_dirs=[testdir.tmpdir.strpath],
-                          testmon_labels=set())
-    testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
-    testmon_data.read_source()
-    testmon.start()
-    func()
-    testmon.stop_and_save(testmon_data, testdir.tmpdir.strpath, 'testnode', {})
-
-    queue.put(testmon_data._fetch_node_data()[0]['testnode'])
-
-
-def track_it(testdir, func):
-    queue = Queue()
-    p = Process(target=_track_it, args=(queue, testdir, func))
-    p.start()
-    p.join()
-    return queue.get()
-
-
 class TestmonDeselect(object):
     def test_dont_readcoveragerc(self, testdir):
         p = testdir.tmpdir.join('.coveragerc')
@@ -171,7 +170,6 @@ class TestmonDeselect(object):
             "*1 passed, 1 deselected*",
         ])
 
-
     def test_simple_change_1_of_2_with_decorator(self, testdir):
         testdir.makepyfile(test_a="""
             import pytest
@@ -206,7 +204,6 @@ class TestmonDeselect(object):
         result.stdout.fnmatch_lines([
             "*1 passed, 1 deselected*",
         ])
-
 
     def test_not_running_after_failure(self, testdir):
         tf = testdir.makepyfile(test_a="""
@@ -293,12 +290,12 @@ class TestmonDeselect(object):
         subdir = testdir.mkdir("tests")
 
         tf = subdir.join("test_a.py")
-        tf.write("""
-import pytest
-@pytest.mark.skip
-def test_add():
-    1/0
-        """, )
+        tf.write(textwrap.dedent("""
+            import pytest
+            @pytest.mark.skip
+            def test_add():
+                1/0
+        """, ))
         tf.setmtime(1)
         testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v", "tests")
 
@@ -748,7 +745,7 @@ def test_add():
         class PlugRereport:
             def pytest_runtest_protocol(self, item, nextitem):
                 hook = getattr(item.ihook, 'pytest_runtest_logreport')
-                #hook(report=)
+                # hook(report=)
                 return True
 
         testdir.makepyfile("""
@@ -957,17 +954,9 @@ class TestXdist(object):
                 print(a)
             """)
 
-        testdir.runpytest_subprocess("test_a.py::test_0", f"--{PLUGIN_NAME}") # xdist is not supported on the first run
+        testdir.runpytest_subprocess("test_a.py::test_0", f"--{PLUGIN_NAME}")  # xdist is not supported on the first run
         result = testdir.runpytest_subprocess("test_a.py", f"--{PLUGIN_NAME}", "-n 4", "-v")
         result.stdout.fnmatch_lines([
             "*testmon=True, *",
             "*PASSED test_a.py::test_1[a0*"
         ])
-
-
-def get_modules(hashes):
-    return hashes
-
-
-if __name__ == '__main__':
-    pytest.main()
