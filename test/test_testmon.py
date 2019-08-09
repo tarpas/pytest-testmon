@@ -421,8 +421,6 @@ def test_add():
         assert 1800000000 == os.path.getmtime(datafilename)
 
     def test_nonfunc_class(self, testdir, monkeypatch):
-        """"
-        """
         cs1 = CodeSample("""\
             class TestA(object):
                 def test_one(self):
@@ -456,8 +454,6 @@ def test_add():
         ])
 
     def test_strange_argparse_handling(self, testdir):
-        """"
-        """
         cs1 = CodeSample("""\
             class TestA(object):
                 def test_one(self):
