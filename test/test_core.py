@@ -17,7 +17,6 @@ from array import array
 class TestGeneral(object):
 
     def test_flip(self):
-        pass
         node_data = {'X': {'a': [1, 2, 3], 'b': [3, 4, 5]}, 'Y': {'b': [3, 6, 7]}}
         files = flip_dictionary(node_data)
         assert files == {'a': {'X': [1, 2, 3]}, 'b': {'X': [3, 4, 5], 'Y': [3, 6, 7]}}

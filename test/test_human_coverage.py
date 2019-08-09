@@ -1,4 +1,5 @@
 #  -- coding:utf8 --
+import pytest
 import ast
 
 from test.coveragepy.coveragetest import CoverageTest
@@ -12,8 +13,10 @@ from os.path import abspath
 
 # delete?
 import re
+
 blank_re = re.compile(r"\s*(#|$)")
 else_finally_re = re.compile(r"\s*(else|finally)\s*:\s*(#|$)")
+
 
 def human_coverage(source, statements, missing):
     result = set()
@@ -44,9 +47,6 @@ def human_coverage(source, statements, missing):
             pass
 
     return result
-
-
-
 
 
 class TestmonCoverageTest(CoverageTest):
@@ -86,6 +86,35 @@ class TestmonCoverageTest(CoverageTest):
         if fingerprints:
             assert create_fingerprints(m.lines, m.special_blocks, lines) == fingerprints
 
+    def check_construct_fingerprints(self, text, lines=None, fingerprints=None):
+
+        text = textwrap.dedent(text)
+
+        coverage_lines, _ = self.write_and_run(text)
+
+        m = Module(source_code=text)
+
+        assert sorted(coverage_lines) == lines
+        if fingerprints:
+            assert create_fingerprints(m.lines, m.special_blocks, lines) == fingerprints
+
+
+class TestCoverageAndFingeprintsAssumptions(TestmonCoverageTest):
+
+    @pytest.mark.xfail
+    def test_pass_1st_position(self):
+        # pass is "not covered" if there are statements afterwards
+        self.check_construct_fingerprints("""\
+            a = 1
+            def b():
+                pass
+                1
+            b()
+            """,
+                  [1, 2, 4, 5],
+                  fingerprints=['a = 1', 'def b():', '    pass', '    1', 'b()', ],
+                  )
+
 
 class BasicTestmonCoverageTest(TestmonCoverageTest):
     """The simplest tests, for quick smoke testing of fundamental changes."""
@@ -99,8 +128,8 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
         # Nothing here
         d = 6
         """,
-                                  [1, 2, 3, 4, 5, 6],
-                                  fingerprints=['a = 1', 'b = 2', 'c = 4', 'd = 6',],)
+        [1, 2, 3, 4, 5, 6],
+        fingerprints=['a = 1', 'b = 2', 'c = 4', 'd = 6', ], )
 
     def test_indentation_wackiness(self):
         # Partial final lines are OK.
@@ -242,7 +271,6 @@ class SimpleStatementTest(TestmonCoverageTest):
                 1
             """,
             [1,2,3,4,5,6], "")
-
 
     def test_pass(self):
         # pass is tricky: if it's the only statement in a block, then it is
@@ -544,14 +572,13 @@ class NewTestmonCoverageTest(TestmonCoverageTest):
         tree = ast.parse(code)
         return tree, len(text.splitlines())
 
-
     def test_function_lines(self):
         tree, line_count = self.parse(
-        """\
-            def a():
-                1
+            """\
+                def a():
+                    1
+                    2
+                    3
                 2
-                3
-            2
-        """)
+            """)
         assert (function_lines(tree, line_count)) == [(2, 4)]
