@@ -948,6 +948,9 @@ class TestXdist(object):
         pytest.importorskip("xdist")
         testdir.makepyfile(test_a="""
             import pytest
+            def test_0():
+                1
+                
             @pytest.mark.parametrize("a", [
                                     ("test0", ),
                                     ("test1", ),
@@ -958,6 +961,7 @@ class TestXdist(object):
                 print(a)
             """)
 
+        testdir.runpytest_subprocess("test_a.py::test_0", f"--{PLUGIN_NAME}") # xdist is not supported on the first run
         result = testdir.runpytest_subprocess("test_a.py", f"--{PLUGIN_NAME}", "-n 4", "-v")
         result.stdout.fnmatch_lines([
             "*testmon=True, *",
