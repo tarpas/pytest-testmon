@@ -187,19 +187,24 @@ class TestmonSelect():
 
     def test_should_run(self, nodeid):
         if self.config.getoption(TLF_OPTION):
-            if nodeid in self.testmon_data.fail_reports:
-                return True
+            reports = self.testmon_data.reports.get(nodeid)
+            if reports:
+                return self.did_fail(reports)
         if nodeid in self.testmon_data.stable_nodeids:
             return False
         else:
             return True
 
-    def report_if_failed(self, nodeid):
-        node_reports = self.testmon_data.fail_reports.get(nodeid, {})
-        for phase in ('setup', 'call', 'teardown'):
-            if phase in node_reports:
-                test_report = runner.TestReport(**node_reports[phase])
-                self.config.hook.pytest_runtest_logreport(report=test_report)
+    def did_fail(self, reports):
+        return bool([True for report in reports.values() if report.get('outcome') == u'failed'])
+
+    def report_from_db(self, nodeid):
+        node_reports = self.testmon_data.reports.get(nodeid, {})
+        if self.did_fail(node_reports):
+            for phase in ('setup', 'call', 'teardown'):
+                if phase in node_reports:
+                    test_report = runner.TestReport(**node_reports[phase])
+                    self.config.hook.pytest_runtest_logreport(report=test_report)
 
     def pytest_report_header(self, config):
         changed_files = ",".join(self.testmon_data.source_tree.changed_files)
@@ -240,7 +245,7 @@ class TestmonSelect():
     def pytest_runtestloop(self, session):
         ignored_deselected = self.collection_ignored.union(self.deselected)
         for nodeid in ignored_deselected:
-            self.report_if_failed(nodeid)
+            self.report_from_db(nodeid)
 
 
 class FakeItemFromTestmon(object):
