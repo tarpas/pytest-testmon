@@ -23,6 +23,7 @@ class Module(object):
         self.source_code = source_code
         self.ast = ast.parse(source_code)
         self.lines = source_code.splitlines()
+        self.full_lines = list(filter(lambda x: not blank_re.match(x), self.lines))
         self.special_blocks = dict(function_lines(self.ast, len(self.lines)))
 
 
@@ -103,29 +104,24 @@ def create_fingerprints(afile, special_blocks, coverage):
     return result
 
 
-def file_has_lines(afile, fingerprints):
+def file_has_lines(full_lines, fingerprints):
     file_idx = 0
     fingerprint_idx = 0
 
-    while file_idx < len(afile) and fingerprint_idx < len(fingerprints):
-
-        if blank_re.match(afile[file_idx]):
-            file_idx += 1
-            continue
+    while file_idx < len(full_lines) and fingerprint_idx < len(fingerprints):
 
         searching_indent = INVERTED_GAP_MARKS.get(fingerprints[fingerprint_idx])
         if searching_indent is not None:
-            while file_idx < len(afile) and \
-                    (get_indent_level(afile[file_idx]) > searching_indent or blank_re.match(afile[file_idx])):
+            while file_idx < len(full_lines) and get_indent_level(full_lines[file_idx]) > searching_indent:
                 file_idx += 1
         else:
-            if afile[file_idx] != fingerprints[fingerprint_idx]:
+            if full_lines[file_idx] != fingerprints[fingerprint_idx]:
                 return False
             file_idx += 1
 
         fingerprint_idx += 1
 
-    if file_idx >= len(afile) and fingerprint_idx >= len(fingerprints):
+    if file_idx >= len(full_lines) and fingerprint_idx >= len(fingerprints):
         return True
     else:
         return False

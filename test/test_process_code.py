@@ -35,6 +35,18 @@ class TestReadSrc:
         Module(None, 'test/samples/print1250r.py')
 
 
+class TestNewModule(object):
+
+    def test_create_nonempty_lines(self):
+        1
+        m = Module("""\
+                    1
+
+                    2
+            """)
+        assert m.full_lines == ['1', '2']
+
+
 class CodeSample():
     def __init__(self, source_code, expected_coverage=None, possible_lines=None):
         self.source_code = source_code
@@ -159,11 +171,6 @@ class TestBlockList():
 
 
 class TestFileHasLines():
-    def test_remove_empty_lines(self):
-        required_fingerprints = ['m', ' 1', ' 2']
-        file_fingerprints = ['', 'm', '     ', ' 1', ' ', '', ' 2']
-
-        assert file_has_lines(file_fingerprints, required_fingerprints) is True
 
     def test_doesnthave1(self):
         assert file_has_lines([], [1]) is False
@@ -194,9 +201,6 @@ class TestFileHasLines():
 
     def test_indent_eof2(self):
         assert file_has_lines(['raise Exception()', 'print(1)'], ['raise Exception()', GAP_MARKS[-1]])
-
-    def test_empty_line_in_gap(self):
-        assert file_has_lines(['def a():', ' 1', '', ' 2'], ['def a():', GAP_MARKS[0]])
 
 
 class TestCoverageAssumptions(TestmonCoverageTest):
