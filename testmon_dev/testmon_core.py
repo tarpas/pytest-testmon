@@ -209,6 +209,7 @@ class TestmonData(object):
             node_id INTEGER,
             file_name TEXT,
             checksums text,
+            UNIQUE(file_name, node_id),
             FOREIGN KEY(node_id) REFERENCES node(id) ON DELETE CASCADE)
     """)
         self._write_attribute('__data_version', str(self.DATA_VERSION), variant='default')
