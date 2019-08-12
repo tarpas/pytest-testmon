@@ -81,10 +81,10 @@ def create_fingerprints(afile, special_blocks, coverage):
             body_end += 1
 
         # TODO implement check for subindented multilines
-        if body_end < len(afile):
-            indent = get_indent_level(afile[body_end])
+        if body_start <= len(afile):
+            indent = get_indent_level(afile[body_start - 1]) - 1
         else:
-            indent = -1
+            indent = 0
         return [GAP_MARKS[indent]], body_end
 
     line_idx = 0

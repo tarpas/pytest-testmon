@@ -181,7 +181,7 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
             c = 1
             """,
                                   [1, 2, 4],
-                                  fingerprints=['a = 1', 'def b():', GAP_MARKS[0], 'c = 1', ],
+                                  fingerprints=['a = 1', 'def b():', GAP_MARKS[3], 'c = 1', ],
                                   )
 
 

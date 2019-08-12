@@ -140,7 +140,7 @@ class TestBlockList():
 
     def test_gap_mark_eof(self):
         afile = ['def a():', ' b', ]
-        assert create_fingerprint_helper(afile, {1}) == ['def a():', GAP_MARKS[-1]]
+        assert create_fingerprint_helper(afile, {1}) == ['def a():', GAP_MARKS[0]]
 
     def test_gap_mark(self):
         afile = ['def a():', ' b', 'c']
