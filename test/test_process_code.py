@@ -6,7 +6,7 @@ import pytest
 from test.test_human_coverage import TestmonCoverageTest
 from testmon_dev.process_code import Module, read_file_with_checksum, \
     file_has_lines, \
-    get_indent_level, GAP_MARKS, create_fingerprints, function_lines
+    get_indent_level, GAP_MARKS, create_fingerprints, function_lines, gap_marks_until
 
 try:
     from StringIO import StringIO as MemFile
@@ -132,7 +132,16 @@ class TestSpecialBlocks():
         assert m.special_blocks == {3: 3}
 
 
-class TestBlockList():
+class TestGapMarksUntil:
+
+    def test_simple(self):
+        assert gap_marks_until(['  a']) == [GAP_MARKS[1]]
+
+    def test_empty(self):
+        assert gap_marks_until([]) == [GAP_MARKS[0]]
+
+
+class TestCreateFingerprints():
 
     def test_simple_everything(self):
         afile = ['def a():', ' b', ]
