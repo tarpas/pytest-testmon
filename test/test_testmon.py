@@ -98,8 +98,8 @@ class TestVariant:
         config = testdir.parseconfigure()
         assert 'NameError' in eval_variant(config.getini('run_variant_expression'))
 
+    # Test that ``os`` is available in list comprehensions.
     def test_complex(self, testdir, monkeypatch):
-        "Test that ``os`` is available in list comprehensions."
         monkeypatch.setenv('TEST_V', 'JUST_A_TEST')
         testdir.makeini("""
                         [pytest]
