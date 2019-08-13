@@ -75,14 +75,14 @@ def get_indent_level(line):
     return space_count
 
 
-def gap_marks_until(block_lines):
-    if block_lines:
-        indent = get_indent_level(block_lines[0]) - 1
+def gap_marks_until(lines, start, end):
+    if start <= len(lines):
+        indent = get_indent_level(lines[start - 1]) - 1
     else:
         indent = 0
 
-    # TODO implement check for subindented multilines
-    return [GAP_MARKS[indent]]
+    # TODO implement check for subindented multilines 
+    return [GAP_MARKS[indent]], end
 
 
 def create_fingerprints(afile, special_blocks, coverage):
@@ -96,10 +96,8 @@ def create_fingerprints(afile, special_blocks, coverage):
             continue
 
         if line_idx in special_blocks and line_idx not in coverage:
-            block_slice = slice(line_idx - 1, special_blocks[line_idx])
-            fingerprints = gap_marks_until(afile[block_slice])
+            fingerprints, line_idx = gap_marks_until(afile, line_idx, special_blocks[line_idx])
             result.extend(fingerprints)
-            line_idx = special_blocks[line_idx]
         else:
             result.append(line)
     return result

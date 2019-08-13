@@ -135,10 +135,10 @@ class TestSpecialBlocks():
 class TestGapMarksUntil:
 
     def test_simple(self):
-        assert gap_marks_until(['  a']) == [GAP_MARKS[1]]
+        assert gap_marks_until(['  a'], 0, 0) == ([GAP_MARKS[1]], 0)
 
-    def test_empty(self):
-        assert gap_marks_until([]) == [GAP_MARKS[0]]
+    def test_eof(self):
+        assert gap_marks_until([' a',], 2, 2) == ([GAP_MARKS[0]], 2)
 
 
 class TestCreateFingerprints():
