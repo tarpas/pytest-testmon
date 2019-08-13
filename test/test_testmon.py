@@ -727,11 +727,11 @@ class TestmonDeselect(object):
         a = testdir.makepyfile(a="""\
             import sys
             import os
-            with open('b.py', 'w') as f:
-                f.write("print('printing from b.py')")
+            with open('b73003.py', 'w') as f:
+                f.write("print('printing from b73003.py')")
             sys.path.append('.')
-            import b
-            os.remove('b.py')
+            import b73003
+            os.remove('b73003.py')
         """)
 
         def f():
