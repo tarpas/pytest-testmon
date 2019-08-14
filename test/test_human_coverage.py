@@ -4,7 +4,7 @@ import ast
 
 from test.coveragepy.coveragetest import CoverageTest
 from coverage import env
-from testmon_dev.process_code import Module, function_lines, GAP_MARKS, create_fingerprints
+from testmon_dev.process_code import Module, function_lines, GAP_MARKS, create_fingerprints, covered_unused_statement
 import textwrap
 from coverage import coverage
 from coverage.parser import PythonParser
@@ -101,7 +101,10 @@ class TestmonCoverageTest(CoverageTest):
 
 class TestCoverageAndFingeprintsAssumptions(TestmonCoverageTest):
 
-    @pytest.mark.xfail
+    def test_covered_pass(self):
+        assert covered_unused_statement(1, 2, {2}) == True
+        assert covered_unused_statement(1, 2, {3}) == False
+
     def test_pass_1st_position(self):
         # pass is "not covered" if there are statements afterwards
         self.check_construct_fingerprints("""\

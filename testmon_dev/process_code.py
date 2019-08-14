@@ -109,6 +109,14 @@ def gap_marks_until(lines, start, end):
 
 
 
+def covered_unused_statement(start, end, coverage):
+    while start <= end:
+        if start in coverage:
+            return True
+        start += 1
+    return False
+
+
 def create_fingerprints(afile, special_blocks, coverage):
     line_idx = 0
     result = []
@@ -119,7 +127,8 @@ def create_fingerprints(afile, special_blocks, coverage):
         if blank_re.match(line):
             continue
 
-        if line_idx in special_blocks and line_idx not in coverage:
+        if line_idx in special_blocks and line_idx not in coverage and \
+                not covered_unused_statement(line_idx + 1, special_blocks[line_idx], coverage):
             fingerprints, line_idx = gap_marks_until(afile, line_idx - 1, special_blocks[line_idx])
             result.extend(fingerprints)
         else:
