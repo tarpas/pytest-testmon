@@ -6,7 +6,7 @@ import pytest
 from test.test_human_coverage import TestmonCoverageTest
 from testmon_dev.process_code import Module, read_file_with_checksum, \
     file_has_lines, \
-    get_indent_level, GAP_MARKS, create_fingerprints, function_lines, gap_marks_until
+    get_indent_level, GAP_MARKS, create_fingerprints, function_lines, gap_marks_until, cover_subindented_multilines
 
 try:
     from StringIO import StringIO as MemFile
@@ -132,13 +132,28 @@ class TestSpecialBlocks():
         assert m.special_blocks == {3: 3}
 
 
+class TestCoverSubindentedMutlilines:
+
+    def test_simple(self):
+        assert cover_subindented_multilines(['def', ' 1', '2', ' 3'], 1, 4, 0) == ['2', GAP_MARKS[0]]
+
+    def test_end_of_block(self):
+        assert cover_subindented_multilines(['def', ' 1', '2', '3'], 1, 4, 0) == ['2', '3', GAP_MARKS[0]]
+
+    def test_no_multiline(self):
+        assert cover_subindented_multilines([' 1', ' 2'], 0, 2, 0) == []
+
+
 class TestGapMarksUntil:
 
     def test_simple(self):
-        assert gap_marks_until(['  a'], 0, 0) == ([GAP_MARKS[1]], 0)
+        assert gap_marks_until(['  a'], 0, 1) == ([GAP_MARKS[1]], 1)
 
     def test_eof(self):
-        assert gap_marks_until([' a',], 2, 2) == ([GAP_MARKS[0]], 2)
+        assert gap_marks_until([' a',], 1, 2) == ([GAP_MARKS[0]], 2)
+
+    def test_multiline(self):
+        assert gap_marks_until([' 1', '2', ' 3'], 0, 3) == ([GAP_MARKS[0], '2', GAP_MARKS[0]], 3)
 
 
 class TestCreateFingerprints():
@@ -158,6 +173,16 @@ class TestCreateFingerprints():
     def test_empty_lines(self):
         afile = ['def a():', ' b', '', 'c']
         assert create_fingerprint_helper(afile, {1, 4}) == ['def a():', GAP_MARKS[0], 'c']
+
+    def test_multiline_gap_no_indent(self):
+        afile = ['def a():', ' a=[', '1,', '2', ' ]', '3']
+        fingerprints = ['def a():', GAP_MARKS[0], '1,', '2', GAP_MARKS[0], '3']
+        assert create_fingerprint_helper(afile, {1, 6}) == fingerprints
+
+    def test_multiline_double_blank(self):
+        afile = ['def a():', ' a=[', '1', ' ]', '', '', '3']
+        fingerprints = ['def a():', GAP_MARKS[0], '1', GAP_MARKS[0], '3']
+        assert create_fingerprint_helper(afile, {1, 7}) == fingerprints
 
     @pytest.mark.xfail  # no ifs yet
     def test_empty_line_after_gap(self):

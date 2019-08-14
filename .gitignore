@@ -54,3 +54,6 @@ nosetests.xml
 
 # Pipenv
 Pipfile.lock
+
+# Stable version
+/testmon/
