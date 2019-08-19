@@ -241,11 +241,10 @@ class TestmonSelect():
         for key, stats in durations.items():
             durations[key]['avg_duration'] = stats['duration'] / stats['node_count']
 
-        items.sort(key=lambda item: (
-            item.duration,
-            durations[item.class_name]['avg_duration'],
-            durations[item.module_name]['avg_duration']
-        ))
+        items.sort(key=lambda item: item.duration)
+        items.sort(key=lambda item: durations[item.class_name]['avg_duration'])
+        items.sort(key=lambda item: durations[item.module_name]['avg_duration'])
+
 
     @pytest.mark.trylast
     def pytest_collection_modifyitems(self, session, config, items):
