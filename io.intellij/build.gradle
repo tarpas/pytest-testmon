@@ -39,8 +39,8 @@ publishPlugin {
 
 patchPluginXml {
     pluginDescription """
-    Plugin for pytest testing framework. runtime-info plugin provides information about failing
-    tests directly in the editor by annotating your tests source code with exceptions.
+    Annotates your code in editor with recent exceptions.
+    Saves you from deciphering stack traces manually. Works with pytest.
     <br><br>
     <b>Installation:</b><br>
     pip install runtime-info
