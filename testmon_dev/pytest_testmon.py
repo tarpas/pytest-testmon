@@ -224,6 +224,29 @@ class TestmonSelect():
             self.collection_ignored.update(self.testmon_data.f_tests[strpath])
             return True
 
+    def sort_items_by_duration(self, items):
+        durations = defaultdict(lambda: {'node_count': 0, 'duration': 0})
+        for item in items:
+            item.duration = sum([report['duration'] for report in self.testmon_data.reports[item.nodeid].values()])
+            item.module_name = item.location[0]
+            item_hierarchy = item.location[2].split('.')
+            item.node_name = item_hierarchy[-1]
+            item.class_name = item_hierarchy[0]
+
+            durations[item.class_name]['node_count'] += 1
+            durations[item.class_name]['duration'] += item.duration
+            durations[item.module_name]['node_count'] += 1
+            durations[item.module_name]['duration'] += item.duration
+
+        for key, stats in durations.items():
+            durations[key]['avg_duration'] = stats['duration'] / stats['node_count']
+
+        items.sort(key=lambda item: (
+            item.duration,
+            durations[item.class_name]['avg_duration'],
+            durations[item.module_name]['avg_duration']
+        ))
+
     @pytest.mark.trylast
     def pytest_collection_modifyitems(self, session, config, items):
         self.testmon_data.collect_garbage(retain=self.collection_ignored.union(set([item.nodeid for item in items])))
@@ -238,6 +261,9 @@ class TestmonSelect():
                 self.deselected.add(item.nodeid)
         items[:] = self.selected
 
+        if self.testmon_data.reports:
+            self.sort_items_by_duration(items)
+
         session.config.hook.pytest_deselected(
             items=([FakeItemFromTestmon(session.config)] *
                    len(self.collection_ignored.union(self.deselected))))
@@ -251,3 +277,12 @@ class TestmonSelect():
 class FakeItemFromTestmon(object):
     def __init__(self, config):
         self.config = config
+
+class Item:
+    def __init__(self, pytest_item):
+        self.item = pytest_item
+
+    @property
+    def module_name(self):
+        return self.item.location[0]
+

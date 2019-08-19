@@ -154,7 +154,7 @@ class TestmonData(object):
 
         fail_reports = defaultdict(lambda: {})
 
-        for row in self.connection.execute('SELECT name, result FROM node WHERE variant=? AND failed=1',
+        for row in self.connection.execute('SELECT name, result FROM node WHERE variant=?',
                                            (self.variant,)):
             fail_reports[row[0]] = json.loads(row[1])
 
@@ -192,8 +192,8 @@ class TestmonData(object):
         self._write_attribute('__data_version', str(self.DATA_VERSION), variant='default')
 
     def read_data(self):
-        self.node_data, self.fail_reports = self._fetch_node_data()
-        self.f_last_failed = set(nodeid.split("::", 1)[0] for nodeid in self.fail_reports)
+        self.node_data, self.reports = self._fetch_node_data()
+        self.f_last_failed = set(nodeid.split("::", 1)[0] for nodeid in self.reports)
         self.f_tests = node_data_to_test_files(self.node_data)
 
     def write_common_data(self):

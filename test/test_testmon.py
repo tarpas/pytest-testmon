@@ -10,7 +10,7 @@ from testmon_dev.testmon_core import eval_variant, NodesData
 from testmon_dev.testmon_core import Testmon as CoreTestmon, TestmonData
 from testmon_dev.testmon_core import TestmonData as CoreTestmonData
 from test.test_process_code import CodeSample
-from testmon_dev.pytest_testmon import PLUGIN_NAME
+from testmon_dev.pytest_testmon import PLUGIN_NAME, READONLY_OPTION
 
 pytest_plugins = "pytester",
 
@@ -313,7 +313,7 @@ class TestmonDeselect(object):
         testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
         testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
         testmon_data.read_data()
-        assert len(testmon_data.fail_reports['test_a.py::test_add']) == 3
+        assert len(testmon_data.reports['test_a.py::test_add']) == 3
 
         tf = testdir.makepyfile(test_a="""
             import pytest
@@ -325,7 +325,7 @@ class TestmonDeselect(object):
         testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
 
         testmon_data.read_data()
-        assert len(testmon_data.fail_reports['test_a.py::test_add']) == 0
+        assert len(testmon_data.reports['test_a.py::test_add']) == 2
 
         tf = testdir.makepyfile(test_a="""
             import pytest
@@ -336,7 +336,7 @@ class TestmonDeselect(object):
         testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", "-v")
 
         testmon_data.read_data()
-        assert len(testmon_data.fail_reports['test_a.py::test_add']) == 3
+        assert len(testmon_data.reports['test_a.py::test_add']) == 3
 
     def test_tlf(self, testdir):
         testdir.makepyfile(test_a="""
@@ -932,6 +932,112 @@ class TestLineAlgEssentialProblems:
         result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         result.stdout.fnmatch_lines([
             "*1 passed*",
+        ])
+
+
+class TestPrioritization:
+
+    def test_module_level(self, testdir):
+        testdir.makepyfile(test_a="""
+                            def test_a():
+                                x = 1
+                                while x < 100000:
+                                    x += 1
+                        """)
+        testdir.makepyfile(test_b="""
+                            def test_b():
+                                x = 1
+                                while x < 1000:
+                                    x += 1
+                        """)
+
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
+        a = testdir.makepyfile(test_a="""
+                            def test_a():
+                                x = 2
+                                while x < 100000:
+                                    x += 1
+                        """)
+        b = testdir.makepyfile(test_b="""
+                            def test_b():
+                                x = 2
+                                while x < 1000:
+                                    x += 1
+                        """)
+        a.setmtime(1424880935)
+        b.setmtime(1424880935)
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}-{READONLY_OPTION}")
+        result.stdout.fnmatch_lines([
+            "test_b.py*",
+            "test_a.py*",
+        ])
+
+    def test_class_level(self, testdir):
+        testdir.makepyfile(test_m="""
+                            class TestA:
+                                def test_a(self):
+                                    x = 1
+                                    while x < 100000:
+                                        x += 1
+                            
+                            class TestB:
+                                def test_b(self):
+                                    x = 1
+                                    while x < 1000:
+                                        x += 1            
+                        """)
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
+        m = testdir.makepyfile(test_m="""
+                            a = 1
+                            class TestA:
+                                def test_a(self):
+                                    x = 1
+                                    while x < 100000:
+                                        x += 1
+
+                            class TestB:
+                                def test_b(self):
+                                    x = 1
+                                    while x < 1000:
+                                        x += 1            
+                        """)
+        m.setmtime(1424880935)
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}-{READONLY_OPTION}", "-v")
+        result.stdout.fnmatch_lines([
+            "*TestB*",
+            "*TestA*",
+        ])
+
+    def test_node_level(self, testdir):
+        testdir.makepyfile(test_m="""
+                            def test_a():
+                                x = 1
+                                while x < 100000:
+                                    x += 1
+
+                            def test_b():
+                                x = 1
+                                while x < 1000:
+                                    x += 1            
+                        """)
+        testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
+        m = testdir.makepyfile(test_m="""
+                            a = 1
+                            def test_a():
+                                x = 1
+                                while x < 100000:
+                                    x += 1
+
+                            def test_b():
+                                x = 1
+                                while x < 1000:
+                                    x += 1            
+                        """)
+        m.setmtime(1424880935)
+        result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}-{READONLY_OPTION}", "-v")
+        result.stdout.fnmatch_lines([
+            "*test_b*",
+            "*test_a*",
         ])
 
 
