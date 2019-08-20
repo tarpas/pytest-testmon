@@ -8,7 +8,7 @@ from collections import defaultdict
 
 import pytest
 
-from testmon_dev.testmon_core import Testmon, eval_variant, TestmonData
+from testmon_dev.testmon_core import Testmon, eval_variant, TestmonData, sort_items_by_duration
 from _pytest import runner
 
 PLUGIN_NAME = 'testmon-dev'
@@ -224,27 +224,6 @@ class TestmonSelect():
             self.collection_ignored.update(self.testmon_data.f_tests[strpath])
             return True
 
-    def sort_items_by_duration(self, items):
-        durations = defaultdict(lambda: {'node_count': 0, 'duration': 0})
-        for item in items:
-            item.duration = sum([report['duration'] for report in self.testmon_data.reports[item.nodeid].values()])
-            item.module_name = item.location[0]
-            item_hierarchy = item.location[2].split('.')
-            item.node_name = item_hierarchy[-1]
-            item.class_name = item_hierarchy[0]
-
-            durations[item.class_name]['node_count'] += 1
-            durations[item.class_name]['duration'] += item.duration
-            durations[item.module_name]['node_count'] += 1
-            durations[item.module_name]['duration'] += item.duration
-
-        for key, stats in durations.items():
-            durations[key]['avg_duration'] = stats['duration'] / stats['node_count']
-
-        items.sort(key=lambda item: item.duration)
-        items.sort(key=lambda item: durations[item.class_name]['avg_duration'])
-        items.sort(key=lambda item: durations[item.module_name]['avg_duration'])
-
 
     @pytest.mark.trylast
     def pytest_collection_modifyitems(self, session, config, items):
@@ -261,7 +240,7 @@ class TestmonSelect():
         items[:] = self.selected
 
         if self.testmon_data.reports:
-            self.sort_items_by_duration(items)
+            sort_items_by_duration(items, self.testmon_data.reports)
 
         session.config.hook.pytest_deselected(
             items=([FakeItemFromTestmon(session.config)] *

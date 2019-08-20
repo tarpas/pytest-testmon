@@ -1,10 +1,13 @@
 import pytest
 from collections import namedtuple
 
+from _pytest.nodes import Item
+
 from testmon_dev.process_code import Module, read_file_with_checksum
 from test.test_process_code import CodeSample
 from testmon_dev.testmon_core import TestmonData as CoreTestmonData, SourceTree, flip_dictionary, stable, \
-    checksums_to_blob, CHECKUMS_ARRAY_TYPE, blob_to_checksums, node_data_to_test_files, NodesData
+    checksums_to_blob, CHECKUMS_ARRAY_TYPE, blob_to_checksums, node_data_to_test_files, NodesData, \
+    sort_items_by_duration
 
 import sqlite3
 
@@ -254,3 +257,38 @@ class TestSourceTree():
         pytest.raises(NoSource, fs_data.get_file, 'c.py')
 
         # parse_fs_changes(stored_version={'a.py': [a_py.mtime, hash(a_py.read_mtime)]})
+
+class TestPrioritization:
+
+    def create_item(self, node_id, location):
+        i = Item(node_id, config='dummy', session='dummy', nodeid=node_id)
+        i._location = location
+        return i
+
+    def test_simple(self):
+        items = [
+            self.create_item('test_a.py::test_a1', ('test_a.py', 0, 'test_a1')),
+            self.create_item('test_a.py::test_a2', ('test_a.py', 0, 'test_a2'))
+        ]
+        reports = {
+            'test_a.py::test_a1': {
+                'setup': {'duration': 1},
+                'call': {'duration': 2},
+                'teardown': {'duration': 1}
+            },
+            'test_a.py::test_a2': {
+                'setup': {'duration': 1},
+                'call': {'duration': 1},
+                'teardown': {'duration': 1}
+            }
+        }
+        sort_items_by_duration(items, reports)
+        assert items[0].nodeid == 'test_a.py::test_a2'
+        assert items[1].nodeid == 'test_a.py::test_a1'
+
+
+
+
+
+
+

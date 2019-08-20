@@ -939,30 +939,26 @@ class TestPrioritization:
 
     def test_module_level(self, testdir):
         testdir.makepyfile(test_a="""
+                            import time
                             def test_a():
-                                x = 1
-                                while x < 100000:
-                                    x += 1
+                                time.sleep(0.5)
                         """)
         testdir.makepyfile(test_b="""
+                            import time
                             def test_b():
-                                x = 1
-                                while x < 1000:
-                                    x += 1
+                                time.sleep(0.1)
                         """)
 
         testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         a = testdir.makepyfile(test_a="""
+                            import time
                             def test_a():
-                                x = 2
-                                while x < 100000:
-                                    x += 1
+                                a=1
                         """)
         b = testdir.makepyfile(test_b="""
+                            import time
                             def test_b():
-                                x = 2
-                                while x < 1000:
-                                    x += 1
+                                b=1
                         """)
         a.setmtime(1424880935)
         b.setmtime(1424880935)
@@ -974,32 +970,25 @@ class TestPrioritization:
 
     def test_class_level(self, testdir):
         testdir.makepyfile(test_m="""
+                            import time
                             class TestA:
                                 def test_a(self):
-                                    x = 1
-                                    while x < 100000:
-                                        x += 1
+                                    time.sleep(0.5)
                             
                             class TestB:
                                 def test_b(self):
-                                    x = 1
-                                    while x < 1000:
-                                        x += 1            
+                                    time.sleep(0.1)            
                         """)
         testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         m = testdir.makepyfile(test_m="""
-                            a = 1
+                            import time
                             class TestA:
                                 def test_a(self):
-                                    x = 1
-                                    while x < 100000:
-                                        x += 1
+                                    a=1
 
                             class TestB:
                                 def test_b(self):
-                                    x = 1
-                                    while x < 1000:
-                                        x += 1            
+                                    b=1
                         """)
         m.setmtime(1424880935)
         result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}-{READONLY_OPTION}", "-v")
@@ -1010,28 +999,20 @@ class TestPrioritization:
 
     def test_node_level(self, testdir):
         testdir.makepyfile(test_m="""
+                            import time
                             def test_a():
-                                x = 1
-                                while x < 100000:
-                                    x += 1
+                                time.sleep(0.5)
 
                             def test_b():
-                                x = 1
-                                while x < 1000:
-                                    x += 1            
+                                time.sleep(0.1)            
                         """)
         testdir.runpytest_subprocess(f"--{PLUGIN_NAME}", )
         m = testdir.makepyfile(test_m="""
-                            a = 1
                             def test_a():
-                                x = 1
-                                while x < 100000:
-                                    x += 1
-
+                                a=1
+                                
                             def test_b():
-                                x = 1
-                                while x < 1000:
-                                    x += 1            
+                                b=1            
                         """)
         m.setmtime(1424880935)
         result = testdir.runpytest_subprocess(f"--{PLUGIN_NAME}-{READONLY_OPTION}", "-v")
