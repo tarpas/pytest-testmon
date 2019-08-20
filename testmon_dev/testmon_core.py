@@ -64,7 +64,7 @@ def stable(node_data, changed_files):
     # but we'll make sure anyway
     for file in changed_files_set:
         for nodeid, fingerprints in file_data[file].items():
-            if not file_has_lines(changed_files[file].full_lines, fingerprints):
+            if not file_has_lines(changed_files[file].full_lines, fingerprints): # TODO or node is must-rerun
                 changed_nodes.add(nodeid)
                 changed_files2.add(nodeid.split('::', 1)[0])
                 changed_files2.add(file)

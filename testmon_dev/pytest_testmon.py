@@ -207,6 +207,11 @@ class TestmonSelect():
         if self.config.getoption(TLF_OPTION):
             self.f_to_ignore -= self.testmon_data.f_last_failed
 
+        self.session = None
+        self.failed_count = 0
+        self.exec_time = 0
+        self.ignore_rest = False
+
     def test_should_run(self, nodeid):
         if self.config.getoption(TLF_OPTION):
             reports = self.testmon_data.reports.get(nodeid)
@@ -268,11 +273,24 @@ class TestmonSelect():
             items=([FakeItemFromTestmon(session.config)] *
                    len(self.collection_ignored.union(self.deselected))))
 
+    def pytest_runtest_protocol(self, item, nextitem):
+        if self.ignore_rest:
+            # TODO mark rest of nodes from module where we stopped
+            return True
+
     def pytest_runtestloop(self, session):
         ignored_deselected = self.collection_ignored.union(self.deselected)
         for nodeid in ignored_deselected:
             self.report_from_db(nodeid)
 
+    def pytest_runtest_logreport(self, report):
+        if not report.nodeid in self.deselected:
+            if report.outcome == 'failed':
+                self.failed_count += 1
+            self.exec_time += report.duration
+
+            if self.failed_count > 0 and self.exec_time > 1:
+                self.ignore_rest = True
 
 class FakeItemFromTestmon(object):
     def __init__(self, config):
