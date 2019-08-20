@@ -8,7 +8,7 @@ from collections import defaultdict
 
 import pytest
 
-from testmon_dev.testmon_core import Testmon, eval_variant, TestmonData, sort_items_by_duration
+from testmon_dev.testmon_core import Testmon, eval_variant, TestmonData
 from _pytest import runner
 
 PLUGIN_NAME = 'testmon-dev'
@@ -124,6 +124,28 @@ def pytest_configure(config):
 def pytest_unconfigure(config):
     if hasattr(config, 'testmon_data'):
         config.testmon_data.close_connection()
+
+
+def sort_items_by_duration(items, reports):
+    durations = defaultdict(lambda: {'node_count': 0, 'duration': 0})
+    for item in items:
+        item.duration = sum([report['duration'] for report in reports[item.nodeid].values()])
+        item.module_name = item.location[0]
+        item_hierarchy = item.location[2].split('.')
+        item.node_name = item_hierarchy[-1]
+        item.class_name = item_hierarchy[0]
+
+        durations[item.class_name]['node_count'] += 1
+        durations[item.class_name]['duration'] += item.duration
+        durations[item.module_name]['node_count'] += 1
+        durations[item.module_name]['duration'] += item.duration
+
+    for key, stats in durations.items():
+        durations[key]['avg_duration'] = stats['duration'] / stats['node_count']
+
+    items.sort(key=lambda item: item.duration)
+    items.sort(key=lambda item: durations[item.class_name]['avg_duration'])
+    items.sort(key=lambda item: durations[item.module_name]['avg_duration'])
 
 
 class TestmonCollect(object):
@@ -255,12 +277,3 @@ class TestmonSelect():
 class FakeItemFromTestmon(object):
     def __init__(self, config):
         self.config = config
-
-class Item:
-    def __init__(self, pytest_item):
-        self.item = pytest_item
-
-    @property
-    def module_name(self):
-        return self.item.location[0]
-

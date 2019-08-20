@@ -80,28 +80,6 @@ def node_data_to_test_files(node_data):
     return test_files
 
 
-def sort_items_by_duration(items, reports):
-    durations = defaultdict(lambda: {'node_count': 0, 'duration': 0})
-    for item in items:
-        item.duration = sum([report['duration'] for report in reports[item.nodeid].values()])
-        item.module_name = item.location[0]
-        item_hierarchy = item.location[2].split('.')
-        item.node_name = item_hierarchy[-1]
-        item.class_name = item_hierarchy[0]
-
-        durations[item.class_name]['node_count'] += 1
-        durations[item.class_name]['duration'] += item.duration
-        durations[item.module_name]['node_count'] += 1
-        durations[item.module_name]['duration'] += item.duration
-
-    for key, stats in durations.items():
-        durations[key]['avg_duration'] = stats['duration'] / stats['node_count']
-
-    items.sort(key=lambda item: item.duration)
-    items.sort(key=lambda item: durations[item.class_name]['avg_duration'])
-    items.sort(key=lambda item: durations[item.module_name]['avg_duration'])
-
-
 class NodesData(dict):
 
     def file_data(self):
