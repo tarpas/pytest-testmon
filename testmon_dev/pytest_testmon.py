@@ -153,7 +153,7 @@ class TestmonCollect(object):
         self.testmon_data = testmon_data
         self.testmon = Testmon(config.project_dirs, testmon_labels=testmon_options(config))
 
-        self.testmon_save = True
+        self.save_mtimes = True
         self.config = config
         self.reports = defaultdict(lambda: {})
         self.file_data = self.testmon_data.file_data()
@@ -169,14 +169,16 @@ class TestmonCollect(object):
         else:
             self.testmon.start()
             result = yield
-            if (result.excinfo and issubclass(result.excinfo[0], BaseException)):
+            if result.excinfo and issubclass(result.excinfo[0], BaseException):
                 self.testmon.stop()
             elif result.get_result() == 'stop':
                 self.testmon.stop()
-                self.testmon_save = False
+                self.save_mtimes = False
             else:
                 self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
                                            self.reports[item.nodeid])
+                if item.session.shouldfail or item.session.shouldstop:
+                    self.save_mtimes = False
 
     def pytest_runtest_logreport(self, report):
         assert report.when not in self.reports, \
@@ -184,13 +186,13 @@ class TestmonCollect(object):
         self.reports[report.nodeid][report.when] = serialize_report(report)
 
     def pytest_internalerror(self, excrepr, excinfo):
-        self.testmon_save = False
+        self.save_mtimes = False
 
     def pytest_keyboard_interrupt(self, excinfo):
-        self.testmon_save = False
+        self.save_mtimes = False
 
     def pytest_sessionfinish(self, session):
-        if self.testmon_save and not self.config.getoption('collectonly') and not self.config.getoption('{}_{}'.format(PLUGIN_NAME, READONLY_OPTION)):
+        if self.save_mtimes and not self.config.getoption('collectonly') and not self.config.getoption('{}_{}'.format(PLUGIN_NAME, READONLY_OPTION)):
             self.testmon_data.write_common_data()
         self.testmon.close()
 
@@ -203,7 +205,7 @@ class TestmonSelect():
         self.testmon = Testmon(config.project_dirs, testmon_labels=testmon_options(config))
 
         self.collection_ignored = set()
-        self.testmon_save = True
+        self.save_mtimes = True
         self.config = config
         self.reports = defaultdict(lambda: {})
         self.selected, self.deselected = [], set()

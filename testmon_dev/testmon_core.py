@@ -64,7 +64,7 @@ def stable(node_data, changed_files):
     # but we'll make sure anyway
     for file in changed_files_set:
         for nodeid, fingerprints in file_data[file].items():
-            if not file_has_lines(changed_files[file].full_lines, fingerprints): # TODO or node is must-rerun
+            if not file_has_lines(changed_files[file].full_lines, fingerprints):
                 changed_nodes.add(nodeid)
                 changed_files2.add(nodeid.split('::', 1)[0])
                 changed_files2.add(file)
@@ -263,11 +263,17 @@ class TestmonData(object):
     def read_source(self):
         mtimes = self._fetch_attribute('mtimes', default={})
         checksums = self._fetch_attribute('file_checksums', default={})
+        all_files_unstable = False
 
+        if not mtimes or not checksums:
+            mtimes = checksums = {name: 0 for name in self.node_data.file_data().keys()}
+            all_files_unstable = True
         self.source_tree = SourceTree(rootdir=self.rootdir, mtimes=mtimes, checksums=checksums)
         self.stable_nodeids, self.stable_files = stable(self.node_data,
                                                         self.source_tree.get_changed_files())
 
+        if all_files_unstable:
+            self.stable_files = set()
 
 class Testmon(object):
     def __init__(self, project_dirs, testmon_labels=set()):
