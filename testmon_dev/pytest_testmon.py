@@ -195,6 +195,9 @@ class TestmonCollect(object):
         self.testmon.close()
 
 class TestmonSelect():
+    MAX_FAILED_COUNT = 0
+    MAX_EXEC_TIME = 10
+
     def __init__(self, config, testmon_data):
         self.testmon_data = testmon_data
         self.testmon = Testmon(config.project_dirs, testmon_labels=testmon_options(config))
@@ -209,7 +212,7 @@ class TestmonSelect():
         if self.config.getoption(TLF_OPTION):
             self.f_to_ignore -= self.testmon_data.f_last_failed
 
-        self.failed_count = 0
+        self.curr_failed_nodeids = set()
         self.exec_time = 0
         self.ignore_rest = False
 
@@ -279,19 +282,17 @@ class TestmonSelect():
             return 'stop'
 
     def pytest_runtestloop(self, session):
-        self.session = session
         ignored_deselected = self.collection_ignored.union(self.deselected)
         for nodeid in ignored_deselected:
             self.report_from_db(nodeid)
 
     def pytest_runtest_logreport(self, report):
-        if not report.nodeid in self.deselected:
-            # TODO can one test fail in multiple phases?
+        if not report.nodeid in self.deselected and report.location[0] in self.file_data:
             if report.outcome == 'failed':
-                self.failed_count += 1
+                self.curr_failed_nodeids.add(report.nodeid)
             self.exec_time += report.duration
 
-            if self.failed_count > 0 and self.exec_time > 1:
+            if self.exec_time >= self.MAX_EXEC_TIME and len(self.curr_failed_nodeids) > self.MAX_FAILED_COUNT:
                 self.ignore_rest = True
 
 class FakeItemFromTestmon(object):

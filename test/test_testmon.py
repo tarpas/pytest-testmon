@@ -6,12 +6,13 @@ import pytest
 from _pytest.nodes import Item
 
 from test.coveragepy import coveragetest
+from testmon_dev import pytest_testmon
 from testmon_dev.process_code import Module
 from testmon_dev.testmon_core import eval_variant, NodesData
 from testmon_dev.testmon_core import Testmon as CoreTestmon, TestmonData
 from testmon_dev.testmon_core import TestmonData as CoreTestmonData
 from test.test_process_code import CodeSample
-from testmon_dev.pytest_testmon import PLUGIN_NAME, READONLY_OPTION, sort_items_by_duration
+from testmon_dev.pytest_testmon import PLUGIN_NAME, READONLY_OPTION, sort_items_by_duration, TestmonSelect
 
 pytest_plugins = "pytester",
 
@@ -1050,6 +1051,34 @@ class TestPrioritization:
             "*test_a*",
         ])
 
+
+class TestStopConditions(object):
+
+    def test_simple(self, testdir, monkeypatch):
+        testdir.makepyfile(test_m="""
+                          import time
+                          def test_a():
+                              pass
+
+                          def test_b():
+                              time.sleep(0.1)            
+                      """)
+        testdir.runpytest_inprocess(f"--{PLUGIN_NAME}", )
+
+        monkeypatch.setattr(pytest_testmon.TestmonSelect, 'MAX_EXEC_TIME', 0.2)
+        testdir.makepyfile(test_m="""
+                                  import time
+                                  def test_a():
+                                      time.sleep(0.4)    
+                                      assert False
+                                  
+                                  def test_b():
+                                      pass            
+                              """)
+        result = testdir.runpytest_inprocess(f"--{PLUGIN_NAME}-{READONLY_OPTION}", "-v")
+        result.stdout.fnmatch_lines([
+            "*1 failed in*",
+        ])
 
 class TestXdist(object):
 
