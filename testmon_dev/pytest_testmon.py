@@ -169,8 +169,11 @@ class TestmonCollect(object):
         else:
             self.testmon.start()
             result = yield
-            if result.excinfo and issubclass(result.excinfo[0], BaseException):
+            if (result.excinfo and issubclass(result.excinfo[0], BaseException)):
                 self.testmon.stop()
+            elif result.get_result() == 'stop':
+                self.testmon.stop()
+                self.testmon_save = False
             else:
                 self.testmon.stop_and_save(self.testmon_data, item.config.rootdir.strpath, item.nodeid,
                                            self.reports[item.nodeid])
@@ -191,7 +194,6 @@ class TestmonCollect(object):
             self.testmon_data.write_common_data()
         self.testmon.close()
 
-
 class TestmonSelect():
     def __init__(self, config, testmon_data):
         self.testmon_data = testmon_data
@@ -207,7 +209,6 @@ class TestmonSelect():
         if self.config.getoption(TLF_OPTION):
             self.f_to_ignore -= self.testmon_data.f_last_failed
 
-        self.session = None
         self.failed_count = 0
         self.exec_time = 0
         self.ignore_rest = False
@@ -275,16 +276,17 @@ class TestmonSelect():
 
     def pytest_runtest_protocol(self, item, nextitem):
         if self.ignore_rest:
-            # TODO mark rest of nodes from module where we stopped
-            return True
+            return 'stop'
 
     def pytest_runtestloop(self, session):
+        self.session = session
         ignored_deselected = self.collection_ignored.union(self.deselected)
         for nodeid in ignored_deselected:
             self.report_from_db(nodeid)
 
     def pytest_runtest_logreport(self, report):
         if not report.nodeid in self.deselected:
+            # TODO can one test fail in multiple phases?
             if report.outcome == 'failed':
                 self.failed_count += 1
             self.exec_time += report.duration
