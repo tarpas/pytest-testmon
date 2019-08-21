@@ -113,6 +113,18 @@ class TestDepGraph():
 
         assert stable(td.node_data, blockify(changes))[0] == {'node2'}
 
+    def test_read_source_empty_mtimes(self, testdir):
+        td = CoreTestmonData(testdir.tmpdir.strpath)
+        td.node_data = NodesData({'test_a.py::node1': {'test_a.py': ['101', '102'], 'a.py': ['105', '106']},
+                                  'test_b.py::node2': {'test_b.py': ['200', '201'], 'a.py': ['102', '103']}})
+
+        testdir.makepyfile(test_a="", test_b="")
+
+        td.read_source()
+
+        assert td.stable_files.intersection({'test_a.py', 'test_b.py'}) == set()
+        assert td.stable_nodeids == set() # something
+
     def test_affected_list2(self):
         changes = blockify({'test_a.py': ['102', '103']})
         dependencies = NodesData({'node1': {'test_a.py': ['102', '103', '104']}, })
