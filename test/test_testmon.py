@@ -39,6 +39,14 @@ def track_it(testdir, func):
     return queue.get()
 
 
+@pytest.fixture
+def test_a(testdir):
+    return testdir.makepyfile(test_a="""\
+                def test_1():
+                    print(1)
+    """)
+
+
 class TestVariant:
 
     def test_separation(self, testdir):
@@ -370,23 +378,12 @@ class TestmonDeselect(object):
             "*test_a.py::test_add PASSED*",
         ])
 
-    @pytest.mark.xfail
-    def test_interrupted(self, testdir):
-        testdir.makepyfile(test_a="""
-             def test_1():
-                 1
-
-             def test_2():
-                 2
-         """)
+    def test_interrupted(self, test_a, testdir):
         testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
 
         tf = testdir.makepyfile(test_a="""
-             def test_1():
-                 raise KeyboardInterrupt
-
-             def test_2():
-                 3
+            def test_1():
+                raise KeyboardInterrupt
          """)
         os.utime(datafilename, (1800000000, 1800000000))
         tf.setmtime(1800000000)
@@ -396,24 +393,13 @@ class TestmonDeselect(object):
         # interrupted run shouldn't save .testmondata
         assert 1800000000 == os.path.getmtime(datafilename)
 
-    @pytest.mark.xfail
-    def test_outcomes_exit(self, testdir):
-        testdir.makepyfile(test_a="""
-             def test_1():
-                 1
-
-             def test_2():
-                 2
-         """)
+    def test_outcomes_exit(self, test_a, testdir):
         testdir.runpytest_subprocess(f"--{PLUGIN_NAME}")
 
         tf = testdir.makepyfile(test_a="""
              def test_1():
                  import pytest
                  pytest.exit("pytest_exit")
-
-             def test_2():
-                 3
          """)
         os.utime(datafilename, (1800000000, 1800000000))
         tf.setmtime(1800000000)
