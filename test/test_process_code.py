@@ -1,12 +1,11 @@
 #  -- coding:utf8 --
-import ast
-
 import pytest
+import os
 
 from test.test_human_coverage import TestmonCoverageTest
 from testmon_dev.process_code import Module, read_file_with_checksum, \
     file_has_lines, \
-    get_indent_level, GAP_MARKS, create_fingerprints, function_lines, gap_marks_until, cover_subindented_multilines
+    get_indent_level, GAP_MARKS, create_fingerprints, gap_marks_until, cover_subindented_multilines
 
 try:
     from StringIO import StringIO as MemFile
@@ -16,23 +15,23 @@ except ImportError:
 from collections import namedtuple
 
 
-def parse(source_code, file_name='a.py'):
-    return Module(source_code=source_code, file_name=file_name).blocks
-
-
 class TestReadSrc:
 
+    def prepend_samples_dir(self, name):
+        return os.path.join(os.path.dirname(__file__), 'samples', name)
+
     def test_read_file_with_checksum(self):
-        assert u'š' in read_file_with_checksum('test/samples/print1250r.py')[0]
+        assert u'š' in read_file_with_checksum(self.prepend_samples_dir('print1250r.py'))[0]
 
     def test_read_empty_file_with_checksum(self):
-        assert read_file_with_checksum('test/samples/empty.py')[0] == ''
+        assert read_file_with_checksum(self.prepend_samples_dir('empty.py'))[0] == ''
 
     def test_read_2lines_file_with_checksum(self):
-        assert read_file_with_checksum('test/samples/2lines.py')[0] == '# -*- coding: cp1250 -*-\n#2ndline\n'
+        assert read_file_with_checksum(
+            self.prepend_samples_dir('2lines.py'))[0] == '# -*- coding: cp1250 -*-\n#2ndline\n'
 
     def test_module_with_1250(self):
-        Module(None, 'test/samples/print1250r.py')
+        Module(None, self.prepend_samples_dir('print1250r.py'))
 
 
 class TestNewModule(object):
@@ -112,7 +111,6 @@ code_samples = {
                             [1, 2, 4]),
 }
 
-
 b = namedtuple('FakeBlock', 'start end')
 
 
@@ -150,7 +148,7 @@ class TestGapMarksUntil:
         assert gap_marks_until(['  a'], 0, 1) == ([GAP_MARKS[1]], 1)
 
     def test_eof(self):
-        assert gap_marks_until([' a',], 1, 2) == ([GAP_MARKS[0]], 2)
+        assert gap_marks_until([' a', ], 1, 2) == ([GAP_MARKS[0]], 2)
 
     def test_multiline(self):
         assert gap_marks_until([' 1', '2', ' 3'], 0, 3) == ([GAP_MARKS[0], '2', GAP_MARKS[0]], 3)
