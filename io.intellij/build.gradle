@@ -2,13 +2,13 @@ import org.apache.tools.ant.taskdefs.condition.Os
 
 plugins {
     id 'maven'
-    id 'org.jetbrains.intellij' version '0.3.12'
+    id 'org.jetbrains.intellij' version '0.4.10'
     id "de.undercouch.download" version "3.4.3"
     id "org.jetbrains.kotlin.jvm" version "1.3.0"
 }
 
 group 'sk.infinit'
-version '0.15.13'
+version '0.15.14'
 sourceCompatibility = 1.8
 
 repositories {
@@ -21,14 +21,15 @@ dependencies {
 }
 
 intellij {
-    version "IC-2018.3" // https://www.jetbrains.com/idea/download/#section=linux
-    plugins = ["PythonCore:2018.3.183.4284.148"] // https://plugins.jetbrains.com/plugin/631-python
+    type "PC"
+    version "PC-2019.2" // https://www.jetbrains.com/idea/download/#section=linux
+//    plugins = ["PythonCore:2019.2.192.6262.58"] // https://plugins.jetbrains.com/plugin/631-python
     pluginName 'runtime-info'
 }
 
 patchPluginXml {
     sinceBuild '171.*'
-    untilBuild '184.*'
+    untilBuild '192.*'
 }
 
 publishPlugin {
@@ -51,6 +52,10 @@ patchPluginXml {
     """
 
     changeNotes """
+    0.15.14<br>
+    <ul>
+        <li>Python bug-fixes, compatibility with Pycharm 2019.2
+    </ul>
     0.15.12<br>
     <ul>
         <li>Improvement: picking only one exception for navigation when multiple of them hit one line</li>
