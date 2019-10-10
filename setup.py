@@ -2,18 +2,15 @@ from setuptools import setup
 
 setup(
     name='pytest-testmon',
-    description='find bugs 10x faster',
-    long_description=''.join(open('README.rst').readlines()),
-    version='0.9.19',
-    license='MIT',
+    description='automatically selects tests affected by changed files and methods',
+    long_description='TODO',
+    version='1.0.0a2',
+    license='AGPL',
     platforms=['linux', 'osx', 'win32'],
     packages=['testmon'],
     url='https://testmon.org',
-    project_urls={
-        "Source Code": 'https://github.com/tarpas/pytest-testmon/',
-    },
     author_email='tibor.arpas@infinit.sk',
-    author='Tibor Arpas, Jozef Knaperek, Martin Riesz, Daniel Hahler',
+    author='Tibor Arpas, Daniel Hahler, Tomas Matlovic, Martin Racak',
     entry_points={
         'pytest11': [
             'testmon = testmon.pytest_testmon',
@@ -22,10 +19,7 @@ setup(
             'testmon = testmon.tox_testmon',
         ],
     },
-    install_requires=[
-        'pytest>=2.8.0,<6',
-        'coverage>=4,<5',
-    ],
+    install_requires=['pytest>=5,<6', 'coverage>=4'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
@@ -36,5 +30,9 @@ setup(
         'Topic :: Software Development :: Libraries',
         'Topic :: Utilities',
         'Programming Language :: Python',
-    ],
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3 :: Only'],
 )
