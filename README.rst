@@ -21,4 +21,4 @@ Quickstart
     pytest --testmon
 
 
-To learn more about specifying multiple project directories, configuring “sticky” testmon and troubleshooting, please head to `testmon.org <https://testmon.org>`_
+To learn more about specifying multiple project directories and troubleshooting, please head to `testmon.org <https://testmon.org>`_
