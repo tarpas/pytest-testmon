@@ -4,7 +4,7 @@ setup(
     name='pytest-testmon',
     description='automatically selects tests affected by changed files and methods',
     long_description='TODO',
-    version='1.0.0a2',
+    version='1.0.0a3',
     license='AGPL',
     platforms=['linux', 'osx', 'win32'],
     packages=['testmon'],
@@ -19,7 +19,7 @@ setup(
             'testmon = testmon.tox_testmon',
         ],
     },
-    install_requires=['pytest>=5,<6', 'coverage>=4'],
+    install_requires=['pytest>=5,<6', 'coverage>=4,<5'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
