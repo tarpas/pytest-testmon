@@ -49,35 +49,36 @@ hookimpl = pluggy.HookimplMarker("tox")
 def _uses_testmon(envconfig):
     """Test if an envconfig uses testmon by looking at the command(s)."""
     for command in envconfig.commands:
-        if '--testmon' in command:
+        if "--testmon" in command:
             return True
     return False
 
 
 def touch_stampfile(venv):
-    open(venv.path.join('.testmon_installed'), 'a').close()
+    open(venv.path.join(".testmon_installed"), "a").close()
 
 
 def installed_testmon(venv):
-    return os.path.exists(venv.path.join('.testmon_installed'))
+    return os.path.exists(venv.path.join(".testmon_installed"))
 
 
 @hookimpl
 def tox_runenvreport(venv, action):
-    if 'TESTMON_DATAFILE' in venv.envconfig.setenv:
-        datafile = venv.envconfig.setenv['TESTMON_DATAFILE']
-        action.setactivity('testmon', 'keeping TESTMON_DATAFILE=%s' % datafile)
+    if "TESTMON_DATAFILE" in venv.envconfig.setenv:
+        datafile = venv.envconfig.setenv["TESTMON_DATAFILE"]
+        action.setactivity("testmon", "keeping TESTMON_DATAFILE=%s" % datafile)
     else:
-        datafile = str(venv.path.join('.testmondata'))
-        action.setactivity('testmon', 'setting TESTMON_DATAFILE=%s' % datafile)
-        venv.envconfig.setenv['TESTMON_DATAFILE'] = datafile
+        datafile = str(venv.path.join(".testmondata"))
+        action.setactivity("testmon", "setting TESTMON_DATAFILE=%s" % datafile)
+        venv.envconfig.setenv["TESTMON_DATAFILE"] = datafile
 
-    if (_uses_testmon(venv.envconfig)
-            and 'pytest-testmon' not in (x.name for x in venv.envconfig.deps)):
+    if _uses_testmon(venv.envconfig) and "pytest-testmon" not in (
+        x.name for x in venv.envconfig.deps
+    ):
         if not installed_testmon(venv):
-            action.setactivity('testmon', 'installing pytest-testmon')
+            action.setactivity("testmon", "installing pytest-testmon")
             # Uses _install for handling configured indexservers.
             # venv.run_install_command(['pytest-testmon'], action=action)
-            venv._install([DepConfig('pytest-testmon')], action=action)
+            venv._install([DepConfig("pytest-testmon")], action=action)
 
             touch_stampfile(venv)

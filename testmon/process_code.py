@@ -6,13 +6,16 @@ import zlib
 import re
 
 from coverage.python import get_python_source
+from coverage.misc import NoSource
+
 
 def encode_lines(lines):
     checksums = []
     for line in lines:
-        checksums.append(zlib.adler32(line.encode('UTF-8')))
+        checksums.append(zlib.adler32(line.encode("UTF-8")))
 
     return checksums
+
 
 
 GAP_MARKS = {i: f"{i}GAP" for i in range(-1, 64)}
@@ -22,7 +25,14 @@ blank_re = re.compile(r"\s*(#|$)")
 
 
 class Module(object):
-    def __init__(self, source_code=None, file_name='<unknown>', rootdir='', mtime=None, checksum=None):
+    def __init__(
+        self,
+        source_code=None,
+        file_name="<unknown>",
+        rootdir="",
+        mtime=None,
+        checksum=None,
+    ):
 
         if source_code is None:
             absfilename = os.path.join(rootdir, file_name)
@@ -63,7 +73,7 @@ def function_lines(node, end):
     result = []
 
     if isinstance(node, ast.AST):
-        if node.__class__.__name__ == 'FunctionDef':
+        if node.__class__.__name__ == "FunctionDef":
             result.append((node.body[0].lineno, end))
 
         for field_name, field_value in ast.iter_fields(node):
@@ -78,18 +88,21 @@ def function_lines(node, end):
 
 def read_file_with_checksum(absfilename):
     hasher = hashlib.sha1()
-    source = get_python_source(absfilename)
-    hasher.update(source.encode('utf-8'))
+    try:
+        source = get_python_source(absfilename)
+    except NoSource:
+        return None, None
+    hasher.update(source.encode("utf-8"))
     return source, hasher.hexdigest()
 
 
 def get_indent_level(line):
     space_count = 0
     for c in line:
-        if c == ' ':
+        if c == " ":
             space_count += 1
             continue
-        elif c == '\t':
+        elif c == "\t":
             space_count += 8 - (space_count % 8)
         else:
             return space_count
@@ -147,26 +160,39 @@ def create_fingerprints(afile, special_blocks, coverage):
         if blank_re.match(line):
             continue
 
-        if line_idx in special_blocks and line_idx not in coverage and                not covered_unused_statement(line_idx + 1, special_blocks[line_idx], coverage):
-            fingerprints, line_idx = gap_marks_until(afile, line_idx - 1, special_blocks[line_idx])
+        if (
+            line_idx in special_blocks
+            and line_idx not in coverage
+            and not covered_unused_statement(
+                line_idx + 1, special_blocks[line_idx], coverage
+            )
+        ):
+            fingerprints, line_idx = gap_marks_until(
+                afile, line_idx - 1, special_blocks[line_idx]
+            )
             result.extend(fingerprints)
         else:
             result.append(line)
     return result
 
 
-def file_has_lines(full_lines, full_lines_checksums, fingerprints):
+def file_has_lines(full_lines, fingerprints):
     file_idx = 0
     fingerprint_idx = 0
 
     while file_idx < len(full_lines) and fingerprint_idx < len(fingerprints):
 
-        searching_indent = INVERTED_GAP_MARKS_CHECKSUMS.get(fingerprints[fingerprint_idx])
+        searching_indent = INVERTED_GAP_MARKS_CHECKSUMS.get(
+            fingerprints[fingerprint_idx]
+        )
         if searching_indent is not None:
-            while file_idx < len(full_lines) and get_indent_level(full_lines[file_idx]) > searching_indent:
+            while (
+                file_idx < len(full_lines)
+                and get_indent_level(full_lines[file_idx]) > searching_indent
+            ):
                 file_idx += 1
         else:
-            if full_lines_checksums[file_idx] != fingerprints[fingerprint_idx]:
+            if encode_lines([full_lines[file_idx]])[0] != fingerprints[fingerprint_idx]:
                 return False
             file_idx += 1
 

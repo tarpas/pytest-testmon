@@ -4,7 +4,7 @@ setup(
     name='pytest-testmon',
     description='automatically selects tests affected by changed files and methods',
     long_description='TODO',
-    version='1.0.0a3',
+    version='1.0.0a4',
     license='AGPL',
     platforms=['linux', 'osx', 'win32'],
     packages=['testmon'],
