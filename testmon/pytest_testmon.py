@@ -26,7 +26,7 @@ def serialize_report(rep):
         if isinstance(d[name], py.path.local):
             d[name] = str(d[name])
         elif name == "result":
-            d[name] = None  
+            d[name] = None
     return d
 
 
@@ -223,7 +223,7 @@ class TestmonCollect(object):
             self.raw_nodeids.extend(
                 [item.nodeid for item in items if isinstance(item, pytest.Item)]
             )
-        except TypeError:  
+        except TypeError:
             pass
 
     def pytest_collection_modifyitems(self, session, config, items):
@@ -284,10 +284,6 @@ class TestmonSelect:
 
         failing_files, failing_nodes = get_failing(testmon_data.all_nodes)
 
-        
-        
-        
-        
 
         self.failing_nodes = failing_nodes
 

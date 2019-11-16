@@ -83,7 +83,7 @@ def is_python_file(file_path):
 def get_measured_relfiles(rootdir, cov, test_file):
     files = {
         test_file: set()
-    }  
+    }
     c = cov.config
     for filename in cov.get_data().measured_files():
         if not is_python_file(filename):
@@ -161,7 +161,6 @@ def split_filter(disk, function, records):
 
 
 class TestmonData(object):
-    
     DATA_VERSION = 6
 
     def __init__(self, rootdir="", environment=None):
@@ -263,7 +262,7 @@ class TestmonData(object):
         )
         result = cursor.fetchone()
         if result:
-            return json.loads(result[0])  
+            return json.loads(result[0])
         else:
             return default
 
@@ -387,7 +386,7 @@ class TestmonData(object):
 
                 if (
                     db_checksum != checksum or db_mtime != mtime
-                ):  
+                ):
                     self.update_mtimes([(mtime, checksum, fingerprint_id)])
 
                 con.execute(
@@ -444,25 +443,19 @@ class TestmonData(object):
 
         filenames_fingerprints = self.filenames_fingerprints
 
-        
-        
 
         _, mtime_misses = split_filter(
             self.source_tree, check_mtime, filenames_fingerprints
-        )  
+        )
 
         checksum_hits, checksum_misses = split_filter(
             self.source_tree, check_checksum, mtime_misses
-        )  
+        )
 
         changed_file_data = self.get_changed_file_data(
             {checksum_miss["fingerprint_id"] for checksum_miss in checksum_misses}
-        )  
+        )
 
-        
-        
-        
-        
 
         fingerprint_hits, fingerprint_misses = split_filter(
             self.source_tree, check_fingerprint, changed_file_data
@@ -481,7 +474,7 @@ class TestmonData(object):
             self.unstable_nodeids.add(fingerprint_miss[1])
             self.unstable_files.add(fingerprint_miss[1].split("::", 1)[0])
 
-        self.stable_nodeids = set(self.all_nodes) - self.unstable_nodeids  
+        self.stable_nodeids = set(self.all_nodes) - self.unstable_nodeids
         self.stable_files = self.all_files - self.unstable_files
 
         self.update_mtimes(get_new_mtimes(self.source_tree, checksum_hits))
