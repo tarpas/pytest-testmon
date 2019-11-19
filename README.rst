@@ -1,8 +1,3 @@
-.. image:: https://secure.travis-ci.org/tarpas/pytest-testmon.png?branch=master
-   :alt: Build Status
-   :target: https://travis-ci.org/tarpas/pytest-testmon
-
-
 This is a pytest plug-in which automatically selects and re-executes only tests affected by recent changes. How is this possible in dynamic language like Python and how reliable is it? Read here: `Determining affected tests <https://testmon.org/determining-affected-tests.html>`_
 
 Quickstart
