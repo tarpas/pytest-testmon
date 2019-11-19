@@ -77,14 +77,6 @@ def pytest_addoption(parser):
 
 
     group.addoption(
-        "--testmon-track-dir",
-        action="append",
-        dest="project_directory",
-        help="Only files under this directory will be tracked. Can be repeated.",
-        default=None,
-    )
-
-    group.addoption(
         "--testmon-env",
         action="store",
         type=str,
@@ -105,7 +97,6 @@ def testmon_options(config):
         "testmon",
         "no-testmon",
         "environment_expression",
-        "project_directory",
     ]:
         if config.getoption(label):
             result.append(label.replace("testmon_", ""))
@@ -115,9 +106,7 @@ def testmon_options(config):
 def init_testmon_data(config, read_source=True):
     if not hasattr(config, "testmon_data"):
         environment = eval_environment(config.getini("environment_expression"))
-        config.project_dirs = config.getoption("project_directory") or [
-            config.rootdir.strpath
-        ]
+        config.project_dirs = [config.rootdir.strpath]
         testmon_data = TestmonData(config.project_dirs[0], environment=environment)
         if read_source:
             testmon_data.determine_stable()
