@@ -109,7 +109,7 @@ class SourceTree:
             code, checksum = read_file_with_checksum(
                 os.path.join(self.rootdir, filename)
             )
-            if code:
+            if checksum:
                 fs_mtime = os.path.getmtime(os.path.join(self.rootdir, filename))
                 self.cache[filename] = Module(
                     source_code=code,
