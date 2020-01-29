@@ -1,6 +1,3 @@
-from array import array
-from collections import defaultdict
-
 import hashlib
 import json
 import os
@@ -8,8 +5,9 @@ import random
 import sqlite3
 import sys
 import textwrap
-
-import coverage
+from array import array
+from collections import defaultdict
+from coverage import Coverage
 from coverage.tracer import CTracer
 
 from testmon.process_code import (
@@ -95,6 +93,10 @@ def get_measured_relfiles(rootdir, cov, test_file):
             f"{c.config_files}, {c._omit}, {c._include}, {c.source}"
         )
     return files
+
+
+class TestmonException(Exception):
+    pass
 
 
 class SourceTree:
@@ -253,7 +255,7 @@ class TestmonData(object):
             "The stored data file {} version ({}) is not compatible with current version ({})."
             " You must delete the stored data to continue."
         ).format(self.datafile, stored_data_version, self.DATA_VERSION)
-        raise Exception(msg)
+        raise TestmonException(msg)
 
     def _fetch_attribute(self, attribute, default=None, environment=None):
         cursor = self.connection.execute(
@@ -492,19 +494,24 @@ def get_new_mtimes(filesystem, hits):
 class Testmon(object):
     coverage_stack = []
 
-    def __init__(self, project_dirs, testmon_labels=set(["singleprocess"])):
-        self.project_dirs = project_dirs
+    def __init__(self, rootdir="", testmon_labels=None, cov_plugin=None):
+        if testmon_labels is None:
+            testmon_labels = set(["singleprocess"])
+        self.rootdir = rootdir
         self.testmon_labels = testmon_labels
-        self.setup_coverage(not ("singleprocess" in testmon_labels))
+        self.cov = None
+        self.setup_coverage(not ("singleprocess" in testmon_labels), cov_plugin)
 
-    def setup_coverage(self, subprocess):
-        includes = [os.path.join(path, "*") for path in self.project_dirs]
+    def setup_coverage(self, subprocess, cov_plugin=None):
+        params = {
+            "include": [os.path.join(self.rootdir, "*")],
+            "omit": _get_python_lib_paths(),
+        }
 
-        self.cov = coverage.Coverage(
-            include=includes,
-            omit=_get_python_lib_paths(),
-            data_file=getattr(self, "sub_cov_file", None),
-            config_file=False,
+
+
+        self.cov = Coverage(
+            data_file=getattr(self, "sub_cov_file", None), config_file=False, **params
         )
         self.cov._warn_no_data = False
 
@@ -514,6 +521,7 @@ class Testmon(object):
 
         self.cov.erase()
         self.cov.start()
+
 
     def stop(self):
         self.cov.stop()
@@ -570,10 +578,16 @@ class TestmonConfig:
         return None
 
     def _get_nocollect_reasons(
-        self, options, debugger=False, coverage=False, dogfooding=False
+        self,
+        options,
+        debugger=False,
+        coverage=False,
+        dogfooding=False,
+        cov_plugin=False,
     ):
         if options["testmon_nocollect"]:
             return [None]
+
 
         if coverage and not dogfooding:
             return ["it's not compatible with coverage.py"]
@@ -612,7 +626,13 @@ class TestmonConfig:
             return []
 
     def _header_collect_select(
-        self, options, debugger=False, coverage=False, dogfooding=False, xdist=False
+        self,
+        options,
+        debugger=False,
+        coverage=False,
+        dogfooding=False,
+        xdist=False,
+        cov_plugin=False,
     ):
         notestmon_reasons = self._get_notestmon_reasons(options, xdist=xdist)
 
@@ -622,7 +642,11 @@ class TestmonConfig:
             return "testmon: " + notestmon_reasons, False, False
 
         nocollect_reasons = self._get_nocollect_reasons(
-            options, debugger=debugger, coverage=coverage, dogfooding=dogfooding
+            options,
+            debugger=debugger,
+            coverage=coverage,
+            dogfooding=dogfooding,
+            cov_plugin=cov_plugin,
         )
 
         noselect_reasons = self._get_noselect_reasons(options)
@@ -641,13 +665,14 @@ class TestmonConfig:
             not bool(noselect_reasons),
         )
 
-    def header_collect_select(self, config, coverage_stack):
+    def header_collect_select(self, config, coverage_stack, cov_plugin=None):
         options = vars(config.option)
         return self._header_collect_select(
             options,
             debugger=self._is_debugger(),
             coverage=self._is_coverage(),
             xdist=self._is_xdist(options),
+            cov_plugin=cov_plugin,
         )
 
 

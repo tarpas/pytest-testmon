@@ -10,6 +10,7 @@ from testmon.testmon_core import (
     TestmonData,
     home_file,
     TestmonConfig,
+    TestmonException,
 )
 from _pytest import runner
 
@@ -106,8 +107,7 @@ def testmon_options(config):
 def init_testmon_data(config, read_source=True):
     if not hasattr(config, "testmon_data"):
         environment = eval_environment(config.getini("environment_expression"))
-        config.project_dirs = [config.rootdir.strpath]
-        testmon_data = TestmonData(config.project_dirs[0], environment=environment)
+        testmon_data = TestmonData(config.rootdir.strpath, environment=environment)
         if read_source:
             testmon_data.determine_stable()
         config.testmon_data = testmon_data
@@ -116,30 +116,39 @@ def init_testmon_data(config, read_source=True):
 def pytest_configure(config):
     coverage_stack = None
 
+    plugin = None
+
+
     testmon_config = TestmonConfig()
     message, should_collect, should_select = testmon_config.header_collect_select(
-        config, coverage_stack
+        config, coverage_stack, cov_plugin=plugin
     )
     config.testmon_config = (message, should_collect, should_select)
     if should_select or should_collect:
         config.option.continue_on_collection_errors = True
-        init_testmon_data(config)
 
-        if should_select:
-            config.pluginmanager.register(
-                TestmonSelect(config, config.testmon_data), "TestmonSelect"
-            )
+        try:
+            init_testmon_data(config)
 
-        if should_collect:
-            config.pluginmanager.register(
-                TestmonCollect(
-                    Testmon(
-                        config.project_dirs, testmon_labels=testmon_options(config)
+            if should_select:
+                config.pluginmanager.register(
+                    TestmonSelect(config, config.testmon_data), "TestmonSelect"
+                )
+
+            if should_collect:
+                config.pluginmanager.register(
+                    TestmonCollect(
+                        Testmon(
+                            config.rootdir.strpath,
+                            testmon_labels=testmon_options(config),
+                            cov_plugin=plugin,
+                        ),
+                        config.testmon_data,
                     ),
-                    config.testmon_data,
-                ),
-                "TestmonCollect",
-            )
+                    "TestmonCollect",
+                )
+        except TestmonException as e:
+            pytest.exit(str(e))
 
 
 def pytest_report_header(config):
