@@ -5,8 +5,11 @@ import random
 import sqlite3
 import sys
 import textwrap
+from packaging import version
 from array import array
 from collections import defaultdict
+
+import coverage
 from coverage import Coverage
 from coverage.tracer import CTracer
 
@@ -50,20 +53,13 @@ class cached_property(object):
         return value
 
 
+
 def _get_python_lib_paths():
     res = [sys.prefix]
     for attr in ["exec_prefix", "real_prefix", "base_prefix"]:
         if getattr(sys, attr, sys.prefix) not in res:
             res.append(getattr(sys, attr))
     return [os.path.join(d, "*") for d in res]
-
-
-def flip_dictionary(node_data):
-    files = defaultdict(lambda: {})
-    for nodeid, node_files in node_data.items():
-        for filename, checksums in node_files.items():
-            files[filename][nodeid] = checksums
-    return files
 
 
 DISAPPEARED_FILE = Module("#dissapeared file")
@@ -517,8 +513,8 @@ class Testmon(object):
 
 
     def start(self):
-        Testmon.coverage_stack.append(self.cov)
 
+        Testmon.coverage_stack.append(self.cov)
         self.cov.erase()
         self.cov.start()
 

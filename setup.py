@@ -1,12 +1,14 @@
 from setuptools import setup
 
+
 long_description = "".join(open("README.rst").readlines())
+
 
 setup(
     name="pytest-testmon",
-    description="selects tests affected by changes files and methods",
+    description="selects tests affected by changed files and methods",
     long_description=long_description,
-    version="1.0.1",
+    version="1.0.2",
     license="AGPL",
     platforms=["linux", "osx", "win32"],
     packages=["testmon",],
@@ -18,7 +20,7 @@ setup(
         "tox": ["testmon = testmon.tox_testmon",],
     },
     python_requires=">=3.6",
-    install_requires=["pytest>=5,<6", "coverage>=4,<5"],
+    install_requires=["pytest>=5,<6", "coverage>=4,<6"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
