@@ -43,11 +43,15 @@ class Module(object):
         self.source_code = source_code
         self.checksum = checksum
         self.mtime = mtime
-        self.ast = ast.parse(source_code)
         self.lines = source_code.splitlines()
         self.full_lines = list(filter(lambda x: not blank_re.match(x), self.lines))
         self._full_lines_checksums = []
-        self.special_blocks = dict(function_lines(self.ast, len(self.lines)))
+
+        try:
+            self.ast = ast.parse(source_code)
+            self.special_blocks = dict(function_lines(self.ast, len(self.lines)))
+        except SyntaxError:
+            pass
 
     @property
     def full_lines_checksums(self):
