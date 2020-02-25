@@ -70,10 +70,10 @@ def pytest_addoption(parser):
         "--no-testmon",
         action="store_true",
         dest="no-testmon",
-        help="""
-        Turn off (even if activated from config by default). Forced if neither read nor write is possible (debugger 
-        plus test selector)
-        """,
+        help=(
+            "Turn off (even if activated from config by default).\n"
+            "Forced if neither read nor write is possible (debugger plus test selector)."
+        ),
     )
 
 
@@ -83,10 +83,11 @@ def pytest_addoption(parser):
         type=str,
         dest="environment_expression",
         default="",
-        help="""
-        This allows you to have separate coverage data within one .testmondata file, e.g. when using the same source 
-        code serving different endpoints or django settings.
-        """,
+        help=(
+            "This allows you to have separate coverage data within one"
+            " .testmondata file, e.g. when using the same source"
+            " code serving different endpoints or Django settings."
+        ),
     )
 
     parser.addini("environment_expression", "environment expression", default="")
