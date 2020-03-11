@@ -18,8 +18,8 @@ def encode_lines(lines):
 
 
 
-GAP_MARKS = {i: f"{i}GAP" for i in range(-1, 64)}
-INVERTED_GAP_MARKS_CHECKSUMS = {encode_lines([f"{i}GAP"])[0]: i for i in range(-1, 64)}
+GAP_MARKS = {i: "{}GAP".format(i) for i in range(-1, 64)}
+INVERTED_GAP_MARKS_CHECKSUMS = {encode_lines(["{}GAP".format(i)])[0]: i for i in range(-1, 64)}
 
 blank_re = re.compile(r"\s*(#|$)")
 
@@ -47,6 +47,7 @@ class Module(object):
         self.full_lines = list(filter(lambda x: not blank_re.match(x), self.lines))
         self._full_lines_checksums = []
 
+        self.special_blocks = {}
         try:
             self.ast = ast.parse(source_code)
             self.special_blocks = dict(function_lines(self.ast, len(self.lines)))
