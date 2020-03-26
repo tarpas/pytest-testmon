@@ -153,22 +153,28 @@ def pytest_configure(config):
 
 def pytest_report_header(config):
     message, should_collect, should_select = config.testmon_config
+    if not should_collect and not should_select:
+        return message
 
-    if should_collect or should_select:
-        if should_select:
-            changed_files = ", ".join(config.testmon_data.unstable_files)
-            if changed_files == "" or len(changed_files) > 100:
-                changed_files = len(config.testmon_data.unstable_files)
+    environment = "environment: {}, ".format(config.testmon_data.environment) if config.testmon_data.environment else ""
+    if not should_select:
+        return message + environment
 
-            if changed_files == 0 and len(config.testmon_data.stable_files) == 0:
-                message += "new DB, "
-            else:
-                message += "changed files: {}, skipping collection of {} files, ".format(
-                    changed_files, len(config.testmon_data.stable_files)
-                )
-
-        if config.testmon_data.environment:
-            message += "environment: {}".format(config.testmon_data.environment)
+    changed_files = "\n".join(config.testmon_data.unstable_files)
+    if not changed_files:
+        changed_files = "0"
+    elif len(changed_files) > 100 and config.getoption("verbose") < 1:
+        changed_files = len(config.testmon_data.unstable_files)
+    else:
+        changed_files = "\n" + changed_files + "\n"
+    new_db = "new DB, " if changed_files == 0 and len(config.testmon_data.stable_files) == 0 else ""
+    return "{message}{environment}{new_db}skipping collection of {stable_files} files, changed files: {changed_files}".format(
+        message=message,
+        environment=environment,
+        new_db=new_db,
+        stable_files=len(config.testmon_data.stable_files),
+        changed_files=changed_files,
+    )
 
     return message
 

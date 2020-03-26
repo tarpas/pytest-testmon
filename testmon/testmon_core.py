@@ -21,22 +21,26 @@ from testmon.process_code import (
 )
 from testmon.process_code import Module
 
-CHECKUMS_ARRAY_TYPE = "I"
+CHECKUMS_ARRAY_TYPE = "i"
 DB_FILENAME = ".testmondata"
 
 
 def checksums_to_blob(checksums):
     blob = array(CHECKUMS_ARRAY_TYPE, checksums)
-    data = blob.tobytes()
-    return sqlite3.Binary(data)
-
-
+    try:
+        data = blob.tobytes()
+    except AttributeError:
+        data = blob.tostring()
+        return sqlite3.Binary(data)
+    
+    
 def blob_to_checksums(blob):
     a = array(CHECKUMS_ARRAY_TYPE)
-    a.frombytes(blob)
-    return a.tolist()
-
-
+    try:
+        a.frombytes(blob)
+    except AttributeError:
+        a.fromstring(blob)
+        return a.tolist()
 
 
 class cached_property(object):
@@ -85,8 +89,8 @@ def get_measured_relfiles(rootdir, cov, test_file):
         relfilename = os.path.relpath(filename, rootdir)
         files[relfilename] = cov.get_data().lines(filename)
         assert files[relfilename] is not None, (
-            f"{filename} is in measured_files but wasn't measured! cov.config: "
-            f"{c.config_files}, {c._omit}, {c._include}, {c.source}"
+            "{} is in measured_files but wasn't measured! cov.config: ".format(filename) +
+            "{config_files}, {_omit}, {_include}, {source}".format(**c)
         )
     return files
 
@@ -523,7 +527,7 @@ class Testmon(object):
         self.cov.stop()
         Testmon.coverage_stack.pop()
 
-    def stop_and_save(self, testmon_data: TestmonData, rootdir, nodeid, result):
+    def stop_and_save(self, testmon_data, rootdir, nodeid, result):
         self.stop()
         if hasattr(self, "sub_cov_file"):
             self.cov.combine()
@@ -614,7 +618,7 @@ class TestmonConfig:
     def _formulate_deactivation(self, what, reasons):
         if reasons:
             return [
-                f"{what} automatically deactivated because {reasons[0]}, "
+                "{} automatically deactivated because {}, ".format(what, reasons[0])
                 if reasons[0]
                 else what + " deactivated, "
             ]
@@ -656,7 +660,7 @@ class TestmonConfig:
             message = ""
 
         return (
-            f"testmon: {message}",
+            "testmon: {}".format(message),
             not bool(nocollect_reasons),
             not bool(noselect_reasons),
         )
