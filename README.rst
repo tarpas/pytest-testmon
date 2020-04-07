@@ -25,6 +25,6 @@ DataRobot Release
 
 To upload a new version:
 - Uprev the version in ``setup.py`` to something like ``0.19.8.post4``
-- Upload with `python setup.py sdist upload -r datarobot-python-dev` in a clean repo.
+- Upload with `python setup.py sdist upload -r python-src` in a clean repo.
 - Update quantum-builder with the new path to source and uprev there in https://github.com/datarobot/quantum-builders/blob/master/libraries/python_pure.matrix.yaml.
 - Tag as ``v0.19.8.post4`` and push.
