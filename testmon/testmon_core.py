@@ -21,8 +21,12 @@ from testmon.process_code import (
 )
 from testmon.process_code import Module
 
+if sys.version_info.major < 3:
+    range = xrange
+
 CHECKUMS_ARRAY_TYPE = "i"
 DB_FILENAME = ".testmondata"
+SQLITE_CHUNK_SIZE = 499  # Half of default host parameter limit
 
 
 def checksums_to_blob(checksums):
@@ -32,8 +36,8 @@ def checksums_to_blob(checksums):
     except AttributeError:
         data = blob.tostring()
         return sqlite3.Binary(data)
-    
-    
+
+
 def blob_to_checksums(blob):
     a = array(CHECKUMS_ARRAY_TYPE)
     try:
@@ -44,7 +48,7 @@ def blob_to_checksums(blob):
 
 
 class cached_property(object):
-    
+
 
     def __init__(self, func):
         self.__doc__ = getattr(func, "__doc__")
@@ -100,7 +104,7 @@ class TestmonException(Exception):
 
 
 class SourceTree:
-    
+
 
     def __init__(self, rootdir=""):
         self.rootdir = rootdir
@@ -227,14 +231,14 @@ class TestmonData(object):
 
         self.connection.execute(
             """
-            CREATE table fingerprint 
+            CREATE table fingerprint
             (
                 id INTEGER PRIMARY KEY,
                 file_name TEXT,
                 fingerprint TEXT,
                 mtime FLOAT,
                 checksum TEXT,
-                UNIQUE (file_name, fingerprint)            
+                UNIQUE (file_name, fingerprint)
             )
             """
         )
@@ -280,11 +284,11 @@ class TestmonData(object):
     def filenames_fingerprints(self):
         return self.connection.execute(
             """
-                SELECT DISTINCT 
-                    f.file_name, f.mtime, f.checksum, f.id as fingerprint_id 
-                FROM node n, node_fingerprint nfp, fingerprint f 
-                WHERE n.id = nfp.node_id AND 
-                      nfp.fingerprint_id = f.id AND 
+                SELECT DISTINCT
+                    f.file_name, f.mtime, f.checksum, f.id as fingerprint_id
+                FROM node n, node_fingerprint nfp, fingerprint f
+                WHERE n.id = nfp.node_id AND
+                      nfp.fingerprint_id = f.id AND
                       environment = ?""",
             (self.environment,),
         ).fetchall()
@@ -299,7 +303,7 @@ class TestmonData(object):
             row[0]: json.loads(row[1])
             for row in self.connection.execute(
                 """  SELECT name, result
-                                    FROM node 
+                                    FROM node
                                     WHERE environment = ?
                                    """,
                 (self.environment,),
@@ -307,26 +311,36 @@ class TestmonData(object):
         }
 
     def get_changed_file_data(self, changed_fingerprints):
-        in_clause_questionsmarks = ", ".join("?" * len(changed_fingerprints))
-        result = []
-        for row in self.connection.execute(
-            """
-                        SELECT
-                            f.file_name,
-                            n.name,
-                            f.fingerprint,
-                            f.id
-                        FROM node n, node_fingerprint nfp, fingerprint f
-                        WHERE 
-                            n.environment = ? AND
-                            n.id = nfp.node_id AND 
-                            nfp.fingerprint_id = f.id AND
-                            f.id IN (%s)"""
-            % in_clause_questionsmarks,
-            [self.environment,] + list(changed_fingerprints),
-        ):
-            result.append((row[0], row[1], blob_to_checksums(row[2]), row[3]))
 
+        # Chunk the fingerprint list to avoid the SQLITE variable limit:
+        # See "Maximum Number Of Host Parameters In A Single SQL Statement"
+        # in https://www.sqlite.org/limits.html
+        changed_fingerprints_list = list(changed_fingerprints)
+        chunked_changed_fingerprints = [
+            changed_fingerprints_list[i:i + SQLITE_CHUNK_SIZE]
+            for i in range(0, len(changed_fingerprints_list), SQLITE_CHUNK_SIZE)
+        ]
+        result = []
+        for fingerprint_chunk in chunked_changed_fingerprints:
+            in_clause_questionsmarks = ", ".join("?" * len(fingerprint_chunk))
+
+            for row in self.connection.execute(
+                """
+                            SELECT
+                                f.file_name,
+                                n.name,
+                                f.fingerprint,
+                                f.id
+                            FROM node n, node_fingerprint nfp, fingerprint f
+                            WHERE
+                                n.environment = ? AND
+                                n.id = nfp.node_id AND
+                                nfp.fingerprint_id = f.id AND
+                                f.id IN (%s)"""
+                % in_clause_questionsmarks,
+                [self.environment,] + fingerprint_chunk,
+            ):
+                result.append((row[0], row[1], blob_to_checksums(row[2]), row[3]))
         return result
 
     def make_nodedata(self, measured_files, default=None):
@@ -354,9 +368,9 @@ class TestmonData(object):
             failed = any(r.get("outcome") == "failed" for r in result.values())
             cursor = con.cursor()
             cursor.execute(
-                """ 
-                INSERT OR REPLACE INTO node 
-                (environment, name, result, failed) 
+                """
+                INSERT OR REPLACE INTO node
+                (environment, name, result, failed)
                 VALUES (?, ?, ?, ?)
                 """,
                 (self.environment, nodeid, json.dumps(result), failed),
@@ -441,7 +455,7 @@ class TestmonData(object):
             )
 
     def run_filters(self):
-        
+
 
         filenames_fingerprints = self.filenames_fingerprints
 
@@ -484,7 +498,7 @@ class TestmonData(object):
 
 
 def get_new_mtimes(filesystem, hits):
-    
+
     for hit in hits:
         module = filesystem.get_file(hit[0])
         if module:
