@@ -1,13 +1,14 @@
+from array import array
+from collections import defaultdict
 import hashlib
+from itertools import tee
 import json
 import os
+from packaging import version
 import random
 import sqlite3
 import sys
 import textwrap
-from packaging import version
-from array import array
-from collections import defaultdict
 
 import coverage
 from coverage import Coverage
@@ -26,7 +27,7 @@ if sys.version_info.major < 3:
 
 CHECKUMS_ARRAY_TYPE = "i"
 DB_FILENAME = ".testmondata"
-SQLITE_CHUNK_SIZE = 499  # Half of default host parameter limit
+SQLITE_PAGE_LIMIT = 10000
 
 
 def checksums_to_blob(checksums):
@@ -68,10 +69,6 @@ def _get_python_lib_paths():
         if getattr(sys, attr, sys.prefix) not in res:
             res.append(getattr(sys, attr))
     return [os.path.join(d, "*") for d in res]
-
-
-DISAPPEARED_FILE = Module("#dissapeared file")
-DISAPPEARED_FILE_CHECKSUM = 3948583
 
 
 def home_file(node_name):
@@ -156,14 +153,11 @@ def check_fingerprint(disk, record):
 
 
 def split_filter(disk, function, records):
-    first = []
-    second = []
-    for record in records:
-        if function(disk, record):
-            first.append(record)
-        else:
-            second.append(record)
-    return first, second
+    first, second = tee((function(disk, record), record) for record in records)
+    return (
+        (record for truth, record in first if truth),
+        (record for truth, record in second if not truth)
+    )
 
 
 class TestmonData(object):
@@ -189,6 +183,9 @@ class TestmonData(object):
         self.connection = sqlite3.connect(self.datafile)
         self.connection.execute("PRAGMA foreign_keys = TRUE ")
         self.connection.execute("PRAGMA recursive_triggers = TRUE ")
+        self.connection.execute("PRAGMA shrink_memory")
+        self.connection.execute("PRAGMA temp_store = FILE")
+        self.connection.execute("PRAGMA auto_vacuum = INCREMENTAL")
         self.connection.row_factory = sqlite3.Row
 
         if new_db:
@@ -311,37 +308,40 @@ class TestmonData(object):
         }
 
     def get_changed_file_data(self, changed_fingerprints):
-
-        # Chunk the fingerprint list to avoid the SQLITE variable limit:
-        # See "Maximum Number Of Host Parameters In A Single SQL Statement"
-        # in https://www.sqlite.org/limits.html
-        changed_fingerprints_list = list(changed_fingerprints)
-        chunked_changed_fingerprints = [
-            changed_fingerprints_list[i:i + SQLITE_CHUNK_SIZE]
-            for i in range(0, len(changed_fingerprints_list), SQLITE_CHUNK_SIZE)
-        ]
-        result = []
-        for fingerprint_chunk in chunked_changed_fingerprints:
-            in_clause_questionsmarks = ", ".join("?" * len(fingerprint_chunk))
-
-            for row in self.connection.execute(
+        """
+        This may be a monster dataset, i.e. 800k fingerprints changed,
+        so page through SQLite style, and yield until there are no more results.
+        """
+        last_nfp_rowid = 0
+        fingerprint_ids = ', '.join([str(fp) for fp in changed_fingerprints])
+        while True:
+            current_page = self.connection.execute(
                 """
-                            SELECT
-                                f.file_name,
-                                n.name,
-                                f.fingerprint,
-                                f.id
-                            FROM node n, node_fingerprint nfp, fingerprint f
-                            WHERE
-                                n.environment = ? AND
-                                n.id = nfp.node_id AND
-                                nfp.fingerprint_id = f.id AND
-                                f.id IN (%s)"""
-                % in_clause_questionsmarks,
-                [self.environment,] + fingerprint_chunk,
-            ):
-                result.append((row[0], row[1], blob_to_checksums(row[2]), row[3]))
-        return result
+                SELECT
+                  f.file_name,
+                  n.name,
+                  f.fingerprint,
+                  nfp.fingerprint_id,
+                  nfp.ROWID
+                FROM node_fingerprint nfp
+                JOIN node n ON n.id = nfp.node_id 
+                JOIN fingerprint f ON f.id = nfp.fingerprint_id
+                WHERE nfp.fingerprint_id IN ({fingerprint_ids})
+                AND nfp.ROWID > {last_nfp_rowid}
+                ORDER BY nfp.ROWID
+                LIMIT {limit}
+                """.format(
+                    fingerprint_ids=fingerprint_ids,
+                    limit=SQLITE_PAGE_LIMIT,
+                    last_nfp_rowid=last_nfp_rowid,
+                )
+            ).fetchall()
+            if len(current_page) == 0:
+                return
+
+            for row in current_page:
+                yield row[0], row[1], blob_to_checksums(row[2]), row[3]
+                last_nfp_rowid = row[4]
 
     def make_nodedata(self, measured_files, default=None):
         result = {}
@@ -456,9 +456,7 @@ class TestmonData(object):
 
     def run_filters(self):
 
-
         filenames_fingerprints = self.filenames_fingerprints
-
 
         _, mtime_misses = split_filter(
             self.source_tree, check_mtime, filenames_fingerprints
@@ -471,7 +469,6 @@ class TestmonData(object):
         changed_file_data = self.get_changed_file_data(
             {checksum_miss["fingerprint_id"] for checksum_miss in checksum_misses}
         )
-
 
         fingerprint_hits, fingerprint_misses = split_filter(
             self.source_tree, check_fingerprint, changed_file_data
@@ -486,6 +483,7 @@ class TestmonData(object):
         self.unstable_nodeids = set()
         self.unstable_files = set()
 
+        # This takes us from 1GiB to 9GiB ??? SQLite? definitely AST/internal objects
         for fingerprint_miss in fingerprint_misses:
             self.unstable_nodeids.add(fingerprint_miss[1])
             self.unstable_files.add(fingerprint_miss[1].split("::", 1)[0])
