@@ -102,7 +102,6 @@ def testmon_options(config):
             result.append(label.replace("testmon_", ""))
     return result
 
-
 def init_testmon_data(config, read_source=True):
     if not hasattr(config, "testmon_data"):
         environment = eval_environment(config.getini("environment_expression"))
@@ -116,7 +115,6 @@ def pytest_configure(config):
     coverage_stack = None
 
     plugin = None
-
 
     testmon_config = TestmonConfig()
     message, should_collect, should_select = testmon_config.header_collect_select(
@@ -187,6 +185,7 @@ def pytest_unconfigure(config):
 
 
 def sort_items_by_duration(items, testmon_data):
+    # TODO: Optimize. This takes forever and probably isn't worth it
     durations = defaultdict(lambda: {"node_count": 0, "duration": 0})
     for item in items:
         item.duration = 0

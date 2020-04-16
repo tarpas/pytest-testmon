@@ -36,7 +36,7 @@ def checksums_to_blob(checksums):
         data = blob.tobytes()
     except AttributeError:
         data = blob.tostring()
-        return sqlite3.Binary(data)
+    return sqlite3.Binary(data)
 
 
 def blob_to_checksums(blob):
@@ -45,7 +45,7 @@ def blob_to_checksums(blob):
         a.frombytes(blob)
     except AttributeError:
         a.fromstring(blob)
-        return a.tolist()
+    return a
 
 
 class cached_property(object):
@@ -144,10 +144,10 @@ def check_checksum(file_system, record):
 
 
 def check_fingerprint(disk, record):
-    file = record[0]
+    file_name = record[0]
     fingerprint = record[2]
 
-    module = disk.get_file(file)
+    module = disk.get_file(file_name)
     return module and file_has_lines(module.full_lines, fingerprint)
 
 
@@ -328,7 +328,7 @@ class TestmonData(object):
             SELECT result FROM node WHERE name = ?
             """, (nodeid,)
         ).fetchone()
-        return json.load(result_row[0]) if result_row else {}
+        return json.loads(result_row[0]) if result_row else {}
 
     def get_changed_file_data(self, changed_fingerprints):
         """
@@ -365,7 +365,6 @@ class TestmonData(object):
             for row in current_page:
                 yield row[0], row[1], blob_to_checksums(row[2]), row[3]
                 last_nfp_rowid = row[4]
-            del current_page
 
     def make_nodedata(self, measured_files, default=None):
         result = {}
@@ -489,6 +488,12 @@ class TestmonData(object):
 
 
     def run_filters(self):
+        # TODO: This needs to get refactored to save memory. While I implemented paging
+        # it isn't able to release the memory of the page because it gets used in the
+        # next call's iterator and since I don't have a hook for when the full chain of iterators
+        # is complete the data stays around in memory. Basically this nice functional style
+        # of chaining to create a pipeline needs to get flattened so that memory is freeable
+        # on each iteration
 
         filenames_fingerprints = self.filenames_fingerprints
 
