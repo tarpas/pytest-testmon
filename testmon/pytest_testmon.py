@@ -1,4 +1,3 @@
-
 import os
 from collections import defaultdict
 
@@ -71,7 +70,7 @@ def pytest_addoption(parser):
         action="store_true",
         dest="no-testmon",
         help="""
-        Turn off (even if activated from config by default). Forced if neither read nor write is possible (debugger 
+        Turn off (even if activated from config by default). Forced if neither read nor write is possible (debugger
         plus test selector)
         """,
     )
@@ -84,7 +83,7 @@ def pytest_addoption(parser):
         dest="environment_expression",
         default="",
         help="""
-        This allows you to have separate coverage data within one .testmondata file, e.g. when using the same source 
+        This allows you to have separate coverage data within one .testmondata file, e.g. when using the same source
         code serving different endpoints or django settings.
         """,
     )
@@ -166,7 +165,10 @@ def pytest_report_header(config):
     elif len(changed_files) > 100 and config.getoption("verbose") < 1:
         changed_files = len(config.testmon_data.unstable_files)
     else:
-        changed_files = "\n" + changed_files + "\n"
+        changed_files = "{} files\n{}\n".format(
+            len(config.testmon_data.unstable_files),
+            changed_files
+        )
     new_db = "new DB, " if changed_files == 0 and len(config.testmon_data.stable_files) == 0 else ""
     return "{message}{environment}{new_db}skipping collection of {stable_files} files, changed files: {changed_files}".format(
         message=message,
@@ -184,15 +186,16 @@ def pytest_unconfigure(config):
         config.testmon_data.close_connection()
 
 
-def sort_items_by_duration(items, reports):
+def sort_items_by_duration(items, testmon_data):
     durations = defaultdict(lambda: {"node_count": 0, "duration": 0})
     for item in items:
-        if item.nodeid in reports:
-            item.duration = sum(
-                [report["duration"] for report in reports[item.nodeid].values()]
-            )
-        else:
-            item.duration = 0
+        item.duration = 0
+        if item.nodeid in testmon_data.all_nodes:
+            report = testmon_data.get_report(item.nodeid)
+            if report:
+                item.duration = sum(
+                    [report["duration"] for report in report.values()]
+                )
         item.module_name = item.location[0]
         item_hierarchy = item.location[2].split(".")
         item.node_name = item_hierarchy[-1]
@@ -263,21 +266,6 @@ class TestmonCollect(object):
         self.testmon.close()
 
 
-def did_fail(reports):
-    return bool(
-        [True for report in reports.values() if report.get("outcome") == u"failed"]
-    )
-
-
-def get_failing(all_nodes):
-    failing_files, failing_nodes = set(), {}
-    for nodeid, result in all_nodes.items():
-        if did_fail(all_nodes[nodeid]):
-            failing_files.add(home_file(nodeid))
-            failing_nodes[nodeid] = result
-    return failing_files, failing_nodes
-
-
 class TestmonSelect:
     def __init__(self, config, testmon_data):
         self.testmon_data = testmon_data
@@ -285,17 +273,17 @@ class TestmonSelect:
 
         self.deselected_files = testmon_data.stable_files
         self.deselected_nodes = testmon_data.stable_nodeids
+        self.failing_nodes = testmon_data.failing_nodes
 
-        failing_files, failing_nodes = get_failing(testmon_data.all_nodes)
-
-
-        self.failing_nodes = failing_nodes
-
-    def report_from_db(self, nodeid):
-        node_reports = self.failing_nodes.get(nodeid, {})
-        if node_reports:
+    def add_failing_reports_from_db(self, failing_stable_nodes):
+        """If the nodeid is failed but stable, add it's report instead of running it."""
+        # TODO: Ask team about what we want here
+        for nodeid in failing_stable_nodes:
+            node_report = self.testmon_data.get_report(nodeid)
+            if not node_report:
+                continue
             for phase in ("setup", "call", "teardown"):
-                if phase in node_reports:
+                if phase in node_report:
                     test_report = runner.TestReport(**node_reports[phase])
                     self.config.hook.pytest_runtest_logreport(report=test_report)
 
@@ -306,20 +294,16 @@ class TestmonSelect:
 
     @pytest.mark.trylast
     def pytest_collection_modifyitems(self, session, config, items):
-        for item in items:
-            assert item.nodeid not in self.deselected_files, (
-                item.nodeid,
-                self.deselected_files,
-            )
-
         selected = []
         for item in items:
-            if item.nodeid not in self.deselected_nodes:
+            if item.nodeid in self.failing_nodes or item.nodeid not in self.deselected_nodes:
                 selected.append(item)
+
         items[:] = selected
 
+        # TODO: Add option to toggle this from config because the overhead is high
         if self.testmon_data.all_nodes:
-            sort_items_by_duration(items, self.testmon_data.all_nodes)
+            sort_items_by_duration(items, self.testmon_data)
 
         session.config.hook.pytest_deselected(
             items=([FakeItemFromTestmon(session.config)] * len(self.deselected_nodes))
@@ -328,8 +312,9 @@ class TestmonSelect:
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtestloop(self, session):
         yield
-        for nodeid in sorted(self.deselected_nodes):
-            self.report_from_db(nodeid)
+        self.add_failing_reports_from_db(
+            self.deselected_nodes.intersection(self.failing_nodes)
+        )
 
 
 class FakeItemFromTestmon(object):

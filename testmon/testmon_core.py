@@ -62,7 +62,6 @@ class cached_property(object):
         return value
 
 
-
 def _get_python_lib_paths():
     res = [sys.prefix]
     for attr in ["exec_prefix", "real_prefix", "base_prefix"]:
@@ -297,15 +296,39 @@ class TestmonData(object):
     @cached_property
     def all_nodes(self):
         return {
-            row[0]: json.loads(row[1])
+            row[0]
             for row in self.connection.execute(
-                """  SELECT name, result
-                                    FROM node
-                                    WHERE environment = ?
-                                   """,
-                (self.environment,),
+                    """
+                    SELECT name
+                    FROM node
+                    WHERE environment = ?
+                    """,
+                    (self.environment,),
             )
         }
+
+    @cached_property
+    def failing_nodes(self):
+        return {
+            row[0]
+            for row in self.connection.execute(
+                    """
+                    SELECT name
+                    FROM node
+                    WHERE environment = ?
+                    AND failed = true
+                    """,
+                    (self.environment,),
+            )
+        }
+
+    def get_report(self, nodeid):
+        result_row = self.connection.execute(
+            """
+            SELECT result FROM node WHERE name = ?
+            """, (nodeid,)
+        ).fetchone()
+        return json.load(result_row[0]) if result_row else {}
 
     def get_changed_file_data(self, changed_fingerprints):
         """
@@ -324,7 +347,7 @@ class TestmonData(object):
                   nfp.fingerprint_id,
                   nfp.ROWID
                 FROM node_fingerprint nfp
-                JOIN node n ON n.id = nfp.node_id 
+                JOIN node n ON n.id = nfp.node_id
                 JOIN fingerprint f ON f.id = nfp.fingerprint_id
                 WHERE nfp.fingerprint_id IN ({fingerprint_ids})
                 AND nfp.ROWID > {last_nfp_rowid}
@@ -342,6 +365,7 @@ class TestmonData(object):
             for row in current_page:
                 yield row[0], row[1], blob_to_checksums(row[2]), row[3]
                 last_nfp_rowid = row[4]
+            del current_page
 
     def make_nodedata(self, measured_files, default=None):
         result = {}
@@ -363,9 +387,15 @@ class TestmonData(object):
             get_measured_relfiles(self.rootdir, cov, home_file(nodeid))
         )
 
+    @staticmethod
+    def did_fail(reports):
+        return any(
+            [True for report in reports.values() if report.get("outcome") == u"failed"]
+        )
+
     def write_node_data(self, nodeid, nodedata, result={}, fake=False):
         with self.connection as con:
-            failed = any(r.get("outcome") == "failed" for r in result.values())
+            failed = self.did_fail(result)
             cursor = con.cursor()
             cursor.execute(
                 """
@@ -411,29 +441,31 @@ class TestmonData(object):
                 )
 
     def sync_db_fs_nodes(self, retain):
-        collected = retain.union(set(self.stable_nodeids))
+        collected = retain.union(self.stable_nodeids)
         with self.connection as con:
-            add = collected - set(self.all_nodes)
+            add = collected - self.all_nodes
 
             for nodeid in add:
-                if is_python_file(home_file(nodeid)):
-                    self.write_node_data(
-                        nodeid,
-                        self.make_nodedata(
-                            {home_file(nodeid): None}, encode_lines(["0match"])
-                        ),
-                        fake=True,
-                    )
+                if not is_python_file(home_file(nodeid)):
+                    continue
+                self.write_node_data(
+                    nodeid,
+                    self.make_nodedata(
+                        {home_file(nodeid): None}, encode_lines(["0match"])
+                    ),
+                    fake=True,
+                )
 
             con.executemany(
                 """
                 DELETE
                 FROM node
                 WHERE environment = ?
-                  AND name = ?""",
+                  AND name = ?
+                """,
                 [
                     (self.environment, nodeid)
-                    for nodeid in set(self.all_nodes) - collected
+                    for nodeid in self.all_nodes - collected
                 ],
             )
 
@@ -448,11 +480,13 @@ class TestmonData(object):
                 """
             )
 
+
     def update_mtimes(self, new_mtimes):
         with self.connection as con:
             con.executemany(
                 "UPDATE fingerprint SET mtime=?, checksum=? WHERE id = ?", new_mtimes
             )
+
 
     def run_filters(self):
 
@@ -483,12 +517,12 @@ class TestmonData(object):
         self.unstable_nodeids = set()
         self.unstable_files = set()
 
-        # This takes us from 1GiB to 9GiB ??? SQLite? definitely AST/internal objects
+        # This takes us from 1GiB to 8GiB? SQLite?!
         for fingerprint_miss in fingerprint_misses:
             self.unstable_nodeids.add(fingerprint_miss[1])
             self.unstable_files.add(fingerprint_miss[1].split("::", 1)[0])
 
-        self.stable_nodeids = set(self.all_nodes) - self.unstable_nodeids
+        self.stable_nodeids = self.all_nodes - self.unstable_nodeids
         self.stable_files = self.all_files - self.unstable_files
 
         self.update_mtimes(get_new_mtimes(self.source_tree, checksum_hits))

@@ -181,6 +181,9 @@ def create_fingerprints(afile, special_blocks, coverage):
 
 
 def file_has_lines(full_lines, fingerprints):
+    if fingerprints is None:
+        return False
+
     file_idx = 0
     fingerprint_idx = 0
 
