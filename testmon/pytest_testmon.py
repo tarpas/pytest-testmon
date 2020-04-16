@@ -301,8 +301,8 @@ class TestmonSelect:
         items[:] = selected
 
         # TODO: Add option to toggle this from config because the overhead is high
-        if self.testmon_data.all_nodes:
-            sort_items_by_duration(items, self.testmon_data)
+        # if self.testmon_data.all_nodes:
+        #     sort_items_by_duration(items, self.testmon_data)
 
         session.config.hook.pytest_deselected(
             items=([FakeItemFromTestmon(session.config)] * len(self.deselected_nodes))

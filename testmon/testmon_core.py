@@ -238,10 +238,19 @@ class TestmonData(object):
             )
             """
         )
+        self.connection.execute(
+            """
+            CREATE INDEX node-fingerprint-idx ON node_fingerprint (
+	        node_id,
+	        fingerprint_id
+            )
+            """
+        )
 
         self._write_attribute(
             "__data_version", str(self.DATA_VERSION), environment="default"
         )
+        self.connection.commit()
 
     def _check_data_version(self):
         stored_data_version = self._fetch_attribute(
@@ -276,18 +285,19 @@ class TestmonData(object):
                 [dataid, json.dumps(data)],
             )
 
-    @cached_property
+    @property
     def filenames_fingerprints(self):
         return self.connection.execute(
             """
-                SELECT DISTINCT
-                    f.file_name, f.mtime, f.checksum, f.id as fingerprint_id
-                FROM node n, node_fingerprint nfp, fingerprint f
-                WHERE n.id = nfp.node_id AND
-                      nfp.fingerprint_id = f.id AND
-                      environment = ?""",
+	    SELECT DISTINCT
+            f.file_name, f.mtime, f.checksum, f.id as fingerprint_id
+            FROM fingerprint f
+	    JOIN  node n ON n.id = nfp.node_id
+	    JOIN node_fingerprint nfp ON nfp.fingerprint_id = f.id
+	    WHERE environment =?
+            """,
             (self.environment,),
-        ).fetchall()
+        )
 
     @property
     def all_files(self):
@@ -495,10 +505,8 @@ class TestmonData(object):
         # of chaining to create a pipeline needs to get flattened so that memory is freeable
         # on each iteration
 
-        filenames_fingerprints = self.filenames_fingerprints
-
         _, mtime_misses = split_filter(
-            self.source_tree, check_mtime, filenames_fingerprints
+            self.source_tree, check_mtime, self.filenames_fingerprints
         )
 
         checksum_hits, checksum_misses = split_filter(
