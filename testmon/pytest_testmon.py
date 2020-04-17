@@ -290,7 +290,7 @@ class TestmonSelect:
                 continue
             for phase in ("setup", "call", "teardown"):
                 if phase in node_report:
-                    test_report = runner.TestReport(**node_reports[phase])
+                    test_report = runner.TestReport(**node_report[phase])
                     self.config.hook.pytest_runtest_logreport(report=test_report)
 
     def pytest_ignore_collect(self, path, config):
