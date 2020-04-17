@@ -194,7 +194,6 @@ def pytest_unconfigure(config):
 
 
 def sort_items_by_duration(items, testmon_data):
-    # TODO: Optimize. This takes forever and probably isn't worth it
     durations = defaultdict(lambda: {"node_count": 0, "duration": 0})
     for item in items:
         item.duration = 0
@@ -285,7 +284,6 @@ class TestmonSelect:
 
     def add_failing_reports_from_db(self, failing_stable_nodes):
         """If the nodeid is failed but stable, add it's report instead of running it."""
-        # TODO: Ask team about what we want here
         for nodeid in failing_stable_nodes:
             node_report = self.testmon_data.get_report(nodeid)
             if not node_report:
@@ -310,7 +308,6 @@ class TestmonSelect:
         items[:] = selected
 
         if self.testmon_data.all_nodes and not config.getoption("testmon_nosort"):
-            raise Exception
             sort_items_by_duration(items, self.testmon_data)
 
         session.config.hook.pytest_deselected(
