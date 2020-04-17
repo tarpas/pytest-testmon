@@ -27,7 +27,7 @@ if sys.version_info.major < 3:
 
 CHECKUMS_ARRAY_TYPE = "i"
 DB_FILENAME = ".testmondata"
-SQLITE_PAGE_LIMIT = 10000
+SQLITE_PAGE_LIMIT = 5000
 
 
 def checksums_to_blob(checksums):
@@ -523,6 +523,48 @@ class TestmonData(object):
 
         return fingerprint_hits, fingerprint_misses, checksum_hits
 
+    def my_determine_stable(self):
+        # TODO: If this works, refactor check methods to take real arguments.
+
+        missed_checksum_fingerprint_ids = set()
+        hit_checksum_fingerprints = []
+        for filename_fingerprint in self.filenames_fingerprints:
+            # If the mtime matches, file is unchanged
+            if check_mtime(self.source_tree, filename_fingerprint):
+                continue
+            # If the checksum is a hit update the modified time
+            # otherwise add the fingerprint id to a set for finding
+            # affected nodes with that fingerprint
+            if check_checksum(self.source_tree, filename_fingerprint):
+                hit_checksum_fingerprints.append(filename_fingerprint)
+            else:
+                missed_checksum_fingerprint_ids.add(filename_fingerprint["fingerprint_id"])
+        self.update_mtimes(get_new_mtimes(self.source_tree, hit_checksum_fingerprints))
+        del hit_checksum_fingerprints
+
+        # Loop through all changed files and verify the fingerprint
+        self.unstable_files = set()
+        self.unstable_nodeids = set()
+        hit_fingerprint_nodes = []
+
+        # Loop through files by affected node
+        for missed_file_fingerprint in self.get_changed_file_data(
+                missed_checksum_fingerprint_ids
+        ):
+            # If the fingerprint is hit, update the mtime
+            # otherwise add the node for the missed fingerprint to a set
+            if check_fingerprint(self.source_tree, missed_file_fingerprint):
+                hit_fingerprint_nodes.append(missed_file_fingerprint)
+            else:
+                self.unstable_nodeids.add(missed_file_fingerprint[1])
+                self.unstable_files.add(home_file(missed_file_fingerprint[1]))
+        self.update_mtimes(get_new_mtimes(self.source_tree, hit_fingerprint_nodes))
+
+        # Reverse the unstable set to the stable set to appropriately handle
+        # new files.
+        self.stable_nodeids = self.all_nodes - self.unstable_nodeids
+        self.stable_files = self.all_files - self.unstable_files
+
     def determine_stable(self):
 
         fingerprint_hits, fingerprint_misses, checksum_hits = self.run_filters()
@@ -533,7 +575,7 @@ class TestmonData(object):
         # This takes us from 1GiB to 8GiB? SQLite?!
         for fingerprint_miss in fingerprint_misses:
             self.unstable_nodeids.add(fingerprint_miss[1])
-            self.unstable_files.add(fingerprint_miss[1].split("::", 1)[0])
+            self.unstable_files.add(home_file(fingerprint_miss[1]))
 
         self.stable_nodeids = self.all_nodes - self.unstable_nodeids
         self.stable_files = self.all_files - self.unstable_files

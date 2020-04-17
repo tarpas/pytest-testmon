@@ -107,7 +107,7 @@ def init_testmon_data(config, read_source=True):
         environment = eval_environment(config.getini("environment_expression"))
         testmon_data = TestmonData(config.rootdir.strpath, environment=environment)
         if read_source:
-            testmon_data.determine_stable()
+            testmon_data.my_determine_stable()
         config.testmon_data = testmon_data
 
 
