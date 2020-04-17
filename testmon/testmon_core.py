@@ -214,7 +214,7 @@ class TestmonData(object):
         )
         self.connection.execute(
             """
-            CREATE INDEX node-fingerprint-idx ON node_fingerprint (
+            CREATE INDEX node_fingerprint_idx ON node_fingerprint (
                 node_id,
                 fingerprint_id
             )
@@ -266,7 +266,7 @@ class TestmonData(object):
             SELECT DISTINCT
             f.file_name, f.mtime, f.checksum, f.id as fingerprint_id
             FROM fingerprint f
-            JOIN  node n ON n.id = nfp.node_id
+            JOIN node n ON n.id = nfp.node_id
             JOIN node_fingerprint nfp ON nfp.fingerprint_id = f.id
             WHERE environment =?
             """,
