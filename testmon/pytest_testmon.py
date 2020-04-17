@@ -3,15 +3,16 @@ from collections import defaultdict
 
 import pytest
 from _pytest.python import Function
+from _pytest import runner
+
 from testmon.testmon_core import (
     Testmon,
     eval_environment,
     TestmonData,
-    home_file,
     TestmonConfig,
     TestmonException,
 )
-from _pytest import runner
+
 
 
 def serialize_report(rep):
@@ -184,8 +185,6 @@ def pytest_report_header(config):
         stable_files=len(config.testmon_data.stable_files),
         changed_files=changed_files,
     )
-
-    return message
 
 
 def pytest_unconfigure(config):
