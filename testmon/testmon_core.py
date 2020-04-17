@@ -1,16 +1,10 @@
 from array import array
-from collections import defaultdict
 import hashlib
-from itertools import tee
 import json
 import os
-from packaging import version
-import random
 import sqlite3
 import sys
-import textwrap
 
-import coverage
 from coverage import Coverage
 from coverage.tracer import CTracer
 
@@ -48,20 +42,6 @@ def blob_to_checksums(blob):
     return a
 
 
-class cached_property(object):
-
-
-    def __init__(self, func):
-        self.__doc__ = getattr(func, "__doc__")
-        self.func = func
-
-    def __get__(self, obj, cls):
-        if obj is None:
-            return self
-        value = obj.__dict__[self.func.__name__] = self.func(obj)
-        return value
-
-
 def _get_python_lib_paths():
     res = [sys.prefix]
     for attr in ["exec_prefix", "real_prefix", "base_prefix"]:
@@ -95,12 +75,40 @@ def get_measured_relfiles(rootdir, cov, test_file):
     return files
 
 
+def eval_environment(environment, **kwargs):
+    if not environment:
+        return ""
+
+    def md5(s):
+        return hashlib.md5(s.encode()).hexdigest()
+
+    eval_globals = {"os": os, "sys": sys, "hashlib": hashlib, "md5": md5}
+    eval_globals.update(kwargs)
+
+    try:
+        return str(eval(environment, eval_globals))
+    except Exception as e:
+        return repr(e)
+
+
+class cached_property(object):
+
+    def __init__(self, func):
+        self.__doc__ = getattr(func, "__doc__")
+        self.func = func
+
+    def __get__(self, obj, cls):
+        if obj is None:
+            return self
+        value = obj.__dict__[self.func.__name__] = self.func(obj)
+        return value
+
+
 class TestmonException(Exception):
     pass
 
 
 class SourceTree:
-
 
     def __init__(self, rootdir=""):
         self.rootdir = rootdir
@@ -123,40 +131,6 @@ class SourceTree:
             else:
                 self.cache[filename] = None
         return self.cache[filename]
-
-
-def check_mtime(file_system, record):
-    absfilename = os.path.join(file_system.rootdir, record["file_name"])
-
-    cache_module = file_system.cache.get(record["file_name"], None)
-    try:
-        fs_mtime = cache_module.mtime if cache_module else os.path.getmtime(absfilename)
-    except OSError:
-        return False
-    return record["mtime"] == fs_mtime
-
-
-def check_checksum(file_system, record):
-    cache_module = file_system.get_file(record["file_name"])
-    fs_checksum = cache_module.checksum if cache_module else None
-
-    return record["checksum"] == fs_checksum
-
-
-def check_fingerprint(disk, record):
-    file_name = record[0]
-    fingerprint = record[2]
-
-    module = disk.get_file(file_name)
-    return module and file_has_lines(module.full_lines, fingerprint)
-
-
-def split_filter(disk, function, records):
-    first, second = tee((function(disk, record), record) for record in records)
-    return (
-        (record for truth, record in first if truth),
-        (record for truth, record in second if not truth)
-    )
 
 
 class TestmonData(object):
@@ -241,8 +215,8 @@ class TestmonData(object):
         self.connection.execute(
             """
             CREATE INDEX node-fingerprint-idx ON node_fingerprint (
-	        node_id,
-	        fingerprint_id
+                node_id,
+                fingerprint_id
             )
             """
         )
@@ -289,12 +263,12 @@ class TestmonData(object):
     def filenames_fingerprints(self):
         return self.connection.execute(
             """
-	    SELECT DISTINCT
+            SELECT DISTINCT
             f.file_name, f.mtime, f.checksum, f.id as fingerprint_id
             FROM fingerprint f
-	    JOIN  node n ON n.id = nfp.node_id
-	    JOIN node_fingerprint nfp ON nfp.fingerprint_id = f.id
-	    WHERE environment =?
+            JOIN  node n ON n.id = nfp.node_id
+            JOIN node_fingerprint nfp ON nfp.fingerprint_id = f.id
+            WHERE environment =?
             """,
             (self.environment,),
         )
@@ -308,12 +282,12 @@ class TestmonData(object):
         return {
             row[0]
             for row in self.connection.execute(
-                    """
-                    SELECT name
-                    FROM node
-                    WHERE environment = ?
-                    """,
-                    (self.environment,),
+                """
+                SELECT name
+                FROM node
+                WHERE environment = ?
+                """,
+                (self.environment,),
             )
         }
 
@@ -322,13 +296,13 @@ class TestmonData(object):
         return {
             row[0]
             for row in self.connection.execute(
-                    """
-                    SELECT name
-                    FROM node
-                    WHERE environment = ?
-                    AND failed = true
-                    """,
-                    (self.environment,),
+                """
+                SELECT name
+                FROM node
+                WHERE environment = ?
+                AND failed = true
+                """,
+                (self.environment,),
             )
         }
 
@@ -339,42 +313,6 @@ class TestmonData(object):
             """, (nodeid,)
         ).fetchone()
         return json.loads(result_row[0]) if result_row else {}
-
-    def get_changed_file_data(self, changed_fingerprints):
-        """
-        This may be a monster dataset, i.e. 800k fingerprints changed,
-        so page through SQLite style, and yield until there are no more results.
-        """
-        last_nfp_rowid = 0
-        fingerprint_ids = ', '.join([str(fp) for fp in changed_fingerprints])
-        while True:
-            current_page = self.connection.execute(
-                """
-                SELECT
-                  f.file_name,
-                  n.name,
-                  f.fingerprint,
-                  nfp.fingerprint_id,
-                  nfp.ROWID
-                FROM node_fingerprint nfp
-                JOIN node n ON n.id = nfp.node_id
-                JOIN fingerprint f ON f.id = nfp.fingerprint_id
-                WHERE nfp.fingerprint_id IN ({fingerprint_ids})
-                AND nfp.ROWID > {last_nfp_rowid}
-                ORDER BY nfp.ROWID
-                LIMIT {limit}
-                """.format(
-                    fingerprint_ids=fingerprint_ids,
-                    limit=SQLITE_PAGE_LIMIT,
-                    last_nfp_rowid=last_nfp_rowid,
-                )
-            ).fetchall()
-            if len(current_page) == 0:
-                return
-
-            for row in current_page:
-                yield row[0], row[1], blob_to_checksums(row[2]), row[3]
-                last_nfp_rowid = row[4]
 
     def make_nodedata(self, measured_files, default=None):
         result = {}
@@ -415,7 +353,6 @@ class TestmonData(object):
                 (self.environment, nodeid, json.dumps(result), failed),
             )
             node_id = cursor.lastrowid
-
 
             for filename in nodedata:
                 if fake:
@@ -489,58 +426,105 @@ class TestmonData(object):
                 """
             )
 
-
     def update_mtimes(self, new_mtimes):
+        """Takes list of tuples of the form `mtime, checksum, fingerprint_id` to update"""
         with self.connection as con:
             con.executemany(
                 "UPDATE fingerprint SET mtime=?, checksum=? WHERE id = ?", new_mtimes
             )
 
+    def get_new_mtimes(self, hits):
+        """
+        Take a list of dictionaries/sqlite3.Row of objects with at least a `file_name` and
+        a `fingerprint_id` and yields the modified time of the module, the checksum and the
+        fingerprint_id.
+        """
+        for hit in hits:
+            module = self.source_tree.get_file(hit["file_name"])
+            if module:
+                yield module.mtime, module.checksum, hit["fingerprint_id"]
 
-    def run_filters(self):
-        # TODO: This needs to get refactored to save memory. While I implemented paging
-        # it isn't able to release the memory of the page because it gets used in the
-        # next call's iterator and since I don't have a hook for when the full chain of iterators
-        # is complete the data stays around in memory. Basically this nice functional style
-        # of chaining to create a pipeline needs to get flattened so that memory is freeable
-        # on each iteration
+    def get_changed_file_data(self, changed_fingerprints):
+        """
+        This may be a monster dataset, i.e. 800k fingerprints changed,
+        so page through SQLite style, and yield until there are no more results.
+        """
+        last_nfp_rowid = 0
+        fingerprint_ids = ', '.join([str(fp) for fp in changed_fingerprints])
+        while True:
+            current_page = self.connection.execute(
+                """
+                SELECT
+                  f.file_name,
+                  n.name,
+                  nfp.fingerprint_id,
+                  f.fingerprint,
+                  nfp.ROWID
+                FROM node_fingerprint nfp
+                JOIN node n ON n.id = nfp.node_id
+                JOIN fingerprint f ON f.id = nfp.fingerprint_id
+                WHERE nfp.fingerprint_id IN ({fingerprint_ids})
+                AND nfp.ROWID > {last_nfp_rowid}
+                ORDER BY nfp.ROWID
+                LIMIT {limit}
+                """.format(
+                    fingerprint_ids=fingerprint_ids,
+                    limit=SQLITE_PAGE_LIMIT,
+                    last_nfp_rowid=last_nfp_rowid,
+                )
+            ).fetchall()
+            if len(current_page) == 0:
+                return
 
-        _, mtime_misses = split_filter(
-            self.source_tree, check_mtime, self.filenames_fingerprints
-        )
+            for row in current_page:
+                yield (
+                    row["file_name"],
+                    row["name"],
+                    blob_to_checksums(row["fingerprint"]),
+                    row["fingerprint_id"]
+                )
+                last_nfp_rowid = row["ROWID"]
 
-        checksum_hits, checksum_misses = split_filter(
-            self.source_tree, check_checksum, mtime_misses
-        )
+    def check_mtime(self, file_name, mtime):
+        absfilename = os.path.join(self.source_tree.rootdir, file_name)
 
-        changed_file_data = self.get_changed_file_data(
-            {checksum_miss["fingerprint_id"] for checksum_miss in checksum_misses}
-        )
+        cache_module = self.source_tree.cache.get(file_name, None)
+        try:
+            fs_mtime = cache_module.mtime if cache_module else os.path.getmtime(absfilename)
+        except OSError:
+            return False
+        return mtime == fs_mtime
 
-        fingerprint_hits, fingerprint_misses = split_filter(
-            self.source_tree, check_fingerprint, changed_file_data
-        )
+    def check_checksum(self, file_name, checksum):
+        cache_module = self.source_tree.get_file(file_name)
+        fs_checksum = cache_module.checksum if cache_module else None
 
-        return fingerprint_hits, fingerprint_misses, checksum_hits
+        return checksum == fs_checksum
 
-    def my_determine_stable(self):
-        # TODO: If this works, refactor check methods to take real arguments.
+    def check_fingerprint(self, file_name, fingerprint):
+        module = self.source_tree.get_file(file_name)
+
+        return module and file_has_lines(module.full_lines, fingerprint)
+
+    def determine_stable(self):
 
         missed_checksum_fingerprint_ids = set()
         hit_checksum_fingerprints = []
-        for filename_fingerprint in self.filenames_fingerprints:
+        for fingerprint in self.filenames_fingerprints:
             # If the mtime matches, file is unchanged
-            if check_mtime(self.source_tree, filename_fingerprint):
+            if self.check_mtime(fingerprint["file_name"], fingerprint["mtime"]):
                 continue
+
             # If the checksum is a hit update the modified time
             # otherwise add the fingerprint id to a set for finding
             # affected nodes with that fingerprint
-            if check_checksum(self.source_tree, filename_fingerprint):
-                hit_checksum_fingerprints.append(filename_fingerprint)
+            if self.check_checksum(fingerprint["file_name"], fingerprint["checksum"]):
+                hit_checksum_fingerprints.append(fingerprint)
             else:
-                missed_checksum_fingerprint_ids.add(filename_fingerprint["fingerprint_id"])
-        self.update_mtimes(get_new_mtimes(self.source_tree, hit_checksum_fingerprints))
-        del hit_checksum_fingerprints
+                missed_checksum_fingerprint_ids.add(fingerprint["fingerprint_id"])
+
+        self.update_mtimes(self.get_new_mtimes(hit_checksum_fingerprints))
+        del hit_checksum_fingerprints  # Memory sensitive function, so free early
 
         # Loop through all changed files and verify the fingerprint
         self.unstable_files = set()
@@ -548,48 +532,24 @@ class TestmonData(object):
         hit_fingerprint_nodes = []
 
         # Loop through files by affected node
-        for missed_file_fingerprint in self.get_changed_file_data(
+        for file_name, nodeid, fingerprint, fingerprint_id in self.get_changed_file_data(
                 missed_checksum_fingerprint_ids
         ):
             # If the fingerprint is hit, update the mtime
-            # otherwise add the node for the missed fingerprint to a set
-            if check_fingerprint(self.source_tree, missed_file_fingerprint):
-                hit_fingerprint_nodes.append(missed_file_fingerprint)
+            # otherwise add the node for the missed fingerprint to the unstable set
+            if self.check_fingerprint(file_name, fingerprint):
+                hit_fingerprint_nodes.append(
+                    {"file_name": file_name, "fingerprint_id": fingerprint_id}
+                )
             else:
-                self.unstable_nodeids.add(missed_file_fingerprint[1])
-                self.unstable_files.add(home_file(missed_file_fingerprint[1]))
-        self.update_mtimes(get_new_mtimes(self.source_tree, hit_fingerprint_nodes))
+                self.unstable_nodeids.add(nodeid)
+                self.unstable_files.add(home_file(nodeid))
+        self.update_mtimes(self.get_new_mtimes(hit_fingerprint_nodes))
 
         # Reverse the unstable set to the stable set to appropriately handle
         # new files.
         self.stable_nodeids = self.all_nodes - self.unstable_nodeids
         self.stable_files = self.all_files - self.unstable_files
-
-    def determine_stable(self):
-
-        fingerprint_hits, fingerprint_misses, checksum_hits = self.run_filters()
-
-        self.unstable_nodeids = set()
-        self.unstable_files = set()
-
-        # This takes us from 1GiB to 8GiB? SQLite?!
-        for fingerprint_miss in fingerprint_misses:
-            self.unstable_nodeids.add(fingerprint_miss[1])
-            self.unstable_files.add(home_file(fingerprint_miss[1]))
-
-        self.stable_nodeids = self.all_nodes - self.unstable_nodeids
-        self.stable_files = self.all_files - self.unstable_files
-
-        self.update_mtimes(get_new_mtimes(self.source_tree, checksum_hits))
-        self.update_mtimes(get_new_mtimes(self.source_tree, fingerprint_hits))
-
-
-def get_new_mtimes(filesystem, hits):
-
-    for hit in hits:
-        module = filesystem.get_file(hit[0])
-        if module:
-            yield module.mtime, module.checksum, hit[3]
 
 
 class Testmon(object):
@@ -643,7 +603,6 @@ class Testmon(object):
 
 class TestmonConfig:
 
-
     def _is_debugger(self):
         return sys.gettrace() and not isinstance(sys.gettrace(), CTracer)
 
@@ -679,12 +638,12 @@ class TestmonConfig:
         return None
 
     def _get_nocollect_reasons(
-        self,
-        options,
-        debugger=False,
-        coverage=False,
-        dogfooding=False,
-        cov_plugin=False,
+            self,
+            options,
+            debugger=False,
+            coverage=False,
+            dogfooding=False,
+            cov_plugin=False,
     ):
         if options["testmon_nocollect"]:
             return [None]
@@ -775,19 +734,3 @@ class TestmonConfig:
             xdist=self._is_xdist(options),
             cov_plugin=cov_plugin,
         )
-
-
-def eval_environment(environment, **kwargs):
-    if not environment:
-        return ""
-
-    def md5(s):
-        return hashlib.md5(s.encode()).hexdigest()
-
-    eval_globals = {"os": os, "sys": sys, "hashlib": hashlib, "md5": md5}
-    eval_globals.update(kwargs)
-
-    try:
-        return str(eval(environment, eval_globals))
-    except Exception as e:
-        return repr(e)

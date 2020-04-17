@@ -75,7 +75,6 @@ def pytest_addoption(parser):
         """,
     )
 
-
     group.addoption(
         "--testmon-env",
         action="store",
@@ -85,6 +84,16 @@ def pytest_addoption(parser):
         help="""
         This allows you to have separate coverage data within one .testmondata file, e.g. when using the same source
         code serving different endpoints or django settings.
+        """,
+    )
+
+    group.addoption(
+        "--testmon-nosort",
+        action="store_true",
+        dest="testmon_nosort",
+        help="""
+        Testmon sorts tests by execution time normally, this disables that feature. Useful
+        when number of tests is large (>10000).
         """,
     )
 
@@ -107,7 +116,7 @@ def init_testmon_data(config, read_source=True):
         environment = eval_environment(config.getini("environment_expression"))
         testmon_data = TestmonData(config.rootdir.strpath, environment=environment)
         if read_source:
-            testmon_data.my_determine_stable()
+            testmon_data.determine_stable()
         config.testmon_data = testmon_data
 
 
@@ -300,9 +309,9 @@ class TestmonSelect:
 
         items[:] = selected
 
-        # TODO: Add option to toggle this from config because the overhead is high
-        # if self.testmon_data.all_nodes:
-        #     sort_items_by_duration(items, self.testmon_data)
+        if self.testmon_data.all_nodes and not config.getoption("testmon_nosort"):
+            raise Exception
+            sort_items_by_duration(items, self.testmon_data)
 
         session.config.hook.pytest_deselected(
             items=([FakeItemFromTestmon(session.config)] * len(self.deselected_nodes))
