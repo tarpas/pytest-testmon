@@ -47,6 +47,7 @@ class Module(object):
         self.full_lines = list(filter(lambda x: not blank_re.match(x), self.lines))
         self._full_lines_checksums = []
 
+        self.special_blocks = {}
         try:
             self.ast = ast.parse(source_code)
             self.special_blocks = dict(function_lines(self.ast, len(self.lines)))
