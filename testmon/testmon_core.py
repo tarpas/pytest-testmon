@@ -1,15 +1,10 @@
+from array import array
 import hashlib
 import json
 import os
-import random
 import sqlite3
 import sys
-import textwrap
-from packaging import version
-from array import array
-from collections import defaultdict
 
-import coverage
 from coverage import Coverage
 from coverage.tracer import CTracer
 
@@ -26,7 +21,7 @@ if sys.version_info.major < 3:
 
 CHECKUMS_ARRAY_TYPE = "i"
 DB_FILENAME = ".testmondata"
-SQLITE_CHUNK_SIZE = 499  # Half of default host parameter limit
+SQLITE_PAGE_LIMIT = 5000
 
 
 def checksums_to_blob(checksums):
@@ -35,7 +30,7 @@ def checksums_to_blob(checksums):
         data = blob.tobytes()
     except AttributeError:
         data = blob.tostring()
-        return sqlite3.Binary(data)
+    return sqlite3.Binary(data)
 
 
 def blob_to_checksums(blob):
@@ -44,22 +39,7 @@ def blob_to_checksums(blob):
         a.frombytes(blob)
     except AttributeError:
         a.fromstring(blob)
-        return a.tolist()
-
-
-class cached_property(object):
-
-
-    def __init__(self, func):
-        self.__doc__ = getattr(func, "__doc__")
-        self.func = func
-
-    def __get__(self, obj, cls):
-        if obj is None:
-            return self
-        value = obj.__dict__[self.func.__name__] = self.func(obj)
-        return value
-
+    return a
 
 
 def _get_python_lib_paths():
@@ -68,10 +48,6 @@ def _get_python_lib_paths():
         if getattr(sys, attr, sys.prefix) not in res:
             res.append(getattr(sys, attr))
     return [os.path.join(d, "*") for d in res]
-
-
-DISAPPEARED_FILE = Module("#dissapeared file")
-DISAPPEARED_FILE_CHECKSUM = 3948583
 
 
 def home_file(node_name):
@@ -99,12 +75,40 @@ def get_measured_relfiles(rootdir, cov, test_file):
     return files
 
 
+def eval_environment(environment, **kwargs):
+    if not environment:
+        return ""
+
+    def md5(s):
+        return hashlib.md5(s.encode()).hexdigest()
+
+    eval_globals = {"os": os, "sys": sys, "hashlib": hashlib, "md5": md5}
+    eval_globals.update(kwargs)
+
+    try:
+        return str(eval(environment, eval_globals))
+    except Exception as e:
+        return repr(e)
+
+
+class cached_property(object):
+
+    def __init__(self, func):
+        self.__doc__ = getattr(func, "__doc__")
+        self.func = func
+
+    def __get__(self, obj, cls):
+        if obj is None:
+            return self
+        value = obj.__dict__[self.func.__name__] = self.func(obj)
+        return value
+
+
 class TestmonException(Exception):
     pass
 
 
 class SourceTree:
-
 
     def __init__(self, rootdir=""):
         self.rootdir = rootdir
@@ -127,43 +131,6 @@ class SourceTree:
             else:
                 self.cache[filename] = None
         return self.cache[filename]
-
-
-def check_mtime(file_system, record):
-    absfilename = os.path.join(file_system.rootdir, record["file_name"])
-
-    cache_module = file_system.cache.get(record["file_name"], None)
-    try:
-        fs_mtime = cache_module.mtime if cache_module else os.path.getmtime(absfilename)
-    except OSError:
-        return False
-    return record["mtime"] == fs_mtime
-
-
-def check_checksum(file_system, record):
-    cache_module = file_system.get_file(record["file_name"])
-    fs_checksum = cache_module.checksum if cache_module else None
-
-    return record["checksum"] == fs_checksum
-
-
-def check_fingerprint(disk, record):
-    file = record[0]
-    fingerprint = record[2]
-
-    module = disk.get_file(file)
-    return module and file_has_lines(module.full_lines, fingerprint)
-
-
-def split_filter(disk, function, records):
-    first = []
-    second = []
-    for record in records:
-        if function(disk, record):
-            first.append(record)
-        else:
-            second.append(record)
-    return first, second
 
 
 class TestmonData(object):
@@ -189,6 +156,9 @@ class TestmonData(object):
         self.connection = sqlite3.connect(self.datafile)
         self.connection.execute("PRAGMA foreign_keys = TRUE ")
         self.connection.execute("PRAGMA recursive_triggers = TRUE ")
+        self.connection.execute("PRAGMA shrink_memory")
+        self.connection.execute("PRAGMA temp_store = FILE")
+        self.connection.execute("PRAGMA auto_vacuum = INCREMENTAL")
         self.connection.row_factory = sqlite3.Row
 
         if new_db:
@@ -242,10 +212,19 @@ class TestmonData(object):
             )
             """
         )
+        self.connection.execute(
+            """
+            CREATE INDEX node_fingerprint_idx ON node_fingerprint (
+                node_id,
+                fingerprint_id
+            )
+            """
+        )
 
         self._write_attribute(
             "__data_version", str(self.DATA_VERSION), environment="default"
         )
+        self.connection.commit()
 
     def _check_data_version(self):
         stored_data_version = self._fetch_attribute(
@@ -280,18 +259,19 @@ class TestmonData(object):
                 [dataid, json.dumps(data)],
             )
 
-    @cached_property
+    @property
     def filenames_fingerprints(self):
         return self.connection.execute(
             """
-                SELECT DISTINCT
-                    f.file_name, f.mtime, f.checksum, f.id as fingerprint_id
-                FROM node n, node_fingerprint nfp, fingerprint f
-                WHERE n.id = nfp.node_id AND
-                      nfp.fingerprint_id = f.id AND
-                      environment = ?""",
+            SELECT DISTINCT
+            f.file_name, f.mtime, f.checksum, f.id as fingerprint_id
+            FROM fingerprint f
+            JOIN node n ON n.id = nfp.node_id
+            JOIN node_fingerprint nfp ON nfp.fingerprint_id = f.id
+            WHERE environment =?
+            """,
             (self.environment,),
-        ).fetchall()
+        )
 
     @property
     def all_files(self):
@@ -300,48 +280,39 @@ class TestmonData(object):
     @cached_property
     def all_nodes(self):
         return {
-            row[0]: json.loads(row[1])
+            row[0]
             for row in self.connection.execute(
-                """  SELECT name, result
-                                    FROM node
-                                    WHERE environment = ?
-                                   """,
+                """
+                SELECT name
+                FROM node
+                WHERE environment = ?
+                """,
                 (self.environment,),
             )
         }
 
-    def get_changed_file_data(self, changed_fingerprints):
-
-        # Chunk the fingerprint list to avoid the SQLITE variable limit:
-        # See "Maximum Number Of Host Parameters In A Single SQL Statement"
-        # in https://www.sqlite.org/limits.html
-        changed_fingerprints_list = list(changed_fingerprints)
-        chunked_changed_fingerprints = [
-            changed_fingerprints_list[i:i + SQLITE_CHUNK_SIZE]
-            for i in range(0, len(changed_fingerprints_list), SQLITE_CHUNK_SIZE)
-        ]
-        result = []
-        for fingerprint_chunk in chunked_changed_fingerprints:
-            in_clause_questionsmarks = ", ".join("?" * len(fingerprint_chunk))
-
+    @cached_property
+    def failing_nodes(self):
+        return {
+            row[0]
             for row in self.connection.execute(
                 """
-                            SELECT
-                                f.file_name,
-                                n.name,
-                                f.fingerprint,
-                                f.id
-                            FROM node n, node_fingerprint nfp, fingerprint f
-                            WHERE
-                                n.environment = ? AND
-                                n.id = nfp.node_id AND
-                                nfp.fingerprint_id = f.id AND
-                                f.id IN (%s)"""
-                % in_clause_questionsmarks,
-                [self.environment,] + fingerprint_chunk,
-            ):
-                result.append((row[0], row[1], blob_to_checksums(row[2]), row[3]))
-        return result
+                SELECT name
+                FROM node
+                WHERE environment = ?
+                AND failed = true
+                """,
+                (self.environment,),
+            )
+        }
+
+    def get_report(self, nodeid):
+        result_row = self.connection.execute(
+            """
+            SELECT result FROM node WHERE name = ?
+            """, (nodeid,)
+        ).fetchone()
+        return json.loads(result_row[0]) if result_row else {}
 
     def make_nodedata(self, measured_files, default=None):
         result = {}
@@ -363,9 +334,15 @@ class TestmonData(object):
             get_measured_relfiles(self.rootdir, cov, home_file(nodeid))
         )
 
+    @staticmethod
+    def did_fail(reports):
+        return any(
+            [True for report in reports.values() if report.get("outcome") == u"failed"]
+        )
+
     def write_node_data(self, nodeid, nodedata, result={}, fake=False):
         with self.connection as con:
-            failed = any(r.get("outcome") == "failed" for r in result.values())
+            failed = self.did_fail(result)
             cursor = con.cursor()
             cursor.execute(
                 """
@@ -376,7 +353,6 @@ class TestmonData(object):
                 (self.environment, nodeid, json.dumps(result), failed),
             )
             node_id = cursor.lastrowid
-
 
             for filename in nodedata:
                 if fake:
@@ -411,29 +387,31 @@ class TestmonData(object):
                 )
 
     def sync_db_fs_nodes(self, retain):
-        collected = retain.union(set(self.stable_nodeids))
+        collected = retain.union(self.stable_nodeids)
         with self.connection as con:
-            add = collected - set(self.all_nodes)
+            add = collected - self.all_nodes
 
             for nodeid in add:
-                if is_python_file(home_file(nodeid)):
-                    self.write_node_data(
-                        nodeid,
-                        self.make_nodedata(
-                            {home_file(nodeid): None}, encode_lines(["0match"])
-                        ),
-                        fake=True,
-                    )
+                if not is_python_file(home_file(nodeid)):
+                    continue
+                self.write_node_data(
+                    nodeid,
+                    self.make_nodedata(
+                        {home_file(nodeid): None}, encode_lines(["0match"])
+                    ),
+                    fake=True,
+                )
 
             con.executemany(
                 """
                 DELETE
                 FROM node
                 WHERE environment = ?
-                  AND name = ?""",
+                  AND name = ?
+                """,
                 [
                     (self.environment, nodeid)
-                    for nodeid in set(self.all_nodes) - collected
+                    for nodeid in self.all_nodes - collected
                 ],
             )
 
@@ -449,60 +427,129 @@ class TestmonData(object):
             )
 
     def update_mtimes(self, new_mtimes):
+        """Takes list of tuples of the form `mtime, checksum, fingerprint_id` to update"""
         with self.connection as con:
             con.executemany(
                 "UPDATE fingerprint SET mtime=?, checksum=? WHERE id = ?", new_mtimes
             )
 
-    def run_filters(self):
+    def get_new_mtimes(self, hits):
+        """
+        Take a list of dictionaries/sqlite3.Row of objects with at least a `file_name` and
+        a `fingerprint_id` and yields the modified time of the module, the checksum and the
+        fingerprint_id.
+        """
+        for hit in hits:
+            module = self.source_tree.get_file(hit["file_name"])
+            if module:
+                yield module.mtime, module.checksum, hit["fingerprint_id"]
 
+    def get_changed_file_data(self, changed_fingerprints):
+        """
+        This may be a monster dataset, i.e. 800k fingerprints changed,
+        so page through SQLite style, and yield until there are no more results.
+        """
+        last_nfp_rowid = 0
+        fingerprint_ids = ', '.join([str(fp) for fp in changed_fingerprints])
+        while True:
+            current_page = self.connection.execute(
+                """
+                SELECT
+                  f.file_name,
+                  n.name,
+                  nfp.fingerprint_id,
+                  f.fingerprint,
+                  nfp.ROWID
+                FROM node_fingerprint nfp
+                JOIN node n ON n.id = nfp.node_id
+                JOIN fingerprint f ON f.id = nfp.fingerprint_id
+                WHERE nfp.fingerprint_id IN ({fingerprint_ids})
+                AND nfp.ROWID > {last_nfp_rowid}
+                ORDER BY nfp.ROWID
+                LIMIT {limit}
+                """.format(
+                    fingerprint_ids=fingerprint_ids,
+                    limit=SQLITE_PAGE_LIMIT,
+                    last_nfp_rowid=last_nfp_rowid,
+                )
+            ).fetchall()
+            if len(current_page) == 0:
+                return
 
-        filenames_fingerprints = self.filenames_fingerprints
+            for row in current_page:
+                yield (
+                    row["file_name"],
+                    row["name"],
+                    blob_to_checksums(row["fingerprint"]),
+                    row["fingerprint_id"]
+                )
+                last_nfp_rowid = row["ROWID"]
 
+    def check_mtime(self, file_name, mtime):
+        absfilename = os.path.join(self.source_tree.rootdir, file_name)
 
-        _, mtime_misses = split_filter(
-            self.source_tree, check_mtime, filenames_fingerprints
-        )
+        cache_module = self.source_tree.cache.get(file_name, None)
+        try:
+            fs_mtime = cache_module.mtime if cache_module else os.path.getmtime(absfilename)
+        except OSError:
+            return False
+        return mtime == fs_mtime
 
-        checksum_hits, checksum_misses = split_filter(
-            self.source_tree, check_checksum, mtime_misses
-        )
+    def check_checksum(self, file_name, checksum):
+        cache_module = self.source_tree.get_file(file_name)
+        fs_checksum = cache_module.checksum if cache_module else None
 
-        changed_file_data = self.get_changed_file_data(
-            {checksum_miss["fingerprint_id"] for checksum_miss in checksum_misses}
-        )
+        return checksum == fs_checksum
 
+    def check_fingerprint(self, file_name, fingerprint):
+        module = self.source_tree.get_file(file_name)
 
-        fingerprint_hits, fingerprint_misses = split_filter(
-            self.source_tree, check_fingerprint, changed_file_data
-        )
-
-        return fingerprint_hits, fingerprint_misses, checksum_hits
+        return module and file_has_lines(module.full_lines, fingerprint)
 
     def determine_stable(self):
 
-        fingerprint_hits, fingerprint_misses, checksum_hits = self.run_filters()
+        missed_checksum_fingerprint_ids = set()
+        hit_checksum_fingerprints = []
+        for fingerprint in self.filenames_fingerprints:
+            # If the mtime matches, file is unchanged
+            if self.check_mtime(fingerprint["file_name"], fingerprint["mtime"]):
+                continue
 
-        self.unstable_nodeids = set()
+            # If the checksum is a hit update the modified time
+            # otherwise add the fingerprint id to a set for finding
+            # affected nodes with that fingerprint
+            if self.check_checksum(fingerprint["file_name"], fingerprint["checksum"]):
+                hit_checksum_fingerprints.append(fingerprint)
+            else:
+                missed_checksum_fingerprint_ids.add(fingerprint["fingerprint_id"])
+
+        self.update_mtimes(self.get_new_mtimes(hit_checksum_fingerprints))
+        del hit_checksum_fingerprints  # Memory sensitive function, so free early
+
+        # Loop through all changed files and verify the fingerprint
         self.unstable_files = set()
+        self.unstable_nodeids = set()
+        hit_fingerprint_nodes = []
 
-        for fingerprint_miss in fingerprint_misses:
-            self.unstable_nodeids.add(fingerprint_miss[1])
-            self.unstable_files.add(fingerprint_miss[1].split("::", 1)[0])
+        # Loop through files by affected node
+        for file_name, nodeid, fingerprint, fingerprint_id in self.get_changed_file_data(
+                missed_checksum_fingerprint_ids
+        ):
+            # If the fingerprint is hit, update the mtime
+            # otherwise add the node for the missed fingerprint to the unstable set
+            if self.check_fingerprint(file_name, fingerprint):
+                hit_fingerprint_nodes.append(
+                    {"file_name": file_name, "fingerprint_id": fingerprint_id}
+                )
+            else:
+                self.unstable_nodeids.add(nodeid)
+                self.unstable_files.add(home_file(nodeid))
+        self.update_mtimes(self.get_new_mtimes(hit_fingerprint_nodes))
 
-        self.stable_nodeids = set(self.all_nodes) - self.unstable_nodeids
+        # Reverse the unstable set to the stable set to appropriately handle
+        # new files.
+        self.stable_nodeids = self.all_nodes - self.unstable_nodeids
         self.stable_files = self.all_files - self.unstable_files
-
-        self.update_mtimes(get_new_mtimes(self.source_tree, checksum_hits))
-        self.update_mtimes(get_new_mtimes(self.source_tree, fingerprint_hits))
-
-
-def get_new_mtimes(filesystem, hits):
-
-    for hit in hits:
-        module = filesystem.get_file(hit[0])
-        if module:
-            yield module.mtime, module.checksum, hit[3]
 
 
 class Testmon(object):
@@ -556,7 +603,6 @@ class Testmon(object):
 
 class TestmonConfig:
 
-
     def _is_debugger(self):
         return sys.gettrace() and not isinstance(sys.gettrace(), CTracer)
 
@@ -592,12 +638,12 @@ class TestmonConfig:
         return None
 
     def _get_nocollect_reasons(
-        self,
-        options,
-        debugger=False,
-        coverage=False,
-        dogfooding=False,
-        cov_plugin=False,
+            self,
+            options,
+            debugger=False,
+            coverage=False,
+            dogfooding=False,
+            cov_plugin=False,
     ):
         if options["testmon_nocollect"]:
             return [None]
@@ -688,19 +734,3 @@ class TestmonConfig:
             xdist=self._is_xdist(options),
             cov_plugin=cov_plugin,
         )
-
-
-def eval_environment(environment, **kwargs):
-    if not environment:
-        return ""
-
-    def md5(s):
-        return hashlib.md5(s.encode()).hexdigest()
-
-    eval_globals = {"os": os, "sys": sys, "hashlib": hashlib, "md5": md5}
-    eval_globals.update(kwargs)
-
-    try:
-        return str(eval(environment, eval_globals))
-    except Exception as e:
-        return repr(e)
