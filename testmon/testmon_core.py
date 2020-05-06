@@ -19,7 +19,7 @@ from testmon.process_code import Module
 if sys.version_info.major < 3:
     range = xrange
 
-CHECKUMS_ARRAY_TYPE = "i"
+CHECKUMS_ARRAY_TYPE = "I"  # from zlib.adler32
 DB_FILENAME = ".testmondata"
 SQLITE_PAGE_LIMIT = 5000
 

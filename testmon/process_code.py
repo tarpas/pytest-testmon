@@ -12,7 +12,7 @@ from coverage.misc import NoSource
 def encode_lines(lines):
     checksums = []
     for line in lines:
-        checksums.append(zlib.adler32(line.encode("UTF-8")))
+        checksums.append(zlib.adler32(line.encode("UTF-8")) & 0xffffffff)
 
     return checksums
 
