@@ -8,7 +8,7 @@ setup(
     name="pytest-testmon",
     description="selects tests affected by changed files and methods",
     long_description=long_description,
-    version="1.0.2.post4",
+    version="1.0.2.post5",
     license="AGPL",
     platforms=["linux", "osx", "win32"],
     packages=["testmon",],

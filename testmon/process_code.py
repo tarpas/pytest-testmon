@@ -3,7 +3,6 @@ import hashlib
 import textwrap
 import os
 import zlib
-import re
 
 from coverage.python import get_python_source
 from coverage.misc import NoSource
@@ -20,7 +19,21 @@ def encode_lines(lines):
 GAP_MARKS = {i: "{}GAP".format(i) for i in range(-1, 64)}
 INVERTED_GAP_MARKS_CHECKSUMS = {encode_lines(["{}GAP".format(i)])[0]: i for i in range(-1, 64)}
 
-blank_re = re.compile(r"\s*(#|$)")
+
+def is_blank_line(line):
+    """
+    Quite a bit faster than using re.compile and re.match, and this
+    executes on hundreds of millions of lines:
+
+    In [69]: timeit(lambda: is_blank_line('     # hi'), number=10000000)
+    Out[69]: 2.4501168727874756
+
+    In [70]: blank_re = re.compile(r"\s*(#|$)")
+    In [71]: timeit(lambda: blank_re.match('     # hi'), number=10000000)
+    Out[71]: 3.775568962097168
+    """
+    stripped_line = line.lstrip()
+    return stripped_line == '' or stripped_line[0] == '#'
 
 
 class Module(object):
@@ -43,7 +56,7 @@ class Module(object):
         self.checksum = checksum
         self.mtime = mtime
         self.lines = source_code.splitlines()
-        self.full_lines = list(filter(lambda x: not blank_re.match(x), self.lines))
+        self.full_lines = list(filter(lambda x: not is_blank_line(x), self.lines))
         self._full_lines_checksums = []
 
         self.special_blocks = {}
@@ -101,16 +114,8 @@ def read_file_with_checksum(absfilename):
 
 
 def get_indent_level(line):
-    space_count = 0
-    for c in line:
-        if c == " ":
-            space_count += 1
-            continue
-        elif c == "\t":
-            space_count += 8 - (space_count % 8)
-        else:
-            return space_count
-    return space_count
+    line_expanded = line.expandtabs(8)
+    return len(line_expanded) - len(line_expanded.lstrip())
 
 
 def cover_subindented_multilines(lines, start, end, indent_threshold):
@@ -119,7 +124,7 @@ def cover_subindented_multilines(lines, start, end, indent_threshold):
     while start < end - 1:
         start += 1
         line = lines[start]
-        if blank_re.match(lines[start]):
+        if is_blank_line(lines[start]):
             continue
 
         curr_indent = get_indent_level(line)
@@ -147,21 +152,18 @@ def gap_marks_until(lines, start, end):
 
 
 def covered_unused_statement(start, end, coverage):
-    while start <= end:
-        if start in coverage:
-            return True
-        start += 1
-    return False
+    return any(i in coverage for i in range(start, end))
 
 
-def create_fingerprints(afile, special_blocks, coverage):
+def create_fingerprints(lines, special_blocks, coverage):
     line_idx = 0
     result = []
-    while line_idx < len(afile):
+    while line_idx < len(lines):
+        line = lines[line_idx]
         line_idx += 1
-        line = afile[line_idx - 1]
+        line = lines[line_idx - 1]
 
-        if blank_re.match(line):
+        if is_blank_line(line):
             continue
 
         if (
@@ -172,7 +174,7 @@ def create_fingerprints(afile, special_blocks, coverage):
             )
         ):
             fingerprints, line_idx = gap_marks_until(
-                afile, line_idx - 1, special_blocks[line_idx]
+                lines, line_idx - 1, special_blocks[line_idx]
             )
             result.extend(fingerprints)
         else:

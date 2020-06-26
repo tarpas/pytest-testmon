@@ -220,6 +220,14 @@ class TestmonData(object):
             )
             """
         )
+        # Speeds up `remove_unused_fingerprints`
+        self.connection.execute(
+            """
+            CREATE INDEX fingerprint_idx ON node_fingerprint (
+                fingerprint_id
+            )
+            """
+        )
 
         self._write_attribute(
             "__data_version", str(self.DATA_VERSION), environment="default"
@@ -321,10 +329,11 @@ class TestmonData(object):
                 result[filename] = default
             else:
                 if os.path.exists(os.path.join(self.rootdir, filename)):
+                    coverage_set = set(covered)  # To speed `in` lookups
                     module = self.source_tree.get_file(filename)
                     result[filename] = encode_lines(
                         create_fingerprints(
-                            module.lines, module.special_blocks, covered
+                            module.lines, module.special_blocks, coverage_set
                         )
                     )
         return result
@@ -344,6 +353,8 @@ class TestmonData(object):
         with self.connection as con:
             failed = self.did_fail(result)
             cursor = con.cursor()
+            # This replaces a node each time to clear out any node<->fingerprint mappings
+            # by relying on the `ON DELETE CASCADE` on `node_id` in `node_fingerprint`.
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO node
@@ -353,7 +364,6 @@ class TestmonData(object):
                 (self.environment, nodeid, json.dumps(result), failed),
             )
             node_id = cursor.lastrowid
-
             for filename in nodedata:
                 if fake:
                     mtime, checksum = None, None
@@ -362,26 +372,24 @@ class TestmonData(object):
                     mtime, checksum = module.mtime, module.checksum
 
                 fingerprint = checksums_to_blob(nodedata[filename])
-                con.execute(
+                fingerprint_id = cursor.lastrowid  # See if it changes (i.e. new record)
+                cursor.execute(
                     """
-                    INSERT OR IGNORE INTO fingerprint
+                    INSERT INTO fingerprint
                     (file_name, fingerprint, mtime, checksum)
                     VALUES (?, ?, ?, ?)
+                    ON CONFLICT(file_name, fingerprint)
+                    DO UPDATE SET mtime=excluded.mtime, checksum=excluded.checksum
                     """,
                     (filename, fingerprint, mtime, checksum),
                 )
-
-                fingerprint_id, db_mtime, db_checksum = con.execute(
-                    "SELECT id, mtime, checksum FROM fingerprint WHERE file_name = ? AND fingerprint=?",
-                    (filename, fingerprint,),
-                ).fetchone()
-
-                if (
-                    db_checksum != checksum or db_mtime != mtime
-                ):
-                    self.update_mtimes([(mtime, checksum, fingerprint_id)])
-
-                con.execute(
+                fingerprint_id = cursor.lastrowid if cursor.lastrowid != fingerprint_id else None
+                if not fingerprint_id:  # Updated, so get ID
+                    fingerprint_id = cursor.execute(
+                        'SELECT id FROM fingerprint WHERE file_name=? AND fingerprint=?',
+                        (filename, fingerprint),
+                    ).fetchone()[0]
+                cursor.execute(
                     "INSERT INTO node_fingerprint VALUES (?, ?)",
                     (node_id, fingerprint_id),
                 )
