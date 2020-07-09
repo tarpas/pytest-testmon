@@ -220,14 +220,6 @@ class TestmonData(object):
             )
             """
         )
-        # Speeds up `remove_unused_fingerprints`
-        self.connection.execute(
-            """
-            CREATE INDEX fingerprint_idx ON node_fingerprint (
-                fingerprint_id
-            )
-            """
-        )
 
         self._write_attribute(
             "__data_version", str(self.DATA_VERSION), environment="default"
