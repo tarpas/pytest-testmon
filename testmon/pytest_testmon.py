@@ -6,13 +6,13 @@ from _pytest.python import Function
 from _pytest import runner
 
 from testmon.testmon_core import (
-    Testmon,
     eval_environment,
+    home_file,
+    Testmon,
     TestmonData,
     TestmonConfig,
     TestmonException,
 )
-
 
 
 def serialize_report(rep):
@@ -111,6 +111,7 @@ def testmon_options(config):
         if config.getoption(label):
             result.append(label.replace("testmon_", ""))
     return result
+
 
 def init_testmon_data(config, read_source=True):
     if not hasattr(config, "testmon_data"):
@@ -280,10 +281,15 @@ class TestmonSelect:
         self.deselected_files = testmon_data.stable_files
         self.deselected_nodes = testmon_data.stable_nodeids
         self.failing_nodes = testmon_data.failing_nodes
+        self.original_files = set()
+        self.original_nodeids = set()
 
     def add_failing_reports_from_db(self, failing_stable_nodes):
         """If the nodeid is failed but stable, add it's report instead of running it."""
         for nodeid in failing_stable_nodes:
+            # Pass if it wouldn't have been selected without this plugin
+            if not (nodeid in self.original_nodeids or home_file(nodeid) in self.original_files):
+                continue
             node_report = self.testmon_data.get_report(nodeid)
             if not node_report:
                 continue
@@ -294,6 +300,7 @@ class TestmonSelect:
 
     def pytest_ignore_collect(self, path, config):
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
+        self.original_files.add(strpath)
         if strpath in self.deselected_files:
             return True
 
@@ -304,6 +311,7 @@ class TestmonSelect:
             if item.nodeid in self.failing_nodes or item.nodeid not in self.deselected_nodes:
                 selected.append(item)
 
+        self.original_nodeids = {item.nodeid for node in items}
         items[:] = selected
 
         if self.testmon_data.all_nodes and not config.getoption("testmon_nosort"):
@@ -316,6 +324,8 @@ class TestmonSelect:
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtestloop(self, session):
         yield
+        if session.config.option.collectonly:
+            return
         self.add_failing_reports_from_db(
             self.deselected_nodes.intersection(self.failing_nodes)
         )
