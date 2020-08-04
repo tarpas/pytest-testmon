@@ -20,7 +20,7 @@ setup(
         "tox": ["testmon = testmon.tox_testmon",],
     },
     python_requires=">=3.6",
-    install_requires=["pytest>=5,<6", "coverage>=4,<6"],
+    install_requires=["pytest>=5,<7", "coverage>=4,<6"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
