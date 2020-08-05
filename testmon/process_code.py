@@ -17,7 +17,6 @@ def encode_lines(lines):
     return checksums
 
 
-
 GAP_MARKS = {i: f"{i}GAP" for i in range(-1, 64)}
 INVERTED_GAP_MARKS_CHECKSUMS = {encode_lines([f"{i}GAP"])[0]: i for i in range(-1, 64)}
 

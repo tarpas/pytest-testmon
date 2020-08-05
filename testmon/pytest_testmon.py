@@ -10,6 +10,8 @@ from testmon.testmon_core import (
     home_file,
     TestmonConfig,
     TestmonException,
+    get_node_class_name,
+    get_node_module_name,
 )
 from _pytest import runner
 
@@ -174,33 +176,6 @@ def pytest_unconfigure(config):
         config.testmon_data.close_connection()
 
 
-def sort_items_by_duration(items, reports):
-    durations = defaultdict(lambda: {"node_count": 0, "duration": 0})
-    for item in items:
-        if item.nodeid in reports:
-            item.duration = sum(
-                [report["duration"] for report in reports[item.nodeid].values()]
-            )
-        else:
-            item.duration = 0
-        item.module_name = item.location[0]
-        item_hierarchy = item.location[2].split(".")
-        item.node_name = item_hierarchy[-1]
-        item.class_name = item_hierarchy[0]
-
-        durations[item.class_name]["node_count"] += 1
-        durations[item.class_name]["duration"] += item.duration
-        durations[item.module_name]["node_count"] += 1
-        durations[item.module_name]["duration"] += item.duration
-
-    for key, stats in durations.items():
-        durations[key]["avg_duration"] = stats["duration"] / stats["node_count"]
-
-    items.sort(key=lambda item: item.duration)
-    items.sort(key=lambda item: durations[item.class_name]["avg_duration"])
-    items.sort(key=lambda item: durations[item.module_name]["avg_duration"])
-
-
 class TestmonCollect(object):
     def __init__(self, testmon, testmon_data):
         self.testmon_data: TestmonData = testmon_data
@@ -288,6 +263,23 @@ class TestmonSelect:
                     test_report = runner.TestReport(**node_reports[phase])
                     self.config.hook.pytest_runtest_logreport(report=test_report)
 
+    def sort_items_by_duration(self, items) -> None:
+        def duration_or_zero(key) -> float:
+            try:
+                return avg_durations[key]
+            except KeyError:
+                return 0
+
+        avg_durations = self.testmon_data.nodes_classes_modules_avg_durations
+
+        items.sort(key=lambda item: duration_or_zero(item.nodeid))
+        items.sort(
+            key=lambda item: duration_or_zero(get_node_class_name(item.location))
+        )
+        items.sort(
+            key=lambda item: duration_or_zero(get_node_module_name(item.location))
+        )
+
     def pytest_ignore_collect(self, path, config):
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
         if strpath in self.deselected_files:
@@ -308,7 +300,7 @@ class TestmonSelect:
         items[:] = selected
 
         if self.testmon_data.all_nodes:
-            sort_items_by_duration(items, self.testmon_data.all_nodes)
+            self.sort_items_by_duration(items)
 
         session.config.hook.pytest_deselected(
             items=([FakeItemFromTestmon(session.config)] * len(self.deselected_nodes))

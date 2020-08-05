@@ -268,11 +268,13 @@ class TestmonData(object):
         return self.connection.execute(
             """
                 SELECT DISTINCT 
-                    f.file_name, f.mtime, f.checksum, f.id as fingerprint_id 
+                    f.file_name, f.mtime, f.checksum, f.id as fingerprint_id, sum(failed) 
                 FROM node n, node_fingerprint nfp, fingerprint f 
                 WHERE n.id = nfp.node_id AND 
                       nfp.fingerprint_id = f.id AND 
-                      environment = ?""",
+                      environment = ?
+                GROUP BY 
+                    f.file_name, f.mtime, f.checksum, f.id""",
             (self.environment,),
         ).fetchall()
 
@@ -302,7 +304,8 @@ class TestmonData(object):
                             f.file_name,
                             n.name,
                             f.fingerprint,
-                            f.id
+                            f.id,
+                            n.failed
                         FROM node n, node_fingerprint nfp, fingerprint f
                         WHERE 
                             n.environment = ? AND
@@ -312,7 +315,7 @@ class TestmonData(object):
             % in_clause_questionsmarks,
             [self.environment,] + list(changed_fingerprints),
         ):
-            result.append((row[0], row[1], blob_to_checksums(row[2]), row[3]))
+            result.append((row[0], row[1], blob_to_checksums(row[2]), row[3], row[4]))
 
         return result
 
@@ -463,6 +466,34 @@ class TestmonData(object):
         self.update_mtimes(get_new_mtimes(self.source_tree, checksum_hits))
         self.update_mtimes(get_new_mtimes(self.source_tree, fingerprint_hits))
 
+    @property
+    def nodes_classes_modules_avg_durations(self) -> dict:
+        stats = defaultdict(lambda: {"node_count": 0, "sum_duration": 0})
+
+        for node_id, report_phases in self.all_nodes.items():
+            if report_phases:
+                report_phases = report_phases.values()
+                node_location = list(report_phases)[0]["location"]
+
+                class_name = get_node_class_name(node_location)
+                module_name = get_node_module_name(node_location)
+
+                stats[node_id]["node_count"] += 1
+                stats[node_id]["sum_duration"] = sum(
+                    [report["duration"] for report in report_phases]
+                )
+                if class_name:
+                    stats[class_name]["node_count"] += 1
+                    stats[class_name]["sum_duration"] += stats[node_id]["sum_duration"]
+                stats[module_name]["node_count"] += 1
+                stats[module_name]["sum_duration"] += stats[node_id]["sum_duration"]
+
+        avg_durations = {}
+        for key, stats in stats.items():
+            avg_durations[key] = stats["sum_duration"] / stats["node_count"]
+
+        return avg_durations
+
 
 def get_new_mtimes(filesystem, hits):
 
@@ -470,6 +501,17 @@ def get_new_mtimes(filesystem, hits):
         module = filesystem.get_file(hit[0])
         if module:
             yield module.mtime, module.checksum, hit[3]
+
+
+def get_node_class_name(location):
+    if len(location[2].split(".")) > 1:
+        return location[2].split(".")[0]
+    else:
+        return None
+
+
+def get_node_module_name(location):
+    return location[0]
 
 
 class Testmon(object):
