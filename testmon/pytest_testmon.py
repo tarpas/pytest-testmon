@@ -90,7 +90,7 @@ def pytest_addoption(parser):
 
     group.addoption(
         "--testmon-nosort",
-        action="store_false",
+        action="store_true",
         dest="testmon_nosort",
         help="""
         Testmon sorts tests by execution time normally, this disables that feature. Useful
