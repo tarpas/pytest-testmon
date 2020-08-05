@@ -1,4 +1,3 @@
-
 import os
 from collections import defaultdict
 
@@ -76,7 +75,6 @@ def pytest_addoption(parser):
         """,
     )
 
-
     group.addoption(
         "--testmon-env",
         action="store",
@@ -118,14 +116,12 @@ def pytest_configure(config):
 
     plugin = None
 
-
     testmon_config = TestmonConfig()
     message, should_collect, should_select = testmon_config.header_collect_select(
         config, coverage_stack, cov_plugin=plugin
     )
     config.testmon_config = (message, should_collect, should_select)
     if should_select or should_collect:
-        config.option.continue_on_collection_errors = True
 
         try:
             init_testmon_data(config)
@@ -207,7 +203,7 @@ def sort_items_by_duration(items, reports):
 
 class TestmonCollect(object):
     def __init__(self, testmon, testmon_data):
-        self.testmon_data = testmon_data
+        self.testmon_data: TestmonData = testmon_data
         self.testmon = testmon
 
         self.reports = defaultdict(lambda: {})
@@ -274,14 +270,13 @@ def get_failing(all_nodes):
 
 class TestmonSelect:
     def __init__(self, config, testmon_data):
-        self.testmon_data = testmon_data
+        self.testmon_data: TestmonData = testmon_data
         self.config = config
 
         self.deselected_files = testmon_data.stable_files
         self.deselected_nodes = testmon_data.stable_nodeids
 
-        failing_files, failing_nodes = get_failing(testmon_data.all_nodes)
-
+        _, failing_nodes = get_failing(testmon_data.all_nodes)
 
         self.failing_nodes = failing_nodes
 

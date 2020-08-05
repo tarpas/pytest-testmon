@@ -37,11 +37,7 @@ def blob_to_checksums(blob):
     return a.tolist()
 
 
-
-
 class cached_property(object):
-    
-
     def __init__(self, func):
         self.__doc__ = getattr(func, "__doc__")
         self.func = func
@@ -51,7 +47,6 @@ class cached_property(object):
             return self
         value = obj.__dict__[self.func.__name__] = self.func(obj)
         return value
-
 
 
 def _get_python_lib_paths():
@@ -75,9 +70,7 @@ def is_python_file(file_path):
 
 
 def get_measured_relfiles(rootdir, cov, test_file):
-    files = {
-        test_file: set()
-    }
+    files = {test_file: set()}
     c = cov.config
     for filename in cov.get_data().measured_files():
         if not is_python_file(filename):
@@ -96,8 +89,6 @@ class TestmonException(Exception):
 
 
 class SourceTree:
-    
-
     def __init__(self, rootdir=""):
         self.rootdir = rootdir
         self.cache = {}
@@ -359,7 +350,6 @@ class TestmonData(object):
             )
             node_id = cursor.lastrowid
 
-
             for filename in nodedata:
                 if fake:
                     mtime, checksum = None, None
@@ -382,9 +372,7 @@ class TestmonData(object):
                     (filename, fingerprint,),
                 ).fetchone()
 
-                if (
-                    db_checksum != checksum or db_mtime != mtime
-                ):
+                if db_checksum != checksum or db_mtime != mtime:
                     self.update_mtimes([(mtime, checksum, fingerprint_id)])
 
                 con.execute(
@@ -437,10 +425,8 @@ class TestmonData(object):
             )
 
     def run_filters(self):
-        
 
         filenames_fingerprints = self.filenames_fingerprints
-
 
         _, mtime_misses = split_filter(
             self.source_tree, check_mtime, filenames_fingerprints
@@ -453,7 +439,6 @@ class TestmonData(object):
         changed_file_data = self.get_changed_file_data(
             {checksum_miss["fingerprint_id"] for checksum_miss in checksum_misses}
         )
-
 
         fingerprint_hits, fingerprint_misses = split_filter(
             self.source_tree, check_fingerprint, changed_file_data
@@ -480,7 +465,7 @@ class TestmonData(object):
 
 
 def get_new_mtimes(filesystem, hits):
-    
+
     for hit in hits:
         module = filesystem.get_file(hit[0])
         if module:
@@ -504,20 +489,16 @@ class Testmon(object):
             "omit": _get_python_lib_paths(),
         }
 
-
-
         self.cov = Coverage(
             data_file=getattr(self, "sub_cov_file", None), config_file=False, **params
         )
         self.cov._warn_no_data = False
-
 
     def start(self):
 
         Testmon.coverage_stack.append(self.cov)
         self.cov.erase()
         self.cov.start()
-
 
     def stop(self):
         self.cov.stop()
@@ -537,8 +518,6 @@ class Testmon(object):
 
 
 class TestmonConfig:
-
-
     def _is_debugger(self):
         return sys.gettrace() and not isinstance(sys.gettrace(), CTracer)
 
@@ -583,7 +562,6 @@ class TestmonConfig:
     ):
         if options["testmon_nocollect"]:
             return [None]
-
 
         if coverage and not dogfooding:
             return ["it's not compatible with coverage.py"]
