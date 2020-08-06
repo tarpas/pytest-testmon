@@ -156,9 +156,9 @@ class TestmonData(object):
         self.connection = sqlite3.connect(self.datafile)
         self.connection.execute("PRAGMA foreign_keys = TRUE ")
         self.connection.execute("PRAGMA recursive_triggers = TRUE ")
-        self.connection.execute("PRAGMA shrink_memory")
-        self.connection.execute("PRAGMA temp_store = FILE")
+        self.connection.execute("PRAGMA temp_store = MEMORY")
         self.connection.execute("PRAGMA auto_vacuum = INCREMENTAL")
+        self.connection.execute("PRAGMA cache_size = -1000000")  # 1 GiB
         self.connection.row_factory = sqlite3.Row
 
         if new_db:
@@ -452,6 +452,7 @@ class TestmonData(object):
         last_nfp_rowid = 0
         fingerprint_ids = ', '.join([str(fp) for fp in changed_fingerprints])
         while True:
+            self.connection.execute("PRAGMA shrink_memory")
             current_page = self.connection.execute(
                 """
                 SELECT
