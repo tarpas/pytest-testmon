@@ -194,7 +194,8 @@ class TestmonData(object):
                 node_id INTEGER,
                 fingerprint_id INTEGER,
                 FOREIGN KEY(node_id) REFERENCES node(id) ON DELETE CASCADE,
-                FOREIGN KEY(fingerprint_id) REFERENCES fingerprint(id)
+                FOREIGN KEY(fingerprint_id) REFERENCES fingerprint(id),
+                UNIQUE (node_id, fingerprint_id)
             )
             """
         )
@@ -382,7 +383,7 @@ class TestmonData(object):
                         (filename, fingerprint),
                     ).fetchone()[0]
                 cursor.execute(
-                    "INSERT INTO node_fingerprint VALUES (?, ?)",
+                    "INSERT OR IGNORE INTO node_fingerprint VALUES (?, ?)",
                     (node_id, fingerprint_id),
                 )
 
