@@ -104,11 +104,11 @@ def function_lines(node, end):
 
 
 def read_file_with_checksum(absfilename):
-    hasher = hashlib.sha1()
     try:
         source = get_python_source(absfilename)
     except NoSource:
         return None, None
+    hasher = hashlib.sha1()
     hasher.update(source.encode("utf-8"))
     return source, hasher.hexdigest()
 

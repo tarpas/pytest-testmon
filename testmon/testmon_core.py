@@ -115,21 +115,24 @@ class SourceTree:
         self.cache = {}
 
     def get_file(self, filename):
-        if filename not in self.cache:
-            code, checksum = read_file_with_checksum(
-                os.path.join(self.rootdir, filename)
-            )
-            if checksum:
-                fs_mtime = os.path.getmtime(os.path.join(self.rootdir, filename))
-                self.cache[filename] = Module(
-                    source_code=code,
-                    file_name=filename,
-                    rootdir=self.rootdir,
-                    mtime=fs_mtime,
-                    checksum=checksum,
-                )
-            else:
-                self.cache[filename] = None
+        if filename in self.cache:
+            return self.cache[filename]
+
+        code, checksum = read_file_with_checksum(
+            os.path.join(self.rootdir, filename)
+        )
+        if not checksum:  # Missing, or not code
+            self.cache[filename] = None
+            return None
+
+        fs_mtime = os.path.getmtime(os.path.join(self.rootdir, filename))
+        self.cache[filename] = Module(
+            source_code=code,
+            file_name=filename,
+            rootdir=self.rootdir,
+            mtime=fs_mtime,
+            checksum=checksum,
+        )
         return self.cache[filename]
 
 
@@ -316,19 +319,20 @@ class TestmonData(object):
         return json.loads(result_row[0]) if result_row else {}
 
     def make_nodedata(self, measured_files, default=None):
+        if default:
+            return {filename: default for filename in measured_files.keys()}
+
         result = {}
         for filename, covered in measured_files.items():
-            if default:
-                result[filename] = default
-            else:
-                if os.path.exists(os.path.join(self.rootdir, filename)):
-                    coverage_set = set(covered)  # To speed `in` lookups
-                    module = self.source_tree.get_file(filename)
-                    result[filename] = encode_lines(
-                        create_fingerprints(
-                            module.lines, module.special_blocks, coverage_set
-                        )
-                    )
+            module = self.source_tree.get_file(filename)
+            if not module:
+                continue
+            coverage_set = set(covered)  # To speed `in` lookups
+            result[filename] = encode_lines(
+                create_fingerprints(
+                    module.lines, module.special_blocks, coverage_set
+                )
+            )
         return result
 
     def node_data_from_cov(self, cov, nodeid):
@@ -398,7 +402,8 @@ class TestmonData(object):
                 self.write_node_data(
                     nodeid,
                     self.make_nodedata(
-                        {home_file(nodeid): None}, encode_lines(["0match"])
+                        {home_file(nodeid): None},
+                        encode_lines(["0match"])
                     ),
                     fake=True,
                 )
