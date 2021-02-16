@@ -39,4 +39,3 @@ nosetests.xml
 .*
 /htmlcov/
 /tags
-/test

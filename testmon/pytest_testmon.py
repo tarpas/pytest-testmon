@@ -3,6 +3,8 @@ from collections import defaultdict
 
 import pytest
 from _pytest.python import Function
+
+from testmon.db import remove_unused_fingerprints
 from testmon.testmon_core import (
     Testmon,
     eval_environment,
@@ -12,8 +14,10 @@ from testmon.testmon_core import (
     TestmonException,
     get_node_class_name,
     get_node_module_name,
+    LIBRARIES_KEY,
 )
 from _pytest import runner
+import pkg_resources
 
 
 def serialize_report(rep):
@@ -107,67 +111,88 @@ def testmon_options(config):
 
 def init_testmon_data(config, read_source=True):
     if not hasattr(config, "testmon_data"):
-        environment = eval_environment(config.getini("environment_expression"))
-        testmon_data = TestmonData(config.rootdir.strpath, environment=environment)
+        environment = config.getoption("environment_expression") or eval_environment(
+            config.getini("environment_expression")
+        )
+        libraries = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
+        testmon_data = TestmonData(
+            config.rootdir.strpath, environment=environment, libraries=libraries
+        )
         if read_source:
             testmon_data.determine_stable()
         config.testmon_data = testmon_data
 
 
+def register_plugins(config, should_select, should_collect, cov_plugin):
+    if should_select:
+        config.pluginmanager.register(
+            TestmonSelect(config, config.testmon_data), "TestmonSelect"
+        )
+
+    if should_collect:
+        config.pluginmanager.register(
+            TestmonCollect(
+                Testmon(
+                    config.rootdir.strpath,
+                    testmon_labels=testmon_options(config),
+                    cov_plugin=cov_plugin,
+                ),
+                config.testmon_data,
+            ),
+            "TestmonCollect",
+        )
+
+
 def pytest_configure(config):
     coverage_stack = None
 
-    plugin = None
+    cov_plugin = None
 
     testmon_config = TestmonConfig()
     message, should_collect, should_select = testmon_config.header_collect_select(
-        config, coverage_stack, cov_plugin=plugin
+        config, coverage_stack, cov_plugin=cov_plugin
     )
     config.testmon_config = (message, should_collect, should_select)
     if should_select or should_collect:
 
         try:
             init_testmon_data(config)
-
-            if should_select:
-                config.pluginmanager.register(
-                    TestmonSelect(config, config.testmon_data), "TestmonSelect"
-                )
-
-            if should_collect:
-                config.pluginmanager.register(
-                    TestmonCollect(
-                        Testmon(
-                            config.rootdir.strpath,
-                            testmon_labels=testmon_options(config),
-                            cov_plugin=plugin,
-                        ),
-                        config.testmon_data,
-                    ),
-                    "TestmonCollect",
-                )
+            register_plugins(config, should_select, should_collect, cov_plugin)
         except TestmonException as e:
             pytest.exit(str(e))
+
+        config.option.continue_on_collection_errors = True
 
 
 def pytest_report_header(config):
     message, should_collect, should_select = config.testmon_config
 
     if should_collect or should_select:
-        if should_select:
-            changed_files = ", ".join(config.testmon_data.unstable_files)
-            if changed_files == "" or len(changed_files) > 100:
-                changed_files = len(config.testmon_data.unstable_files)
+        unstable_files = getattr(config.testmon_data, "unstable_files", set())
+        stable_files = getattr(config.testmon_data, "stable_files", set()) - {
+            LIBRARIES_KEY
+        }
+        environment = config.testmon_data.environment
+        libraries_miss = config.testmon_data.libraries_miss
 
-            if changed_files == 0 and len(config.testmon_data.stable_files) == 0:
+        if should_select:
+            changed_files_msg = ", ".join(unstable_files)
+            if changed_files_msg == "" or len(changed_files_msg) > 100:
+                changed_files_msg = str(len(config.testmon_data.unstable_files))
+
+            if changed_files_msg == "0" and len(stable_files) == 0:
                 message += "new DB, "
             else:
-                message += "changed files: {}, skipping collection of {} files, ".format(
-                    changed_files, len(config.testmon_data.stable_files)
+                message += (
+                    "changed files{}: {}, skipping collection of {} files, ".format(
+                        "(libraries upgrade/install)" if libraries_miss else "",
+                        changed_files_msg,
+                        len(stable_files),
+                    )
                 )
 
         if config.testmon_data.environment:
-            message += "environment: {}".format(config.testmon_data.environment)
+            message += "environment: {}".format(environment)
 
     return message
 
@@ -225,13 +250,13 @@ class TestmonCollect(object):
         self.reports[report.nodeid][report.when] = serialize_report(report)
 
     def pytest_sessionfinish(self, session):
-        self.testmon_data.remove_unused_fingerprints()
+        remove_unused_fingerprints(self.testmon_data.connection)
         self.testmon.close()
 
 
 def did_fail(reports):
     return bool(
-        [True for report in reports.values() if report.get("outcome") == u"failed"]
+        [True for report in reports.values() if report.get("outcome") == "failed"]
     )
 
 

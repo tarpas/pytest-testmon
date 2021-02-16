@@ -7,6 +7,10 @@ import re
 
 from coverage.python import get_python_source
 from coverage.misc import NoSource
+from array import array
+import sqlite3
+
+CHECKUMS_ARRAY_TYPE = "I"
 
 
 def encode_lines(lines):
@@ -15,6 +19,18 @@ def encode_lines(lines):
         checksums.append(zlib.adler32(line.encode("UTF-8")))
 
     return checksums
+
+
+def checksums_to_blob(checksums):
+    blob = array(CHECKUMS_ARRAY_TYPE, checksums)
+    data = blob.tobytes()
+    return sqlite3.Binary(data)
+
+
+def blob_to_checksums(blob):
+    a = array(CHECKUMS_ARRAY_TYPE)
+    a.frombytes(blob)
+    return a.tolist()
 
 
 GAP_MARKS = {i: f"{i}GAP" for i in range(-1, 64)}

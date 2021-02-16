@@ -11,13 +11,19 @@ setup(
     version="1.0.3",
     license="AGPL",
     platforms=["linux", "osx", "win32"],
-    packages=["testmon",],
+    packages=[
+        "testmon",
+    ],
     url="https://testmon.org",
     author_email="tibor.arpas@infinit.sk",
     author="Tibor Arpas, Tomas Matlovic, Daniel Hahler, Martin Racak",
     entry_points={
-        "pytest11": ["testmon = testmon.pytest_testmon",],
-        "tox": ["testmon = testmon.tox_testmon",],
+        "pytest11": [
+            "testmon = testmon.pytest_testmon",
+        ],
+        "tox": [
+            "testmon = testmon.tox_testmon",
+        ],
     },
     python_requires=">=3.6",
     install_requires=["pytest>=5,<7", "coverage>=4,<6"],
