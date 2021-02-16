@@ -1,4 +1,3 @@
-
 import pytest
 import os
 
@@ -20,8 +19,6 @@ except ImportError:
     from io import BytesIO as MemFile
 
 from collections import namedtuple
-
-
 
 
 class TestReadSrc:

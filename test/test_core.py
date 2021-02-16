@@ -27,7 +27,6 @@ from testmon.testmon_core import (
 from testmon.process_code import checksums_to_blob, blob_to_checksums
 
 
-
 pytest_plugins = ("pytester",)
 
 from array import array
@@ -91,7 +90,6 @@ class TestMisc(object):
         assert is_python_file("f.py")
         assert not is_python_file("/notpy/file.p")
 
-
     def test_sqlite_assumption_foreign_key(self, tmdata):
         def node_fingerprint_count(nodeid):
             return con.execute(
@@ -120,7 +118,6 @@ class TestMisc(object):
         assert node_fingerprint_count(second_nodeid) == 1
         tmdata.connection.execute("DELETE FROM node")
         assert node_fingerprint_count(second_nodeid) == 0
-
 
 
 class TestData:
@@ -168,7 +165,6 @@ class TestData:
 
     def test_determine_stable_flow(self, tmdata):
         tmdata.write("test_1.py::test_1", {"test_1.py": encode_lines(["FINGERPRINT1"])})
-
 
         filenames_fingerprints = tmdata.filenames_fingerprints
 
@@ -367,7 +363,6 @@ class TestCoreTestmon:
         )
 
 
-
 class TestSourceTree:
     def test_get_file(self, testdir):
         a_py = testdir.makepyfile(
@@ -460,4 +455,3 @@ class TestTestmonConfig:
             False,
             True,
         )
-

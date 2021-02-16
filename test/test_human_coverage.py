@@ -1,4 +1,3 @@
-
 import ast
 
 from .coveragepy.coveragetest import CoverageTest
@@ -126,8 +125,6 @@ class TestCoverageAndFingeprintsAssumptions(TestmonCoverageTest):
 
 
 class BasicTestmonCoverageTest(TestmonCoverageTest):
-    
-
     def test_simple(self):
         self.check_human_coverage(
             """\
@@ -218,8 +215,6 @@ class BasicTestmonCoverageTest(TestmonCoverageTest):
 
 
 class SimpleStatementTest(TestmonCoverageTest):
-    
-
     def test_assert(self):
         self.check_human_coverage(
             """\

@@ -546,9 +546,7 @@ class TestmonDeselect(object):
         )
         testdir.runpytest_inprocess("--testmon")
 
-        tmdata_with_dummy_libraries = CoreTestmonData(
-            rootdir="", libraries=", "
-        )
+        tmdata_with_dummy_libraries = CoreTestmonData(rootdir="", libraries=", ")
         tmdata_with_dummy_libraries.determine_stable()
         assert tmdata_with_dummy_libraries.all_files == {
             "/libraries_checksum_testmon_name",
@@ -618,9 +616,7 @@ class TestmonDeselect(object):
         Module(cs2.source_code)
 
         test_a = testdir.makepyfile(test_a=cs1.source_code)
-        result = testdir.runpytest_inprocess(
-            "--testmon", "test_a.py::TestA::test_one"
-        )
+        result = testdir.runpytest_inprocess("--testmon", "test_a.py::TestA::test_one")
         result.stdout.fnmatch_lines(
             [
                 "*1 passed*",
@@ -1683,8 +1679,6 @@ class TestPrioritization:
         )
 
 
-
-
 class TestXdist(object):
     def test_xdist_4(self, testdir):
         pytest.importorskip("xdist")
@@ -1705,9 +1699,7 @@ class TestXdist(object):
             """
         )
 
-        testdir.runpytest_inprocess(
-            "test_a.py::test_0", "--testmon", "-v"
-        )
+        testdir.runpytest_inprocess("test_a.py::test_0", "--testmon", "-v")
         time.sleep(0.1)
         result = testdir.runpytest_inprocess("test_a.py", "--testmon", "-n 4", "-v")
         result.stdout.fnmatch_lines(

@@ -175,25 +175,44 @@ def pytest_report_header(config):
         environment = config.testmon_data.environment
         libraries_miss = config.testmon_data.libraries_miss
 
-        if should_select:
-            changed_files_msg = ", ".join(unstable_files)
-            if changed_files_msg == "" or len(changed_files_msg) > 100:
-                changed_files_msg = str(len(config.testmon_data.unstable_files))
+    if should_collect or should_select:
 
-            if changed_files_msg == "0" and len(stable_files) == 0:
-                message += "new DB, "
-            else:
-                message += (
-                    "changed files{}: {}, skipping collection of {} files, ".format(
-                        "(libraries upgrade/install)" if libraries_miss else "",
-                        changed_files_msg,
-                        len(stable_files),
-                    )
-                )
+        message += changed_message(
+            config,
+            environment,
+            libraries_miss,
+            should_select,
+            stable_files,
+            unstable_files,
+        )
 
-        if config.testmon_data.environment:
-            message += "environment: {}".format(environment)
+    return message
 
+
+def changed_message(
+    config,
+    environment,
+    libraries_miss,
+    should_select,
+    stable_files,
+    unstable_files,
+):
+    message = ""
+    if should_select:
+        changed_files_msg = ", ".join(unstable_files)
+        if changed_files_msg == "" or len(changed_files_msg) > 100:
+            changed_files_msg = str(len(config.testmon_data.unstable_files))
+
+        if changed_files_msg == "0" and len(stable_files) == 0:
+            message += "new DB, "
+        else:
+            message += "changed files{}: {}, skipping collection of {} files, ".format(
+                "(libraries upgrade/install)" if libraries_miss else "",
+                changed_files_msg,
+                len(stable_files),
+            )
+    if config.testmon_data.environment:
+        message += "environment: {}".format(environment)
     return message
 
 
