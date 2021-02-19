@@ -535,7 +535,7 @@ class TestmonDeselect(object):
         assert testmon_data.all_files == {"test_a.py", LIBRARIES_KEY}
         assert testmon_data.unstable_files == set()
         assert testmon_data.stable_files == {"test_a.py", LIBRARIES_KEY}
-        assert testmon_data.libraries_miss == False
+        assert bool(testmon_data.libraries_miss) == False
 
     def test_libraries(self, testdir):
         testdir.makepyfile(
@@ -554,7 +554,7 @@ class TestmonDeselect(object):
         }
         assert tmdata_with_dummy_libraries.unstable_nodeids == {"test_a.py::test_add"}
         assert tmdata_with_dummy_libraries.unstable_files == {"test_a.py"}
-        assert tmdata_with_dummy_libraries.libraries_miss == True
+        assert bool(tmdata_with_dummy_libraries.libraries_miss) == True
 
     def test_interrupted(self, test_a, testdir):
         testdir.runpytest_inprocess("--testmon")

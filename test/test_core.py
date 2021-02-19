@@ -345,7 +345,7 @@ class TestCoreTestmon:
         assert split_filter(fs, check_mtime, (record2,)) == ([], [record2])
 
     def test_split_filter(self):
-        assert split_filter(None, lambda disk, x, _: x == 1, (1, 2)) == ([1], [2])
+        assert split_filter(None, lambda disk, x: x == 1, (1, 2)) == ([1], [2])
 
     def test_get_new_mtimes(self, testdir):
         a_py = testdir.makepyfile(

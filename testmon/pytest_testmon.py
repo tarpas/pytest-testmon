@@ -255,7 +255,6 @@ class TestmonCollect(object):
             else:
                 self.testmon.stop_and_save(
                     self.testmon_data,
-                    item.config.rootdir.strpath,
                     item.nodeid,
                     self.reports[item.nodeid],
                 )

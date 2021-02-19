@@ -99,9 +99,7 @@ class SourceTree:
         return self.cache[filename]
 
 
-def check_mtime(file_system, record, libraries=None):
-    if record["file_name"] == LIBRARIES_KEY:
-        return record["checksum"] == libraries
+def check_mtime(file_system, record):
     absfilename = os.path.join(file_system.rootdir, record["file_name"])
 
     cache_module = file_system.cache.get(record["file_name"], None)
@@ -112,18 +110,14 @@ def check_mtime(file_system, record, libraries=None):
     return record["mtime"] == fs_mtime
 
 
-def check_checksum(file_system, record, _=None):
-    if record["file_name"] == LIBRARIES_KEY:
-        return False
+def check_checksum(file_system, record):
     cache_module = file_system.get_file(record["file_name"])
     fs_checksum = cache_module.checksum if cache_module else None
 
     return record["checksum"] == fs_checksum
 
 
-def check_fingerprint(disk, record: ChangedFileData, _=None):
-    if record.file_name == LIBRARIES_KEY:
-        return False
+def check_fingerprint(disk, record: ChangedFileData):
     file = record.file_name
     fingerprint = record.checksums
 
@@ -131,11 +125,11 @@ def check_fingerprint(disk, record: ChangedFileData, _=None):
     return module and file_has_lines(module.full_lines, fingerprint)
 
 
-def split_filter(disk, function, records: [T], arg=None) -> ([T], [T]):
+def split_filter(disk, function, records: [T]) -> ([T], [T]):
     first = []
     second = []
     for record in records:
-        if function(disk, record, arg):
+        if function(disk, record):
             first.append(record)
         else:
             second.append(record)
@@ -290,9 +284,16 @@ class TestmonData(object):
 
     def run_filters(self, filenames_fingerprints):
 
-        _, mtime_misses = split_filter(
-            self.source_tree, check_mtime, filenames_fingerprints, self.libraries
-        )
+        library_misses = []
+        mtime_misses = []
+
+        for record in filenames_fingerprints:
+            if record["file_name"] == LIBRARIES_KEY:
+                if record["checksum"] != self.libraries:
+                    library_misses.append(record)
+            else:
+                if not check_mtime(self.source_tree, record):
+                    mtime_misses.append(record)
 
         checksum_hits, checksum_misses = split_filter(
             self.source_tree, check_checksum, mtime_misses
@@ -301,7 +302,10 @@ class TestmonData(object):
         changed_file_data = get_changed_file_data(
             self.connection,
             self.environment,
-            {checksum_miss["fingerprint_id"] for checksum_miss in checksum_misses},
+            {
+                checksum_miss["fingerprint_id"]
+                for checksum_miss in (checksum_misses + library_misses)
+            },
         )
 
         fingerprint_hits, fingerprint_misses = split_filter(
@@ -312,7 +316,7 @@ class TestmonData(object):
             fingerprint_hits,
             fingerprint_misses,
             checksum_hits,
-            any(LIBRARIES_KEY == mm[0] for mm in mtime_misses),
+            library_misses,
         )
 
     def determine_stable(self):
@@ -409,7 +413,7 @@ class Testmon(object):
 
     def __init__(self, rootdir="", testmon_labels=None, cov_plugin=None):
         if testmon_labels is None:
-            testmon_labels = set(["singleprocess"])
+            testmon_labels = {"singleprocess"}
         self.rootdir = rootdir
         self.testmon_labels = testmon_labels
         self.cov = None
@@ -436,7 +440,7 @@ class Testmon(object):
         self.cov.stop()
         Testmon.coverage_stack.pop()
 
-    def stop_and_save(self, testmon_data: TestmonData, rootdir, nodeid, result):
+    def stop_and_save(self, testmon_data: TestmonData, nodeid, result):
         self.stop()
         if hasattr(self, "sub_cov_file"):
             self.cov.combine()
