@@ -1,5 +1,4 @@
 import hashlib
-import json
 import os
 import random
 import sqlite3
@@ -14,14 +13,9 @@ import coverage
 from coverage import Coverage
 from coverage.tracer import CTracer
 
-from testmon.db import (
-    update_mtimes,
-    insert_node_fingerprints,
-    _fetch_attribute,
-    init_tables,
-    get_changed_file_data,
-    ChangedFileData,
-)
+from testmon import db
+from testmon.db import DB
+
 from testmon.process_code import (
     read_file_with_checksum,
     file_has_lines,
@@ -117,7 +111,7 @@ def check_checksum(file_system, record):
     return record["checksum"] == fs_checksum
 
 
-def check_fingerprint(disk, record: ChangedFileData):
+def check_fingerprint(disk, record: db.ChangedFileData):
     file = record.file_name
     fingerprint = record.checksums
 
@@ -177,8 +171,10 @@ class TestmonData(object):
         self.connection.execute("PRAGMA recursive_triggers = TRUE ")
         self.connection.row_factory = sqlite3.Row
 
+        self.db = DB(self.connection, self.environment)
+
         if new_db:
-            init_tables(self.connection, self.DATA_VERSION, self.environment)
+            self.db.init_tables(self.DATA_VERSION)
 
         self._check_data_version()
 
@@ -187,8 +183,8 @@ class TestmonData(object):
             self.connection.close()
 
     def _check_data_version(self):
-        stored_data_version = _fetch_attribute(
-            self.connection, "__data_version", default=None, environment="default"
+        stored_data_version = self.db._fetch_attribute(
+            "__data_version", default=None, environment="default"
         )
 
         if stored_data_version is None or int(stored_data_version) == self.DATA_VERSION:
@@ -202,18 +198,7 @@ class TestmonData(object):
 
     @cached_property
     def filenames_fingerprints(self):
-        return self.connection.execute(
-            """
-                SELECT DISTINCT 
-                    f.file_name, f.mtime, f.checksum, f.id as fingerprint_id, sum(failed) 
-                FROM node n, node_fingerprint nfp, fingerprint f 
-                WHERE n.id = nfp.node_id AND 
-                      nfp.fingerprint_id = f.id AND 
-                      environment = ?
-                GROUP BY 
-                    f.file_name, f.mtime, f.checksum, f.id""",
-            (self.environment,),
-        ).fetchall()
+        return self.db.filenames_fingerprints()
 
     @property
     def all_files(self):
@@ -221,16 +206,7 @@ class TestmonData(object):
 
     @cached_property
     def all_nodes(self):
-        return {
-            row[0]: json.loads(row[1])
-            for row in self.connection.execute(
-                """  SELECT name, result
-                                    FROM node 
-                                    WHERE environment = ?
-                                   """,
-                (self.environment,),
-            )
-        }
+        return self.db.all_nodes()
 
     def node_data_from_cov(self, measured_files, default=None):
         result = {}
@@ -249,16 +225,14 @@ class TestmonData(object):
 
     def sync_db_fs_nodes(self, retain):
         collected = retain.union(set(self.stable_nodeids))
-        with self.connection as con:
+        with self.db as db:
             add = collected - set(self.all_nodes)
 
             for nodeid in add:
                 if is_python_file(home_file(nodeid)):
-                    insert_node_fingerprints(
-                        self.connection,
-                        self.environment,
-                        nodeid,
-                        [
+                    db.insert_node_fingerprints(
+                        nodeid=nodeid,
+                        fingerprint_records=(
                             {
                                 "filename": home_file(nodeid),
                                 "fingerprint": checksums_to_blob(
@@ -266,21 +240,10 @@ class TestmonData(object):
                                 ),
                                 "mtime": None,
                                 "checksum": None,
-                            }
-                        ],
+                            },
+                        ),
                     )
-
-            con.executemany(
-                """
-                DELETE
-                FROM node
-                WHERE environment = ?
-                  AND name = ?""",
-                [
-                    (self.environment, nodeid)
-                    for nodeid in set(self.all_nodes) - collected
-                ],
-            )
+            db.delete_nodes(set(self.all_nodes) - collected)
 
     def run_filters(self, filenames_fingerprints):
 
@@ -299,9 +262,7 @@ class TestmonData(object):
             self.source_tree, check_checksum, mtime_misses
         )
 
-        changed_file_data = get_changed_file_data(
-            self.connection,
-            self.environment,
+        changed_file_data = self.db.get_changed_file_data(
             {
                 checksum_miss["fingerprint_id"]
                 for checksum_miss in (checksum_misses + library_misses)
@@ -341,10 +302,8 @@ class TestmonData(object):
         self.stable_nodeids = set(self.all_nodes) - self.unstable_nodeids
         self.stable_files = self.all_files - self.unstable_files
 
-        update_mtimes(self.connection, get_new_mtimes(self.source_tree, checksum_hits))
-        update_mtimes(
-            self.connection, get_new_mtimes(self.source_tree, fingerprint_hits)
-        )
+        self.db.update_mtimes(get_new_mtimes(self.source_tree, checksum_hits))
+        self.db.update_mtimes(get_new_mtimes(self.source_tree, fingerprint_hits))
 
     @property
     def nodes_classes_modules_avg_durations(self) -> dict:
@@ -457,9 +416,7 @@ class Testmon(object):
                 "fingerprint": checksums_to_blob(encode_lines("0fake_fingerprint")),
             }
         )
-        insert_node_fingerprints(
-            testmon_data.connection,
-            testmon_data.environment,
+        testmon_data.db.insert_node_fingerprints(
             nodeid,
             nodes_fingerprints,
             result,

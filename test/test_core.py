@@ -3,11 +3,6 @@ import sqlite3
 from collections import defaultdict
 
 from testmon.db import (
-    remove_unused_fingerprints,
-    insert_node_fingerprints,
-    _write_attribute,
-    _fetch_attribute,
-    get_changed_file_data,
     ChangedFileData,
 )
 from testmon.process_code import Module, encode_lines
@@ -76,7 +71,7 @@ class CoreTestmonDataForTest(CoreTestmonData):
             else:
                 r1 = {}
 
-        insert_node_fingerprints(self.connection, self.environment, node, records, r1)
+        self.db.insert_node_fingerprints(node, records, r1)
 
 
 @pytest.fixture
@@ -103,15 +98,11 @@ class TestMisc(object):
             "mtime": None,
             "checksum": None,
         }
-        insert_node_fingerprints(
-            tmdata.connection, tmdata.environment, "test_a.py::n1", [record]
-        )
+        tmdata.db.insert_node_fingerprints("test_a.py::n1", [record])
         con = tmdata.connection
         first_nodeid = con.execute("SELECT id FROM node").fetchone()[0]
 
-        insert_node_fingerprints(
-            tmdata.connection, tmdata.environment, "test_a.py::n1", [record]
-        )
+        tmdata.db.insert_node_fingerprints("test_a.py::n1", [record])
         second_nodeid = con.execute("SELECT max(id) FROM node").fetchone()[0]
         assert first_nodeid != second_nodeid
         assert node_fingerprint_count(first_nodeid) == 0
@@ -123,13 +114,13 @@ class TestMisc(object):
 class TestData:
     def test_read_nonexistent(self, testdir):
         td = CoreTestmonData(testdir.tmpdir.strpath, "V2")
-        assert _fetch_attribute(td.connection, "1") == None
+        assert td.db._fetch_attribute("1") == None
 
     def test_write_read_attribute(self, testdir):
         td = CoreTestmonData(testdir.tmpdir.strpath, "V1")
-        _write_attribute(td.connection, "1", {"a": 1})
+        td.db._write_attribute("1", {"a": 1})
         td2 = CoreTestmonData(testdir.tmpdir.strpath, "V1")
-        assert _fetch_attribute(td2.connection, "1") == {"a": 1}
+        assert td2.db._fetch_attribute("1") == {"a": 1}
 
     def test_write_read_nodedata(self, tmdata):
         tmdata.write("test_a.py::n1", {"test_a.py": encode_lines(["1"])})
@@ -155,7 +146,7 @@ class TestData:
             "test_1.py::test_1", {"test_1.py": encode_lines(["FINGERPRINT1"])}, failed=1
         )
 
-        node_data = get_changed_file_data(tmdata.connection, tmdata.environment, {1})
+        node_data = tmdata.db.get_changed_file_data({1})
 
         assert node_data == [
             ChangedFileData(
@@ -182,9 +173,7 @@ class TestData:
 
         assert changed_files == {1}
 
-        changed_file_data = get_changed_file_data(
-            tmdata.connection, tmdata.environment, changed_files
-        )
+        changed_file_data = tmdata.db.get_changed_file_data(changed_files)
 
         assert changed_file_data == [
             ("test_1.py", "test_1.py::test_1", encode_lines(["FINGERPRINT1"]), 1, 0)
@@ -224,9 +213,13 @@ class TestData:
 
         result = defaultdict(dict)
 
-        for (filename, node_name, fingerprint, _, _,) in get_changed_file_data(
-            tmdata.connection, tmdata.environment, set(range(10))
-        ):
+        for (
+            filename,
+            node_name,
+            fingerprint,
+            _,
+            _,
+        ) in tmdata.db.get_changed_file_data(set(range(10))):
             result[node_name][filename] = fingerprint
         assert result == node_data
 
@@ -246,9 +239,13 @@ class TestData:
             },
         )
 
-        for (filename, node_name, fingerprint, _, _,) in get_changed_file_data(
-            tmdata.connection, tmdata.environment, set(range(10))
-        ):
+        for (
+            filename,
+            node_name,
+            fingerprint,
+            _,
+            _,
+        ) in tmdata.db.get_changed_file_data(set(range(10))):
             result[node_name][filename] = fingerprint
         assert result == node_data
 
@@ -276,7 +273,7 @@ class TestData:
         tmdata.determine_stable()
 
         tmdata.sync_db_fs_nodes(set())
-        remove_unused_fingerprints(tmdata.connection)
+        tmdata.db.remove_unused_fingerprints()
 
         c = tmdata.connection
         assert c.execute("SELECT * FROM fingerprint").fetchall() == []

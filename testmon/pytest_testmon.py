@@ -4,7 +4,6 @@ from collections import defaultdict
 import pytest
 from _pytest.python import Function
 
-from testmon.db import remove_unused_fingerprints
 from testmon.testmon_core import (
     Testmon,
     eval_environment,
@@ -268,7 +267,7 @@ class TestmonCollect(object):
         self.reports[report.nodeid][report.when] = serialize_report(report)
 
     def pytest_sessionfinish(self, session):
-        remove_unused_fingerprints(self.testmon_data.connection)
+        self.testmon_data.db.remove_unused_fingerprints()
         self.testmon.close()
 
 
