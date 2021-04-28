@@ -241,7 +241,7 @@ class TestmonCollect(object):
 
     def pytest_collection_modifyitems(self, session, config, items):
         _, should_collect, should_select = config.testmon_config
-        if should_select or should_collect:
+        if should_collect and not session.testsfailed:
             config.testmon_data.sync_db_fs_nodes(retain=set(self.raw_nodeids))
 
     @pytest.hookimpl(hookwrapper=True)

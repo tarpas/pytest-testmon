@@ -1270,6 +1270,49 @@ class TestmonDeselect(object):
         )
 
 
+class TestPytestCollectionPhase:
+    def test_sync_after_collectionerror(self, testdir):
+        testdir.makepyfile(
+            test_a="""
+                def test_0():
+                    pass
+                
+                def test_2():
+                    pass
+            """
+        )
+        testdir.runpytest_inprocess(
+            "--testmon",
+        )
+        testdir.makepyfile(
+            test_a="""
+                def test_0():
+                    pass
+                
+                def test_2():
+                    try:
+            """
+        )
+        testdir.runpytest_inprocess(
+            "--testmon",
+        )
+        testdir.makepyfile(
+            test_a="""
+                def test_0():
+                    pass
+                
+                def test_2():
+                    print(1)
+            """
+        )
+        result = testdir.runpytest_inprocess("--testmon", "-v")
+        result.stdout.fnmatch_lines(
+            [
+                "*test_2 PASSED*",
+            ]
+        )
+
+
 class TestmonCollect:
     def test_failed_setup_phase(self, testdir):
         testdir.makepyfile(
