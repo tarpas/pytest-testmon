@@ -413,7 +413,9 @@ class Testmon(object):
                 "filename": LIBRARIES_KEY,
                 "checksum": testmon_data.libraries,
                 "mtime": None,
-                "fingerprint": checksums_to_blob(encode_lines("0fake_fingerprint")),
+                "fingerprint": checksums_to_blob(
+                    encode_lines([testmon_data.libraries])
+                ),
             }
         )
         testmon_data.db.insert_node_fingerprints(
