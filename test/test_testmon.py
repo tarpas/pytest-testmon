@@ -1290,7 +1290,7 @@ class TestPytestCollectionPhase:
                     pass
                 
                 def test_2():
-                    try:
+                    try: # This is wrong syntax and will cause collection error.
             """
         )
         testdir.runpytest_inprocess(
