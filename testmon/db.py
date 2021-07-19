@@ -2,16 +2,49 @@ import json
 import sqlite3
 from functools import lru_cache
 from collections import namedtuple
+import os
+
+DATA_VERSION = 7
 
 from testmon.process_code import blob_to_checksums
 
 ChangedFileData = namedtuple("ChangedFileData", "file_name name checksums id failed")
 
 
+class TestmonDbException(Exception):
+    pass
+
+
 class DB(object):
-    def __init__(self, connection, environment="default"):
+    def __init__(self, datafile, environment="default"):
+        new_db = not os.path.exists(datafile)
+
+        connection = sqlite3.connect(datafile)
         self.con = connection
         self.env = environment
+
+        connection.execute("PRAGMA foreign_keys = TRUE ")
+        connection.execute("PRAGMA recursive_triggers = TRUE ")
+        connection.row_factory = sqlite3.Row
+
+        if new_db:
+            self.init_tables(DATA_VERSION)
+
+        self._check_data_version(datafile)
+
+    def _check_data_version(self, datafile):
+        stored_data_version = self._fetch_attribute(
+            "__data_version", default=None, environment="default"
+        )
+
+        if stored_data_version is None or int(stored_data_version) == DATA_VERSION:
+            return
+
+        msg = (
+            "The stored data file {} version ({}) is not compatible with current version ({})."
+            " You must delete the stored data to continue."
+        ).format(datafile, stored_data_version, DATA_VERSION)
+        raise TestmonDbException(msg)
 
     def __enter__(self):
         self.other_con = self.con

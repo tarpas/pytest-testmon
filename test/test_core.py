@@ -99,7 +99,7 @@ class TestMisc(object):
             "checksum": None,
         }
         tmdata.db.insert_node_fingerprints("test_a.py::n1", [record])
-        con = tmdata.connection
+        con = tmdata.db.con
         first_nodeid = con.execute("SELECT id FROM node").fetchone()[0]
 
         tmdata.db.insert_node_fingerprints("test_a.py::n1", [record])
@@ -107,7 +107,7 @@ class TestMisc(object):
         assert first_nodeid != second_nodeid
         assert node_fingerprint_count(first_nodeid) == 0
         assert node_fingerprint_count(second_nodeid) == 1
-        tmdata.connection.execute("DELETE FROM node")
+        tmdata.db.con.execute("DELETE FROM node")
         assert node_fingerprint_count(second_nodeid) == 0
 
 
@@ -275,7 +275,7 @@ class TestData:
         tmdata.sync_db_fs_nodes(set())
         tmdata.db.remove_unused_fingerprints()
 
-        c = tmdata.connection
+        c = tmdata.db.con
         assert c.execute("SELECT * FROM fingerprint").fetchall() == []
 
     def test_one_failed_in_fingerprints(self, tmdata):

@@ -1,3 +1,4 @@
+import sqlite3
 import os
 
 import pkg_resources
@@ -6,6 +7,7 @@ import textwrap
 import time
 import pytest
 
+from testmon import db
 from testmon.process_code import Module, encode_lines
 from testmon.testmon_core import (
     eval_environment,
@@ -574,6 +576,52 @@ class TestmonDeselect(object):
 
         assert 1800000000 == os.path.getmtime(datafilename)
 
+    def test_interrupted01(self, testdir):
+        testdir.makepyfile(
+            test_a="""
+                import time
+                def test_1():
+                    time.sleep(0.01)
+                
+                def test_2():
+                    time.sleep(0.02)
+
+                def test_3():
+                    time.sleep(0.03)
+        """
+        )
+        testdir.runpytest_inprocess("--testmon")
+
+        tf = testdir.makepyfile(
+            test_a="""
+                import time
+                def test_1():
+                    time.sleep(0.015)
+                
+                def test_2():
+                    raise KeyboardInterrupt
+
+                def test_3():
+                    time.sleep(0.035)
+         """
+        )
+        td = CoreTestmonData(testdir.tmpdir.strpath)
+        td.determine_stable()
+        assert td.unstable_nodeids == {
+            "test_a.py::test_1",
+            "test_a.py::test_2",
+            "test_a.py::test_3",
+        }
+        try:
+            result = testdir.runpytest_subprocess("--testmon", "-v")
+        except KeyboardInterrupt:
+            pass
+        result.stdout.fnmatch_lines(["*test_a.py::test_1 PASSED*"])
+        result.stdout.no_fnmatch_line("*test_a.py::test_2 PASSED*")
+
+        td.determine_stable()
+        assert td.unstable_nodeids == {"test_a.py::test_2", "test_a.py::test_3"}
+
     def test_outcomes_exit(self, test_a, testdir):
         testdir.runpytest_inprocess("--testmon")
 
@@ -938,9 +986,7 @@ class TestmonDeselect(object):
         result = testdir.runpytest_inprocess("--testmon")
         assert result.ret == 0
 
-        monkeypatch.setattr(
-            CoreTestmonData, "DATA_VERSION", CoreTestmonData.DATA_VERSION + 1
-        )
+        monkeypatch.setattr(db, "DATA_VERSION", db.DATA_VERSION + 1)
         result = testdir.runpytest("--testmon")
 
         assert result.ret != 0
@@ -948,8 +994,8 @@ class TestmonDeselect(object):
             [
                 "*The stored data file *{} version ({}) is not compatible with current version ({}).*".format(
                     datafilename,
-                    CoreTestmonData.DATA_VERSION - 1,
-                    CoreTestmonData.DATA_VERSION,
+                    db.DATA_VERSION - 1,
+                    db.DATA_VERSION,
                 ),
             ]
         )
@@ -1718,6 +1764,78 @@ class TestPrioritization:
             [
                 "*test_b PASSED*",
                 "*test_a FAILED*",
+            ]
+        )
+
+    @pytest.mark.xfail
+    def test_interrupted2(self, testdir):
+
+        testdir.makepyfile(
+            test_m="""     
+                def test_a():
+                   assert 1 == 1
+
+                def test_b():
+                   assert 2 == 2             
+
+                def test_c():
+                   assert 3 == 3             
+                       """
+        )
+        testdir.runpytest_inprocess(
+            "--testmon",
+        )
+
+        testdir.makepyfile(
+            test_m="""
+                def test_a():
+                   assert 2 == 2
+                
+                def test_b():
+                   raise KeyboardInterrupt             
+                
+                def test_c():
+                   assert 4 == 4             
+                       """
+        )
+        try:
+            result = testdir.runpytest_inprocess("--testmon", "-v")
+        except KeyboardInterrupt as e:
+            pass
+
+        print(
+            "\n".join(
+                [
+                    str((s[2], s[9], s["checksum"]))
+                    for s in db.con.execute(
+                        "select * from "
+                        "node n, node_fingerprint nf, fingerprint f "
+                        'where nf.node_id = n.id and f.id=nf.fingerprint_id and name="test_m.py::test_a"'
+                    ).fetchall()
+                ]
+            )
+        )
+
+        testdir.makepyfile(
+            test_m="""
+                           def test_a():
+                               assert 2 == 2
+
+                           def test_b():
+                               assert 2 == 2             
+
+                           def test_c():
+                               assert 3 == 3             
+                       """
+        )
+        result = testdir.runpytest_inprocess("--testmon", "-v")
+
+        result.stdout.no_fnmatch_line("*test_a PASSED*")
+
+        result.stdout.fnmatch_lines(
+            [
+                "*test_b PASSED*",
+                "*test_c PASSED*",
             ]
         )
 

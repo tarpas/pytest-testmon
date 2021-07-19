@@ -4,6 +4,7 @@ import random
 import sqlite3
 from typing import TypeVar
 
+import pkg_resources
 import sys
 import textwrap
 from packaging import version
@@ -146,14 +147,15 @@ def get_measured_relfiles(rootdir, cov, test_file):
 
 
 class TestmonData(object):
-    DATA_VERSION = 7
-
     def __init__(self, rootdir="", environment=None, libraries=None):
 
         self.environment = environment if environment else "default"
         self.rootdir = rootdir
         self.unstable_files = None
         self.source_tree = SourceTree(rootdir=self.rootdir)
+        if libraries == None:
+            libraries = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
+
         self.libraries = libraries
 
         self.connection = None
@@ -164,37 +166,11 @@ class TestmonData(object):
             "TESTMON_DATAFILE", os.path.join(self.rootdir, DB_FILENAME)
         )
 
-        new_db = not os.path.exists(self.datafile)
-
-        self.connection = sqlite3.connect(self.datafile)
-        self.connection.execute("PRAGMA foreign_keys = TRUE ")
-        self.connection.execute("PRAGMA recursive_triggers = TRUE ")
-        self.connection.row_factory = sqlite3.Row
-
-        self.db = DB(self.connection, self.environment)
-
-        if new_db:
-            self.db.init_tables(self.DATA_VERSION)
-
-        self._check_data_version()
+        self.db = DB(self.datafile, self.environment)
 
     def close_connection(self):
         if self.connection:
             self.connection.close()
-
-    def _check_data_version(self):
-        stored_data_version = self.db._fetch_attribute(
-            "__data_version", default=None, environment="default"
-        )
-
-        if stored_data_version is None or int(stored_data_version) == self.DATA_VERSION:
-            return
-
-        msg = (
-            "The stored data file {} version ({}) is not compatible with current version ({})."
-            " You must delete the stored data to continue."
-        ).format(self.datafile, stored_data_version, self.DATA_VERSION)
-        raise TestmonException(msg)
 
     @cached_property
     def filenames_fingerprints(self):
