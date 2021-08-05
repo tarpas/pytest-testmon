@@ -26,7 +26,7 @@ setup(
         ],
     },
     python_requires=">=3.6",
-    install_requires=["pytest>=5,<7", "coverage>=4,<6"],
+    install_requires=["pytest>=5,<7", "coverage>=4,<7"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
