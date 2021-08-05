@@ -9,12 +9,14 @@ from testmon.testmon_core import (
     eval_environment,
     TestmonData,
     home_file,
-    TestmonConfig,
     TestmonException,
     get_node_class_name,
     get_node_module_name,
     LIBRARIES_KEY,
 )
+
+from testmon import configure as configure
+
 from _pytest import runner
 import pkg_resources
 
@@ -147,8 +149,7 @@ def pytest_configure(config):
 
     cov_plugin = None
 
-    testmon_config = TestmonConfig()
-    message, should_collect, should_select = testmon_config.header_collect_select(
+    message, should_collect, should_select = configure.header_collect_select(
         config, coverage_stack, cov_plugin=cov_plugin
     )
     config.testmon_config = (message, should_collect, should_select)
@@ -160,8 +161,6 @@ def pytest_configure(config):
         except TestmonException as e:
             pytest.exit(str(e))
 
-        config.option.continue_on_collection_errors = True
-
 
 def pytest_report_header(config):
     message, should_collect, should_select = config.testmon_config
@@ -172,7 +171,7 @@ def pytest_report_header(config):
             LIBRARIES_KEY
         }
         environment = config.testmon_data.environment
-        libraries_miss = config.testmon_data.libraries_miss
+        libraries_miss = getattr(config.testmon_data, "libraries_miss", None)
 
     if should_collect or should_select:
 

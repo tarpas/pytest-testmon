@@ -6,7 +6,11 @@ import zlib
 import re
 
 from coverage.python import get_python_source
-from coverage.misc import NoSource
+
+try:
+    from coverage.exceptions import NoSource
+except:
+    from coverage.misc import NoSource
 from array import array
 import sqlite3
 

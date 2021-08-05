@@ -86,7 +86,7 @@ class TestmonCoverageTest(CoverageTest):
         if fingerprints:
             assert create_fingerprints(m.lines, m.special_blocks, lines) == fingerprints
 
-    def check_construct_fingerprints(self, text, lines=None, fingerprints=None):
+    def check_construct_fingerprints(self, text, liness=None, fingerprints=None):
 
         text = textwrap.dedent(text)
 
@@ -94,7 +94,10 @@ class TestmonCoverageTest(CoverageTest):
 
         m = Module(source_code=text)
 
-        assert sorted(coverage_lines) == lines
+        passed = False
+        for lines in liness:
+            passed = (sorted(coverage_lines) == lines) or passed
+        assert passed, "None of the provided liness matches actual coverage"
         if fingerprints:
             assert create_fingerprints(m.lines, m.special_blocks, lines) == fingerprints
 
@@ -113,14 +116,7 @@ class TestCoverageAndFingeprintsAssumptions(TestmonCoverageTest):
                 1
             b()
             """,
-            [1, 2, 4, 5],
-            fingerprints=[
-                "a = 1",
-                "def b():",
-                "    pass",
-                "    1",
-                "b()",
-            ],
+            [[1, 2, 4, 5], [1, 2, 3, 4, 5]],
         )
 
 

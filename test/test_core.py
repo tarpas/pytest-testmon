@@ -11,7 +11,6 @@ from testmon.testmon_core import (
     SourceTree,
     CHECKUMS_ARRAY_TYPE,
     is_python_file,
-    TestmonConfig,
     check_mtime,
     split_filter,
     check_fingerprint,
@@ -19,6 +18,7 @@ from testmon.testmon_core import (
     get_new_mtimes,
     Testmon as CoreTestmon,
 )
+
 from testmon.process_code import checksums_to_blob, blob_to_checksums
 
 
@@ -382,73 +382,3 @@ class TestSourceTree:
         testdir.makepyfile(__init__="")
         module = file_system.get_file("__init__.py")
         assert module.checksum == "da39a3ee5e6b4b0d3255bfef95601890afd80709"
-
-
-class TestTestmonConfig:
-    @pytest.fixture
-    def testmon_config(self):
-        return TestmonConfig()
-
-    @pytest.fixture()
-    def options(self):
-        return {
-            "testmon": False,
-            "testmon_noselect": False,
-            "testmon_nocollect": False,
-            "testmon_forceselect": False,
-            "no-testmon": False,
-            "keyword": "",
-            "markexpr": "",
-            "lf": False,
-        }
-
-    def test_easy(self, testmon_config, options):
-        options["testmon"] = True
-        assert testmon_config._header_collect_select(options) == (
-            "testmon: ",
-            True,
-            True,
-        )
-
-    def test_empty(self, testmon_config, options):
-        options["testmon"] = None
-        assert testmon_config._header_collect_select(options) == (None, False, False)
-
-    def test_dogfooding(self, testmon_config, options):
-        options["testmon"] = True
-        assert testmon_config._header_collect_select(
-            options, dogfooding=True, debugger=True
-        ) == ("testmon: ", True, True)
-
-    def test_noselect(self, testmon_config, options):
-        options["testmon_noselect"] = True
-        assert testmon_config._header_collect_select(options) == (
-            "testmon: selection deactivated, ",
-            True,
-            False,
-        )
-
-    def test_noselect_trace(self, testmon_config, options):
-        options["testmon_noselect"] = True
-        assert testmon_config._header_collect_select(options, debugger=True) == (
-            "testmon: collection automatically deactivated because it's not compatible with debugger, selection deactivated, ",
-            False,
-            False,
-        )
-
-    def test_nocollect_minus_k(self, testmon_config, options):
-        options["keyword"] = "test1"
-        options["testmon_nocollect"] = True
-        assert testmon_config._header_collect_select(options) == (
-            "testmon: collection deactivated, selection automatically deactivated because -k was used, ",
-            False,
-            False,
-        )
-
-    def test_nocollect_coverage(self, testmon_config, options):
-        options["testmon"] = True
-        assert testmon_config._header_collect_select(options, coverage=True) == (
-            "testmon: collection automatically deactivated because it's not compatible with coverage.py, ",
-            False,
-            True,
-        )

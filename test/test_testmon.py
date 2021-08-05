@@ -581,13 +581,13 @@ class TestmonDeselect(object):
             test_a="""
                 import time
                 def test_1():
-                    time.sleep(0.01)
+                    time.sleep(0.05)
                 
                 def test_2():
-                    time.sleep(0.02)
+                    time.sleep(0.10)
 
                 def test_3():
-                    time.sleep(0.03)
+                    time.sleep(0.15)
         """
         )
         testdir.runpytest_inprocess("--testmon")
@@ -612,10 +612,8 @@ class TestmonDeselect(object):
             "test_a.py::test_2",
             "test_a.py::test_3",
         }
-        try:
-            result = testdir.runpytest_subprocess("--testmon", "-v")
-        except KeyboardInterrupt:
-            pass
+
+        result = testdir.runpytest_subprocess("--testmon", "-v")
         result.stdout.fnmatch_lines(["*test_a.py::test_1 PASSED*"])
         result.stdout.no_fnmatch_line("*test_a.py::test_2 PASSED*")
 
@@ -1767,19 +1765,19 @@ class TestPrioritization:
             ]
         )
 
-    @pytest.mark.xfail
     def test_interrupted2(self, testdir):
 
         testdir.makepyfile(
-            test_m="""     
+            test_m="""
+                import time     
                 def test_a():
-                   assert 1 == 1
+                   time.sleep(0.05)
 
                 def test_b():
-                   assert 2 == 2             
+                   time.sleep(0.10)             
 
                 def test_c():
-                   assert 3 == 3             
+                   time.sleep(0.15)             
                        """
         )
         testdir.runpytest_inprocess(
@@ -1788,44 +1786,32 @@ class TestPrioritization:
 
         testdir.makepyfile(
             test_m="""
+                import time     
                 def test_a():
-                   assert 2 == 2
-                
+                   time.sleep(0.051)
+
                 def test_b():
                    raise KeyboardInterrupt             
-                
+
                 def test_c():
-                   assert 4 == 4             
+                   time.sleep(0.151)             
+               
                        """
         )
-        try:
-            result = testdir.runpytest_inprocess("--testmon", "-v")
-        except KeyboardInterrupt as e:
-            pass
 
-        print(
-            "\n".join(
-                [
-                    str((s[2], s[9], s["checksum"]))
-                    for s in db.con.execute(
-                        "select * from "
-                        "node n, node_fingerprint nf, fingerprint f "
-                        'where nf.node_id = n.id and f.id=nf.fingerprint_id and name="test_m.py::test_a"'
-                    ).fetchall()
-                ]
-            )
-        )
+        result = testdir.runpytest_subprocess("--testmon", "-v", "--full-trace")
 
         testdir.makepyfile(
             test_m="""
-                           def test_a():
-                               assert 2 == 2
+                import time     
+                def test_a():
+                   time.sleep(0.051)
+                
+                def test_b():
+                   time.sleep(0.102)             
 
-                           def test_b():
-                               assert 2 == 2             
-
-                           def test_c():
-                               assert 3 == 3             
+                def test_c():
+                   time.sleep(0.152)             
                        """
         )
         result = testdir.runpytest_inprocess("--testmon", "-v")

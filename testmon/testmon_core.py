@@ -1,7 +1,6 @@
 import hashlib
 import os
 import random
-import sqlite3
 from typing import TypeVar
 
 import pkg_resources
@@ -12,10 +11,8 @@ from collections import defaultdict
 
 import coverage
 from coverage import Coverage
-from coverage.tracer import CTracer
 
 from testmon import db
-from testmon.db import DB
 
 from testmon.process_code import (
     read_file_with_checksum,
@@ -166,7 +163,7 @@ class TestmonData(object):
             "TESTMON_DATAFILE", os.path.join(self.rootdir, DB_FILENAME)
         )
 
-        self.db = DB(self.datafile, self.environment)
+        self.db = db.DB(self.datafile, self.environment)
 
     def close_connection(self):
         if self.connection:
@@ -333,6 +330,7 @@ def get_new_mtimes(filesystem, hits):
 
 
 def get_node_class_name(location):
+
     if len(location[2].split(".")) > 1:
         return location[2].split(".")[0]
     else:
@@ -404,139 +402,6 @@ class Testmon(object):
         if hasattr(self, "sub_cov_file"):
             os.remove(self.sub_cov_file + "_rc")
         os.environ.pop("COVERAGE_PROCESS_START", None)
-
-
-class TestmonConfig:
-    def _is_debugger(self):
-        return sys.gettrace() and not isinstance(sys.gettrace(), CTracer)
-
-    def _is_coverage(self):
-        return isinstance(sys.gettrace(), CTracer)
-
-    def _is_xdist(self, options):
-        return (
-            "dist" in options and options["dist"] != "no"
-        ) or "slaveinput" in options
-
-    def _get_notestmon_reasons(self, options, xdist):
-        if options["no-testmon"]:
-            return "deactivated through --no-testmon"
-
-        if options["testmon_noselect"] and options["testmon_nocollect"]:
-            return "deactivated, both noselect and nocollect options used"
-
-        if not any(
-            options[t]
-            for t in [
-                "testmon",
-                "testmon_noselect",
-                "testmon_nocollect",
-                "testmon_forceselect",
-            ]
-        ):
-            return "not mentioned"
-
-        if xdist:
-            return "deactivated, execution with xdist is not supported"
-
-        return None
-
-    def _get_nocollect_reasons(
-        self,
-        options,
-        debugger=False,
-        coverage=False,
-        dogfooding=False,
-        cov_plugin=False,
-    ):
-        if options["testmon_nocollect"]:
-            return [None]
-
-        if coverage and not dogfooding:
-            return ["it's not compatible with coverage.py"]
-
-        if debugger and not dogfooding:
-            return ["it's not compatible with debugger"]
-
-        return []
-
-    def _get_noselect_reasons(self, options):
-        if options["testmon_forceselect"]:
-            return []
-
-        elif options["testmon_noselect"]:
-            return [None]
-
-        if options["keyword"]:
-            return ["-k was used"]
-
-        if options["markexpr"]:
-            return ["-m was used"]
-
-        if options["lf"]:
-            return ["--lf was used"]
-
-        return []
-
-    def _formulate_deactivation(self, what, reasons):
-        if reasons:
-            return [
-                f"{what} automatically deactivated because {reasons[0]}, "
-                if reasons[0]
-                else what + " deactivated, "
-            ]
-        else:
-            return []
-
-    def _header_collect_select(
-        self,
-        options,
-        debugger=False,
-        coverage=False,
-        dogfooding=False,
-        xdist=False,
-        cov_plugin=False,
-    ):
-        notestmon_reasons = self._get_notestmon_reasons(options, xdist=xdist)
-
-        if notestmon_reasons == "not mentioned":
-            return None, False, False
-        elif notestmon_reasons:
-            return "testmon: " + notestmon_reasons, False, False
-
-        nocollect_reasons = self._get_nocollect_reasons(
-            options,
-            debugger=debugger,
-            coverage=coverage,
-            dogfooding=dogfooding,
-            cov_plugin=cov_plugin,
-        )
-
-        noselect_reasons = self._get_noselect_reasons(options)
-
-        if nocollect_reasons or noselect_reasons:
-            message = "".join(
-                self._formulate_deactivation("collection", nocollect_reasons)
-                + self._formulate_deactivation("selection", noselect_reasons)
-            )
-        else:
-            message = ""
-
-        return (
-            f"testmon: {message}",
-            not bool(nocollect_reasons),
-            not bool(noselect_reasons),
-        )
-
-    def header_collect_select(self, config, coverage_stack, cov_plugin=None):
-        options = vars(config.option)
-        return self._header_collect_select(
-            options,
-            debugger=self._is_debugger(),
-            coverage=self._is_coverage(),
-            xdist=self._is_xdist(options),
-            cov_plugin=cov_plugin,
-        )
 
 
 def eval_environment(environment, **kwargs):
