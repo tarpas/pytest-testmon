@@ -282,18 +282,13 @@ class TestmonData(object):
     def nodes_classes_modules_avg_durations(self) -> dict:
         stats = defaultdict(lambda: {"node_count": 0, "sum_duration": 0})
 
-        for node_id, report_phases in self.all_nodes.items():
-            if report_phases:
-                report_phases = report_phases.values()
-                node_location = list(report_phases)[0]["location"]
-
-                class_name = get_node_class_name(node_location)
-                module_name = get_node_module_name(node_location)
+        for node_id, report in self.all_nodes.items():
+            if report:
+                class_name = get_node_class_name(node_id)
+                module_name = get_node_module_name(node_id)
 
                 stats[node_id]["node_count"] += 1
-                stats[node_id]["sum_duration"] = sum(
-                    [report["duration"] for report in report_phases]
-                )
+                stats[node_id]["sum_duration"] = sum(report["durations"].values())
                 if class_name:
                     stats[class_name]["node_count"] += 1
                     stats[class_name]["sum_duration"] += stats[node_id]["sum_duration"]
@@ -329,16 +324,16 @@ def get_new_mtimes(filesystem, hits):
             yield module.mtime, module.checksum, hit[3]
 
 
-def get_node_class_name(location):
+def get_node_class_name(node_id):
 
-    if len(location[2].split(".")) > 1:
-        return location[2].split(".")[0]
+    if len(node_id.split("::")) > 2:
+        return node_id.split("::")[1]
     else:
         return None
 
 
-def get_node_module_name(location):
-    return location[0]
+def get_node_module_name(node_id):
+    return node_id.split("::")[0]
 
 
 class Testmon(object):

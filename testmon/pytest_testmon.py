@@ -271,9 +271,7 @@ class TestmonCollect(object):
 
 
 def did_fail(reports):
-    return bool(
-        [True for report in reports.values() if report.get("outcome") == "failed"]
-    )
+    return reports["failed"]
 
 
 def get_failing(all_nodes):
@@ -290,20 +288,14 @@ class TestmonSelect:
         self.testmon_data: TestmonData = testmon_data
         self.config = config
 
-        self.deselected_files = testmon_data.stable_files
-        self.deselected_nodes = testmon_data.stable_nodeids
+        failing_files, failing_nodes = get_failing(testmon_data.all_nodes)
 
-        _, failing_nodes = get_failing(testmon_data.all_nodes)
-
-        self.failing_nodes = failing_nodes
-
-    def report_from_db(self, nodeid):
-        node_reports = self.failing_nodes.get(nodeid, {})
-        if node_reports:
-            for phase in ("setup", "call", "teardown"):
-                if phase in node_reports:
-                    test_report = runner.TestReport(**node_reports[phase])
-                    self.config.hook.pytest_runtest_logreport(report=test_report)
+        self.deselected_files = [
+            file for file in testmon_data.stable_files if file not in failing_files
+        ]
+        self.deselected_nodes = [
+            node for node in testmon_data.stable_nodeids if node not in failing_nodes
+        ]
 
     def sort_items_by_duration(self, items) -> None:
         def duration_or_zero(key) -> float:
@@ -315,12 +307,8 @@ class TestmonSelect:
         avg_durations = self.testmon_data.nodes_classes_modules_avg_durations
 
         items.sort(key=lambda item: duration_or_zero(item.nodeid))
-        items.sort(
-            key=lambda item: duration_or_zero(get_node_class_name(item.location))
-        )
-        items.sort(
-            key=lambda item: duration_or_zero(get_node_module_name(item.location))
-        )
+        items.sort(key=lambda item: duration_or_zero(get_node_class_name(item.nodeid)))
+        items.sort(key=lambda item: duration_or_zero(get_node_module_name(item.nodeid)))
 
     def pytest_ignore_collect(self, path, config):
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
@@ -347,12 +335,6 @@ class TestmonSelect:
         session.config.hook.pytest_deselected(
             items=([FakeItemFromTestmon(session.config)] * len(self.deselected_nodes))
         )
-
-    @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtestloop(self, session):
-        yield
-        for nodeid in sorted(self.deselected_nodes):
-            self.report_from_db(nodeid)
 
 
 class FakeItemFromTestmon(object):

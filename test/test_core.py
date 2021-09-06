@@ -36,6 +36,13 @@ class CoreTestmonDataForTest(CoreTestmonData):
     ):
         phases = ["setup", "call", "teardown"]
         result = {}
+        name = "".join(
+            [
+                node_module,
+                "::",
+                f"{node_class}::{node_name}" if node_class else node_name,
+            ]
+        )
         location = (
             node_module,
             1,
@@ -47,7 +54,7 @@ class CoreTestmonDataForTest(CoreTestmonData):
                 duration / phases_count, location
             )
 
-        self.write(node_name, {node_module: encode_lines([""])}, result)
+        self.write(name, {node_module: encode_lines([""])}, result)
 
     def write(self, node, files, result=None, failed=False):
         records = []
@@ -124,7 +131,12 @@ class TestData:
 
     def test_write_read_nodedata(self, tmdata):
         tmdata.write("test_a.py::n1", {"test_a.py": encode_lines(["1"])})
-        assert tmdata.all_nodes == {"test_a.py::n1": {}}
+        assert tmdata.all_nodes == {
+            "test_a.py::n1": {
+                "durations": {"call": 0.0, "setup": 0.0, "teardown": 0.0},
+                "failed": 0,
+            }
+        }
         assert tmdata.all_files == {"test_a.py"}
 
     def test_filenames_fingerprints(self, tmdata):
@@ -299,9 +311,10 @@ class TestData:
         tmdata.create_report(1, 5, "test_b1", "tests.py", "TestB")
 
         avg_durations = tmdata.nodes_classes_modules_avg_durations
-        assert avg_durations["test_a1"] == 3
-        assert avg_durations["test_a2"] == 4
-        assert avg_durations["test_b1"] == 5
+        print(avg_durations)
+        assert avg_durations["tests.py::TestA::test_a1"] == 3
+        assert avg_durations["tests.py::TestA::test_a2"] == 4
+        assert avg_durations["tests.py::TestB::test_b1"] == 5
         assert avg_durations["TestA"] == 3.5
         assert avg_durations["TestB"] == 5
         assert avg_durations["tests.py"] == 4

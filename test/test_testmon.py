@@ -1,4 +1,3 @@
-import sqlite3
 import os
 
 import pkg_resources
@@ -6,6 +5,7 @@ import sys
 import textwrap
 import time
 import pytest
+import sqlite3
 
 from testmon import db
 from testmon.process_code import Module, encode_lines
@@ -23,6 +23,8 @@ from testmon.testmon_core import TestmonData as CoreTestmonData
 from .test_process_code import CodeSample
 from .coveragepy import coveragetest
 from .test_core import CoreTestmonDataForTest
+
+from threading import Thread, Condition
 
 pytest_plugins = ("pytester",)
 
@@ -289,6 +291,41 @@ class TestmonDeselect(object):
             ]
         )
 
+    def test_re_executing_failed(self, testdir):
+        testdir.makepyfile(
+            test_a="""
+            import os
+            
+            def test_file(): # test that on first run fails, but on second one passes
+                if os.path.exists('check'): # if file exists then pass the test
+                    assert True
+                else: # otherwise create the file and fail the test
+                    open('check', 'a').close()
+                    assert False
+                    """
+        )
+
+        result = testdir.runpytest_inprocess("--testmon")
+        result.stdout.fnmatch_lines(
+            [
+                "*1 failed*",
+            ]
+        )
+
+        result = testdir.runpytest_inprocess("--testmon")
+        result.stdout.fnmatch_lines(
+            [
+                "*1 passed*",
+            ]
+        )
+
+        result = testdir.runpytest_inprocess("--testmon")
+        result.stdout.fnmatch_lines(
+            [
+                "*1 deselected*",
+            ]
+        )
+
     def test_simple_change_1_of_2_with_decorator(self, testdir):
         testdir.makepyfile(
             test_a="""
@@ -458,7 +495,10 @@ class TestmonDeselect(object):
         )
         testdir.runpytest_inprocess("--testmon", "-v")
         testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
-        assert len(testmon_data.all_nodes["test_a.py::test_add"]) == 3
+        assert testmon_data.all_nodes["test_a.py::test_add"]["failed"]
+        assert testmon_data.all_nodes["test_a.py::test_add"]["durations"]["setup"]
+        assert testmon_data.all_nodes["test_a.py::test_add"]["durations"]["call"]
+        assert testmon_data.all_nodes["test_a.py::test_add"]["durations"]["teardown"]
 
         tf = testdir.makepyfile(
             test_a="""
@@ -473,7 +513,9 @@ class TestmonDeselect(object):
 
         testmon_data.close_connection()
         testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
-        assert len(testmon_data.all_nodes["test_a.py::test_add"]) == 2
+        assert testmon_data.all_nodes["test_a.py::test_add"]["durations"]["setup"]
+        assert testmon_data.all_nodes["test_a.py::test_add"]["durations"]["call"] == 0
+        assert testmon_data.all_nodes["test_a.py::test_add"]["durations"]["teardown"]
 
         tf = testdir.makepyfile(
             test_a="""
@@ -487,7 +529,9 @@ class TestmonDeselect(object):
 
         testmon_data.close_connection()
         testmon_data = CoreTestmonData(testdir.tmpdir.strpath)
-        assert len(testmon_data.all_nodes["test_a.py::test_add"]) == 3
+        assert testmon_data.all_nodes["test_a.py::test_add"]["durations"]["setup"]
+        assert testmon_data.all_nodes["test_a.py::test_add"]["durations"]["call"]
+        assert testmon_data.all_nodes["test_a.py::test_add"]["durations"]["teardown"]
 
     def test_lf(self, testdir):
         testdir.makepyfile(
@@ -501,7 +545,7 @@ class TestmonDeselect(object):
         result = testdir.runpytest_inprocess("--testmon", "-v")
         result.stdout.fnmatch_lines(
             [
-                "*1 failed, 1 deselected*",
+                "*1 failed*",
             ]
         )
 
@@ -1357,7 +1401,92 @@ class TestPytestCollectionPhase:
         )
 
 
+while_running_condition = Condition()
+
+
 class TestmonCollect:
+    @pytest.mark.xfail
+    def test_change_while_running_no_data(self, testdir):
+        def make_second_version(condition):
+            with condition:
+                condition.wait()
+                t = testdir.makepyfile(test_a=test_template.replace("$r", "2 == 3"))
+                t.setmtime(2640053809)
+
+        test_template = """
+                from test import test_testmon
+
+                with test_testmon.while_running_condition:
+                    test_testmon.while_running_condition.notify()
+
+                def test_1():
+                    assert $r
+            """
+
+        testdir.makepyfile(test_a=test_template.replace("$r", "1 == 1"))
+        thread = Thread(target=make_second_version, args=(while_running_condition,))
+        thread.start()
+        testdir.runpytest_inprocess(
+            "--testmon",
+        )
+        thread.join()
+
+        result = testdir.runpytest_inprocess("--testmon")
+        result.stdout.fnmatch_lines(
+            [
+                "*1 failed*",
+            ]
+        )
+
+    def test_change_while_running_with_data(self, testdir):
+        def make_third_version(condition):
+            with condition:
+                condition.wait()
+                t = testdir.makepyfile(test_a=test_template.replace("$r", "2 == 3"))
+                t.setmtime(2640053809)
+
+        test_template = """
+                    from test import test_testmon
+
+                    with test_testmon.while_running_condition:
+                        test_testmon.while_running_condition.notify()
+
+                    def test_1():
+                        assert $r
+                """
+
+        testdir.makepyfile(test_a=test_template.replace("$r", "1 == 1"))
+
+        result = testdir.runpytest_inprocess("--testmon")
+        result.stdout.fnmatch_lines(
+            [
+                "*1 passed*",
+            ]
+        )
+
+        file = testdir.makepyfile(test_a=test_template.replace("$r", "2 == 2"))
+        file.setmtime(2640044809)
+
+        thread = Thread(target=make_third_version, args=(while_running_condition,))
+        thread.start()
+
+        result = testdir.runpytest_inprocess("--testmon")
+
+        result.stdout.fnmatch_lines(
+            [
+                "*1 passed*",
+            ]
+        )
+
+        thread.join()
+
+        result = testdir.runpytest_inprocess("--testmon")
+        result.stdout.fnmatch_lines(
+            [
+                "*1 failed*",
+            ]
+        )
+
     def test_failed_setup_phase(self, testdir):
         testdir.makepyfile(
             fixture="""
@@ -1766,7 +1895,6 @@ class TestPrioritization:
         )
 
     def test_interrupted2(self, testdir):
-
         testdir.makepyfile(
             test_m="""
                 import time     

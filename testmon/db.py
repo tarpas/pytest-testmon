@@ -1,10 +1,10 @@
 import json
 import sqlite3
 from functools import lru_cache
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import os
 
-DATA_VERSION = 7
+DATA_VERSION = 8
 
 from testmon.process_code import blob_to_checksums
 
@@ -102,14 +102,25 @@ class DB(object):
     def insert_node_fingerprints(self, nodeid: str, fingerprint_records, result={}):
         with self.con as con:
             failed = any(r.get("outcome") == "failed" for r in result.values())
+            durations = defaultdict(
+                float,
+                {key: value.get("duration", 0.0) for key, value in result.items()},
+            )
             cursor = con.cursor()
             cursor.execute(
                 """ 
                 INSERT OR REPLACE INTO node 
-                (environment, name, result, failed) 
-                VALUES (?, ?, ?, ?)
+                (environment, name, setup_duration, call_duration, teardown_duration, failed) 
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (self.env, nodeid, json.dumps(result), failed),
+                (
+                    self.env,
+                    nodeid,
+                    durations["setup"],
+                    durations["call"],
+                    durations["teardown"],
+                    failed,
+                ),
             )
             node_id = cursor.lastrowid
 
@@ -156,7 +167,9 @@ class DB(object):
                 id INTEGER PRIMARY KEY ASC,
                 environment TEXT,
                 name TEXT,
-                result TEXT,
+                setup_duration FLOAT,
+                call_duration FLOAT,
+                teardown_duration FLOAT,
                 failed BIT,
                 UNIQUE (environment, name)
             )
@@ -240,9 +253,12 @@ class DB(object):
 
     def all_nodes(self):
         return {
-            row[0]: json.loads(row[1])
+            row[0]: {
+                "durations": {"setup": row[1], "call": row[2], "teardown": row[3]},
+                "failed": row[4],
+            }
             for row in self.con.execute(
-                """  SELECT name, result
+                """  SELECT name, setup_duration, call_duration, teardown_duration, failed
                                     FROM node 
                                     WHERE environment = ?
                                    """,
