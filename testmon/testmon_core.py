@@ -1,26 +1,27 @@
 import hashlib
 import os
 import random
-from typing import TypeVar
-
-import pkg_resources
 import sys
 import textwrap
-from packaging import version
-from collections import defaultdict
 
 import coverage
+import pkg_resources
+
+from collections import defaultdict
+from packaging import version
+from typing import TypeVar
+
 from coverage import Coverage
 
 from testmon import db
-
 from testmon.process_code import (
     read_file_with_checksum,
-    file_has_lines,
-    create_fingerprints,
+    match_fingerprint,
+    create_fingerprint,
     encode_lines,
+    string_checksum,
 )
-from testmon.process_code import Module, checksums_to_blob
+from testmon.process_code import Module, fingerprint_to_blob
 
 T = TypeVar("T")
 
@@ -30,7 +31,9 @@ CHECKUMS_ARRAY_TYPE = "I"
 DB_FILENAME = ".testmondata"
 
 
-class cached_property(object):
+class CachedProperty(object):
+    
+
     def __init__(self, func):
         self.__doc__ = getattr(func, "__doc__")
         self.func = func
@@ -42,16 +45,14 @@ class cached_property(object):
         return value
 
 
+
+
 def _get_python_lib_paths():
     res = [sys.prefix]
     for attr in ["exec_prefix", "real_prefix", "base_prefix"]:
         if getattr(sys, attr, sys.prefix) not in res:
             res.append(getattr(sys, attr))
     return [os.path.join(d, "*") for d in res]
-
-
-DISAPPEARED_FILE = Module("#dissapeared file")
-DISAPPEARED_FILE_CHECKSUM = 3948583
 
 
 def home_file(node_name):
@@ -67,6 +68,8 @@ class TestmonException(Exception):
 
 
 class SourceTree:
+    
+
     def __init__(self, rootdir="", libraries=None):
         self.rootdir = rootdir
         self.libraries = libraries
@@ -79,13 +82,7 @@ class SourceTree:
             )
             if checksum:
                 fs_mtime = os.path.getmtime(os.path.join(self.rootdir, filename))
-                self.cache[filename] = Module(
-                    source_code=code,
-                    file_name=filename,
-                    rootdir=self.rootdir,
-                    mtime=fs_mtime,
-                    checksum=checksum,
-                )
+                self.cache[filename] = Module(source_code=code, mtime=fs_mtime)
             else:
                 self.cache[filename] = None
         return self.cache[filename]
@@ -104,7 +101,7 @@ def check_mtime(file_system, record):
 
 def check_checksum(file_system, record):
     cache_module = file_system.get_file(record["file_name"])
-    fs_checksum = cache_module.checksum if cache_module else None
+    fs_checksum = string_checksum(cache_module.source_code) if cache_module else None
 
     return record["checksum"] == fs_checksum
 
@@ -114,7 +111,7 @@ def check_fingerprint(disk, record: db.ChangedFileData):
     fingerprint = record.checksums
 
     module = disk.get_file(file)
-    return module and file_has_lines(module.full_lines, fingerprint)
+    return module and match_fingerprint(module.source_code, fingerprint)
 
 
 def split_filter(disk, function, records: [T]) -> ([T], [T]):
@@ -129,13 +126,16 @@ def split_filter(disk, function, records: [T]) -> ([T], [T]):
 
 
 def get_measured_relfiles(rootdir, cov, test_file):
-    files = {test_file: set()}
+    files = {
+        test_file: set()
+    }
     c = cov.config
-    for filename in cov.get_data().measured_files():
+    cov_data = cov.get_data()
+    for filename in cov_data.measured_files():
         if not is_python_file(filename):
             continue
         relfilename = os.path.relpath(filename, rootdir)
-        files[relfilename] = cov.get_data().lines(filename)
+        files[relfilename] = cov_data.lines(filename)
         assert files[relfilename] is not None, (
             f"{filename} is in measured_files but wasn't measured! cov.config: "
             f"{c.config_files}, {c._omit}, {c._include}, {c.source}"
@@ -144,32 +144,35 @@ def get_measured_relfiles(rootdir, cov, test_file):
 
 
 class TestmonData(object):
+
     def __init__(self, rootdir="", environment=None, libraries=None):
 
         self.environment = environment if environment else "default"
         self.rootdir = rootdir
         self.unstable_files = None
         self.source_tree = SourceTree(rootdir=self.rootdir)
-        if libraries == None:
+        if libraries is None:
             libraries = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
 
         self.libraries = libraries
 
         self.connection = None
-        self.init_connection()
-
-    def init_connection(self):
         self.datafile = os.environ.get(
             "TESTMON_DATAFILE", os.path.join(self.rootdir, DB_FILENAME)
         )
-
         self.db = db.DB(self.datafile, self.environment)
+
+        self.libraries_miss = set()
+        self.unstable_nodeids = set()
+        self.unstable_files = set()
+        self.stable_nodeids = set()
+        self.stable_files = set()
 
     def close_connection(self):
         if self.connection:
             self.connection.close()
 
-    @cached_property
+    @CachedProperty
     def filenames_fingerprints(self):
         return self.db.filenames_fingerprints()
 
@@ -177,48 +180,50 @@ class TestmonData(object):
     def all_files(self):
         return {row["file_name"] for row in self.filenames_fingerprints}
 
-    @cached_property
+    @CachedProperty
     def all_nodes(self):
         return self.db.all_nodes()
 
-    def node_data_from_cov(self, measured_files, default=None):
-        result = {}
+    def get_nodes_fingerprints(self, measured_files, default=None):
+        nodes_fingerprints = []
+
         for filename, covered in measured_files.items():
-            if default:
-                result[filename] = default
-            else:
-                if os.path.exists(os.path.join(self.rootdir, filename)):
-                    module = self.source_tree.get_file(filename)
-                    result[filename] = encode_lines(
-                        create_fingerprints(
-                            module.lines, module.special_blocks, covered
-                        )
-                    )
-        return result
+            if os.path.exists(os.path.join(self.rootdir, filename)):
+                module = self.source_tree.get_file(filename)
+                fingerprint = create_fingerprint(module.source_code, covered)
+                nodes_fingerprints.append(
+                    {
+                        "filename": filename,
+                        "mtime": module.mtime,
+                        "checksum": string_checksum(module.source_code),
+                        "fingerprint": fingerprint,
+                    }
+                )
+        return nodes_fingerprints
 
     def sync_db_fs_nodes(self, retain):
         collected = retain.union(set(self.stable_nodeids))
-        with self.db as db:
+        with self.db as database:
             add = collected - set(self.all_nodes)
 
             for nodeid in add:
                 if is_python_file(home_file(nodeid)):
-                    db.insert_node_fingerprints(
+                    database.insert_node_fingerprints(
                         nodeid=nodeid,
                         fingerprint_records=(
                             {
                                 "filename": home_file(nodeid),
-                                "fingerprint": checksums_to_blob(
-                                    encode_lines("0match")
-                                ),
+                                "fingerprint": encode_lines(["0match"]),
                                 "mtime": None,
                                 "checksum": None,
                             },
                         ),
                     )
-            db.delete_nodes(set(self.all_nodes) - collected)
+            database.delete_nodes(set(self.all_nodes) - collected)
 
     def run_filters(self, filenames_fingerprints):
+        
+
 
         library_misses = []
         mtime_misses = []
@@ -241,6 +246,7 @@ class TestmonData(object):
                 for checksum_miss in (checksum_misses + library_misses)
             },
         )
+
 
         fingerprint_hits, fingerprint_misses = split_filter(
             self.source_tree, check_fingerprint, changed_file_data
@@ -301,27 +307,13 @@ class TestmonData(object):
 
         return avg_durations
 
-    def node_data2records(self, nodedata):
-        fingerprint_records = []
-        for filename in nodedata:
-            module = self.source_tree.get_file(filename)
-            fingerprint_records.append(
-                {
-                    "filename": filename,
-                    "mtime": module.mtime,
-                    "checksum": module.checksum,
-                    "fingerprint": checksums_to_blob(nodedata[filename]),
-                }
-            )
-        return fingerprint_records
-
 
 def get_new_mtimes(filesystem, hits):
-
+    
     for hit in hits:
         module = filesystem.get_file(hit[0])
         if module:
-            yield module.mtime, module.checksum, hit[3]
+            yield module.mtime, string_checksum(module.source_code), hit[3]
 
 
 def get_node_class_name(node_id):
@@ -345,6 +337,7 @@ class Testmon(object):
         self.rootdir = rootdir
         self.testmon_labels = testmon_labels
         self.cov = None
+        self.sub_cov_file = None
         self.setup_coverage(not ("singleprocess" in testmon_labels), cov_plugin)
 
     def setup_coverage(self, subprocess, cov_plugin=None):
@@ -353,10 +346,11 @@ class Testmon(object):
             "omit": _get_python_lib_paths(),
         }
 
-        self.cov = Coverage(
-            data_file=getattr(self, "sub_cov_file", None), config_file=False, **params
-        )
+
+
+        self.cov = Coverage(data_file=self.sub_cov_file, config_file=False, **params)
         self.cov._warn_no_data = False
+
 
     def start(self):
 
@@ -364,37 +358,35 @@ class Testmon(object):
         self.cov.erase()
         self.cov.start()
 
+
     def stop(self):
         self.cov.stop()
         Testmon.coverage_stack.pop()
 
     def stop_and_save(self, testmon_data: TestmonData, nodeid, result):
         self.stop()
-        if hasattr(self, "sub_cov_file"):
+        if self.sub_cov_file:
             self.cov.combine()
         measured_files = get_measured_relfiles(
             self.rootdir, self.cov, home_file(nodeid)
         )
-        node_data = testmon_data.node_data_from_cov(measured_files)
-        nodes_fingerprints = testmon_data.node_data2records(node_data)
+
+        nodes_fingerprints = testmon_data.get_nodes_fingerprints(measured_files)
+
         nodes_fingerprints.append(
             {
                 "filename": LIBRARIES_KEY,
                 "checksum": testmon_data.libraries,
                 "mtime": None,
-                "fingerprint": checksums_to_blob(
-                    encode_lines([testmon_data.libraries])
-                ),
+                "fingerprint": encode_lines([testmon_data.libraries]),
             }
         )
         testmon_data.db.insert_node_fingerprints(
-            nodeid,
-            nodes_fingerprints,
-            result,
+            nodeid, nodes_fingerprints, result,
         )
 
     def close(self):
-        if hasattr(self, "sub_cov_file"):
+        if self.sub_cov_file:
             os.remove(self.sub_cov_file + "_rc")
         os.environ.pop("COVERAGE_PROCESS_START", None)
 

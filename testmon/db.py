@@ -1,12 +1,13 @@
 import json
+import os
 import sqlite3
+
 from functools import lru_cache
 from collections import namedtuple, defaultdict
-import os
 
-DATA_VERSION = 8
+from testmon.process_code import blob_to_fingerprint, fingerprint_to_blob
 
-from testmon.process_code import blob_to_checksums
+DATA_VERSION = 9
 
 ChangedFileData = namedtuple("ChangedFileData", "file_name name checksums id failed")
 
@@ -28,32 +29,29 @@ class DB(object):
         connection.row_factory = sqlite3.Row
 
         if new_db:
-            self.init_tables(DATA_VERSION)
+            self.init_tables()
 
         self._check_data_version(datafile)
 
     def _check_data_version(self, datafile):
-        stored_data_version = self._fetch_attribute(
-            "__data_version", default=None, environment="default"
-        )
+        stored_data_version = self._fetch_data_version()
 
-        if stored_data_version is None or int(stored_data_version) == DATA_VERSION:
+        if int(stored_data_version) == DATA_VERSION:
             return
 
         msg = (
-            "The stored data file {} version ({}) is not compatible with current version ({})."
+            "The stored data file {} version ({}) "
+            "is not compatible with current version ({})."
             " You must delete the stored data to continue."
         ).format(datafile, stored_data_version, DATA_VERSION)
         raise TestmonDbException(msg)
 
     def __enter__(self):
-        self.other_con = self.con
         self.con = self.con.__enter__()
         return self
 
     def __exit__(self, *args, **kwargs):
         self.con.__exit__(*args, **kwargs)
-        self.con = self.other_con
 
     def update_mtimes(self, new_mtimes):
         with self.con as con:
@@ -86,14 +84,20 @@ class DB(object):
             )
 
             fingerprint_id = cursor.lastrowid
-        except sqlite3.IntegrityError as e:
+        except sqlite3.IntegrityError:
 
             fingerprint_id, db_mtime, db_checksum = cursor.execute(
-                "SELECT id, mtime, checksum FROM fingerprint WHERE file_name = ? AND fingerprint = ?",
-                (
-                    filename,
-                    fingerprint,
-                ),
+                """
+                SELECT
+                    id,
+                    mtime,
+                    checksum
+                FROM
+                    fingerprint
+                WHERE
+                    file_name = ? AND fingerprint = ?
+                """,
+                (filename, fingerprint),
             ).fetchone()
 
             self.update_mtimes([(mtime, checksum, fingerprint_id)])
@@ -108,9 +112,10 @@ class DB(object):
             )
             cursor = con.cursor()
             cursor.execute(
-                """ 
-                INSERT OR REPLACE INTO node 
-                (environment, name, setup_duration, call_duration, teardown_duration, failed) 
+                """
+                INSERT OR REPLACE INTO node
+                (environment, name, setup_duration,
+                call_duration, teardown_duration, failed)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
@@ -124,18 +129,24 @@ class DB(object):
             )
             node_id = cursor.lastrowid
 
+
             for record in fingerprint_records:
                 fingerprint_id = self.fetch_or_create_fingerprint(
                     record["filename"],
                     record["mtime"],
                     record["checksum"],
-                    record["fingerprint"],
+                    fingerprint_to_blob(record["fingerprint"]),
                 )
 
                 cursor.execute(
                     "INSERT INTO node_fingerprint VALUES (?, ?)",
                     (node_id, fingerprint_id),
                 )
+
+    def _fetch_data_version(self):
+        con = self.con
+
+        return con.execute("PRAGMA user_version").fetchone()[0]
 
     def _write_attribute(self, attribute, data, environment=None):
         dataid = (environment or self.env) + ":" + attribute
@@ -156,7 +167,7 @@ class DB(object):
         else:
             return default
 
-    def init_tables(self, DATA_VERSION):
+    def init_tables(self):
         connection = self.con
 
         connection.execute("CREATE TABLE metadata (dataid TEXT PRIMARY KEY, data TEXT)")
@@ -189,51 +200,46 @@ class DB(object):
 
         connection.execute(
             """
-            CREATE table fingerprint 
+            CREATE table fingerprint
             (
                 id INTEGER PRIMARY KEY,
                 file_name TEXT,
                 fingerprint TEXT,
                 mtime FLOAT,
                 checksum TEXT,
-                UNIQUE (file_name, fingerprint)            
+                UNIQUE (file_name, fingerprint)
             )
             """
         )
 
-        self._write_attribute(
-            "__data_version",
-            str(DATA_VERSION),
-        )
+        connection.execute(f"PRAGMA user_version = {DATA_VERSION}")
 
     def get_changed_file_data(self, changed_fingerprints) -> [ChangedFileData]:
         in_clause_questionsmarks = ", ".join("?" * len(changed_fingerprints))
         result = []
         for row in self.con.execute(
             """
-                                SELECT
-                                    f.file_name,
-                                    n.name,
-                                    f.fingerprint,
-                                    f.id,
-                                    n.failed
-                                FROM node n, node_fingerprint nfp, fingerprint f
-                                WHERE 
-                                    n.environment = ? AND
-                                    n.id = nfp.node_id AND 
-                                    nfp.fingerprint_id = f.id AND
-                                    f.id IN (%s)"""
+            SELECT
+                f.file_name,
+                n.name,
+                f.fingerprint,
+                f.id,
+                n.failed
+            FROM node n, node_fingerprint nfp, fingerprint f
+            WHERE
+                n.environment = ? AND
+                n.id = nfp.node_id AND
+                nfp.fingerprint_id = f.id AND
+                f.id IN (%s)
+            """
             % in_clause_questionsmarks,
-            [
-                self.env,
-            ]
-            + list(changed_fingerprints),
+            [self.env,] + list(changed_fingerprints),
         ):
             result.append(
                 ChangedFileData(
                     row["file_name"],
                     row["name"],
-                    blob_to_checksums(row["fingerprint"]),
+                    blob_to_fingerprint(row["fingerprint"]),
                     row["id"],
                     row["failed"],
                 )
@@ -258,10 +264,12 @@ class DB(object):
                 "failed": row[4],
             }
             for row in self.con.execute(
-                """  SELECT name, setup_duration, call_duration, teardown_duration, failed
-                                    FROM node 
-                                    WHERE environment = ?
-                                   """,
+                """
+                SELECT
+                    name, setup_duration, call_duration, teardown_duration, failed
+                FROM node
+                WHERE environment = ?
+                """,
                 (self.env,),
             )
         }
@@ -269,13 +277,20 @@ class DB(object):
     def filenames_fingerprints(self):
         return self.con.execute(
             """
-                SELECT DISTINCT 
-                    f.file_name, f.mtime, f.checksum, f.id as fingerprint_id, sum(failed) 
-                FROM node n, node_fingerprint nfp, fingerprint f 
-                WHERE n.id = nfp.node_id AND 
-                      nfp.fingerprint_id = f.id AND 
-                      environment = ?
-                GROUP BY 
-                    f.file_name, f.mtime, f.checksum, f.id""",
+            SELECT DISTINCT
+                f.file_name,
+                f.mtime,
+                f.checksum,
+                f.id as fingerprint_id,
+                sum(failed)
+            FROM
+                node n, node_fingerprint nfp, fingerprint f
+            WHERE
+                n.id = nfp.node_id AND
+                nfp.fingerprint_id = f.id AND
+                environment = ?
+            GROUP BY
+                f.file_name, f.mtime, f.checksum, f.id
+            """,
             (self.env,),
         ).fetchall()

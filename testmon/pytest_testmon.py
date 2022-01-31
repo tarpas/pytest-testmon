@@ -1,8 +1,12 @@
+
 import os
 from collections import defaultdict
 
 import pytest
+import pkg_resources
+
 from _pytest.python import Function
+from _pytest.config import ExitCode
 
 from testmon.testmon_core import (
     Testmon,
@@ -14,11 +18,7 @@ from testmon.testmon_core import (
     get_node_module_name,
     LIBRARIES_KEY,
 )
-
 from testmon import configure as configure
-
-from _pytest import runner
-import pkg_resources
 
 
 def serialize_report(rep):
@@ -44,32 +44,43 @@ def pytest_addoption(parser):
         "--testmon",
         action="store_true",
         dest="testmon",
-        help="Select tests affected by changes (based on previously collected data) and collect + write new data "
-        "(.testmondata file). Either collection or selection might be deactivated (sometimes automatically). "
-        "See below.",
+        help=(
+            "Select tests affected by changes (based on previously collected data) "
+            "and collect + write new data (.testmondata file). "
+            "Either collection or selection might be deactivated "
+            "(sometimes automatically). See below."
+        ),
     )
 
     group.addoption(
         "--testmon-nocollect",
         action="store_true",
         dest="testmon_nocollect",
-        help="Run testmon but deactivate the collection and writing of testmon data. Forced if you run under debugger "
-        "or coverage.",
+        help=(
+            "Run testmon but deactivate the collection and writing of testmon data. "
+            "Forced if you run under debugger or coverage."
+        ),
     )
 
     group.addoption(
         "--testmon-noselect",
         action="store_true",
         dest="testmon_noselect",
-        help="Run testmon but deactivate selection, so all tests selected by other means will be collected and "
-        "executed. Forced if you use -k, -l, -lf, test_file.py::test_name (to be implemented)",
+        help=(
+            "Run testmon but deactivate selection, so all tests selected by other "
+            "means will be collected and executed. "
+            "Forced if you use -k, -l, -lf, test_file.py::test_name"
+        ),
     )
 
     group.addoption(
         "--testmon-forceselect",
         action="store_true",
         dest="testmon_forceselect",
-        help="Run testmon and select only tests affected by changes and satisfying pytest selectors at the same time.",
+        help=(
+            "Run testmon and select only tests affected by changes "
+            "and satisfying pytest selectors at the same time."
+        ),
     )
 
     group.addoption(
@@ -78,7 +89,8 @@ def pytest_addoption(parser):
         dest="no-testmon",
         help=(
             "Turn off (even if activated from config by default).\n"
-            "Forced if neither read nor write is possible (debugger plus test selector)."
+            "Forced if neither read nor write is possible "
+            "(debugger plus test selector)."
         ),
     )
 
@@ -173,8 +185,6 @@ def pytest_report_header(config):
         environment = config.testmon_data.environment
         libraries_miss = getattr(config.testmon_data, "libraries_miss", None)
 
-    if should_collect or should_select:
-
         message += changed_message(
             config,
             environment,
@@ -188,12 +198,7 @@ def pytest_report_header(config):
 
 
 def changed_message(
-    config,
-    environment,
-    libraries_miss,
-    should_select,
-    stable_files,
-    unstable_files,
+    config, environment, libraries_miss, should_select, stable_files, unstable_files,
 ):
     message = ""
     if should_select:
@@ -252,9 +257,7 @@ class TestmonCollect(object):
                 self.testmon.stop()
             else:
                 self.testmon.stop_and_save(
-                    self.testmon_data,
-                    item.nodeid,
-                    self.reports[item.nodeid],
+                    self.testmon_data, item.nodeid, self.reports[item.nodeid],
                 )
         else:
             yield
@@ -335,6 +338,11 @@ class TestmonSelect:
         session.config.hook.pytest_deselected(
             items=([FakeItemFromTestmon(session.config)] * len(self.deselected_nodes))
         )
+
+    @pytest.hookimpl(trylast=True)
+    def pytest_sessionfinish(self, session, exitstatus):
+        if len(self.deselected_nodes) and exitstatus == ExitCode.NO_TESTS_COLLECTED:
+            session.exitstatus = ExitCode.OK
 
 
 class FakeItemFromTestmon(object):

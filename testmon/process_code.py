@@ -1,23 +1,40 @@
 import ast
 import hashlib
 import textwrap
-import os
 import zlib
+import os
+from functools import lru_cache
+
 import re
+import sqlite3
+
+from functools import lru_cache
+
+from array import array
 
 from coverage.python import get_python_source
 
 try:
     from coverage.exceptions import NoSource
-except:
+except ImportError:
     from coverage.misc import NoSource
-from array import array
-import sqlite3
 
 CHECKUMS_ARRAY_TYPE = "I"
 
 
-def encode_lines(lines):
+def debug_encode_lines(lines):
+    return lines
+
+
+def debug_fingerprint_to_blob(checksums):
+    return "\n".join(checksums)
+
+
+def debug_blob_to_fingerprint(blob):
+    return blob.split("\n")
+
+
+def prod_encode_lines(lines):
     checksums = []
     for line in lines:
         checksums.append(zlib.adler32(line.encode("UTF-8")))
@@ -25,203 +42,166 @@ def encode_lines(lines):
     return checksums
 
 
-def checksums_to_blob(checksums):
+def prod_fingerprint_to_blob(checksums):
     blob = array(CHECKUMS_ARRAY_TYPE, checksums)
     data = blob.tobytes()
     return sqlite3.Binary(data)
 
 
-def blob_to_checksums(blob):
+def prod_blob_to_fingerprint(blob):
     a = array(CHECKUMS_ARRAY_TYPE)
     a.frombytes(blob)
     return a.tolist()
 
 
+encode_lines = prod_encode_lines
+fingerprint_to_blob = prod_fingerprint_to_blob
+blob_to_fingerprint = prod_blob_to_fingerprint
+
+
 GAP_MARKS = {i: f"{i}GAP" for i in range(-1, 64)}
 INVERTED_GAP_MARKS_CHECKSUMS = {encode_lines([f"{i}GAP"])[0]: i for i in range(-1, 64)}
 
-blank_re = re.compile(r"\s*(#|$)")
+
+class Block:
+    def __init__(self, start, end, code=0, name=""):
+        self.start = start
+        self.end = end
+        self.name = name
+        self.code = code
+
+    @property
+    def checksum(self):
+        return self.code
+
+    def __repr__(self):
+        return "{}-{} h: {}, n:{}, repr:{}".format(
+            self.start, self.end, self.checksum, self.name, self.code
+        )
+
+    def __eq__(self, other):
+        return (self.start, self.end, self.checksum, self.name) == (
+            other.start,
+            other.end,
+            other.checksum,
+            other.name,
+        )
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+@lru_cache(100)
+def string_checksum(s):
+    return zlib.adler32(s.encode("UTF-8"))
+
+
+def _next_lineno(nodes, i, end):
+    try:
+        return nodes[i + 1].lineno - 1
+    except IndexError:
+        return end
+    except AttributeError:
+        return None
 
 
 class Module(object):
-    def __init__(
-        self,
-        source_code=None,
-        file_name="<unknown>",
-        rootdir="",
-        mtime=None,
-        checksum=None,
-    ):
-
-        if source_code is None:
-            absfilename = os.path.join(rootdir, file_name)
-            mtime = os.path.getmtime(absfilename)
-            source_code, checksum = read_file_with_checksum(absfilename)
-        else:
-            source_code = textwrap.dedent(source_code)
-        self.source_code = source_code
-        self.checksum = checksum
+    def __init__(self, source_code=None, mtime=None):
+        self.blocks = []
+        self.counter = 0
         self.mtime = mtime
-        self.lines = source_code.splitlines()
-        self.full_lines = list(filter(lambda x: not blank_re.match(x), self.lines))
-        self._full_lines_checksums = []
+        self.source_code = textwrap.dedent(source_code)
 
+        lines = self.source_code.splitlines()
         try:
-            self.ast = ast.parse(source_code)
-            self.special_blocks = dict(function_lines(self.ast, len(self.lines)))
-        except SyntaxError:
+            tree = ast.parse(self.source_code, filename="<unknown>")
+            self.dump_and_block(tree, len(lines), name="<module>")
+        except SyntaxError as e:
             pass
+
+    def dump_and_block(self, node, end, name="unknown", into_block=False):
+        
+
+        if isinstance(node, ast.AST):
+            class_name = node.__class__.__name__
+            fields = []
+            for field_name, field_value in ast.iter_fields(node):
+                transform_into_block = (
+                    class_name in ("FunctionDef", "Module")
+                ) and field_name == "body"
+                fields.append(
+                    (
+                        field_name,
+                        self.dump_and_block(
+                            field_value,
+                            end,
+                            name=getattr(node, "name", "unknown"),
+                            into_block=transform_into_block,
+                        ),
+                    )
+                )
+            return "%s(%s)" % (
+                class_name,
+                ", ".join((field_value for field_name, field_value in fields)),
+            )
+        elif isinstance(node, list):
+            representations = []
+            for i, item in enumerate(node):
+                representations.append(
+                    self.dump_and_block(item, _next_lineno(node, i, end))
+                )
+            if into_block and node:
+                self.blocks.append(
+                    Block(
+                        node[0].lineno,
+                        end,
+                        code=str(self.counter) + ":" + ", ".join(representations),
+                        name=name,
+                    )
+                )
+                self.counter += 1
+                return "transformed_into_block"
+            else:
+                return ", ".join(representations)
+        return repr(node)
 
     @property
-    def full_lines_checksums(self):
-        if not self._full_lines_checksums:
-            self._full_lines_checksums = encode_lines(self.full_lines)
-        return self._full_lines_checksums
-
-
-def function_lines(node, end):
-    def _next_lineno(i, end):
-        try:
-            return node[i + 1].decorator_list[0].lineno - 1
-        except (IndexError, AttributeError):
-            pass
-
-        try:
-            return node[i + 1].lineno - 1
-        except IndexError:
-            return end
-        except AttributeError:
-            return None
-
-    result = []
-
-    if isinstance(node, ast.AST):
-        if node.__class__.__name__ == "FunctionDef":
-            result.append((node.body[0].lineno, end))
-
-        for field_name, field_value in ast.iter_fields(node):
-            result.extend(function_lines(field_value, end))
-
-    elif isinstance(node, list):
-        for i, item in enumerate(node):
-            result.extend(function_lines(item, _next_lineno(i, end)))
-
-    return result
+    def checksums(self):
+        return encode_lines([block.checksum for block in self.blocks])
 
 
 def read_file_with_checksum(absfilename):
-    hasher = hashlib.sha1()
     try:
         source = get_python_source(absfilename)
     except NoSource:
         return None, None
-    hasher.update(source.encode("utf-8"))
-    return source, hasher.hexdigest()
+    return source, zlib.adler32(source.encode("UTF-8"))
 
 
-def get_indent_level(line):
-    space_count = 0
-    for c in line:
-        if c == " ":
-            space_count += 1
-            continue
-        elif c == "\t":
-            space_count += 8 - (space_count % 8)
-        else:
-            return space_count
-    return space_count
-
-
-def cover_subindented_multilines(lines, start, end, indent_threshold):
-    fingerprints = []
-    in_subindented_area = False
-    while start < end - 1:
-        start += 1
-        line = lines[start]
-        if blank_re.match(lines[start]):
-            continue
-
-        curr_indent = get_indent_level(line)
-        if curr_indent <= indent_threshold:
-            fingerprints.append(line)
-            in_subindented_area = True
-        else:
-            if in_subindented_area:
-                fingerprints.append(GAP_MARKS[curr_indent - 1])
-                in_subindented_area = False
-
-    if in_subindented_area:
-        fingerprints.append(GAP_MARKS[0])
-    return fingerprints
-
-
-def gap_marks_until(lines, start, end):
-    if start < len(lines):
-        indent_threshold = get_indent_level(lines[start]) - 1
+def match_fingerprint(source_code, fingerprint):
+    module = Module(source_code=source_code)
+    if set(fingerprint) - set(module.checksums):
+        return False
     else:
-        indent_threshold = 0
-
-    fingerprints = cover_subindented_multilines(lines, start, end, indent_threshold)
-    return [GAP_MARKS[indent_threshold]] + fingerprints, end
+        return True
 
 
-def covered_unused_statement(start, end, coverage):
-    while start <= end:
-        if start in coverage:
-            return True
-        start += 1
-    return False
-
-
-def create_fingerprints(afile, special_blocks, coverage):
-    line_idx = 0
+def create_fingerprint(source_code, lines):
+    module = Module(source_code=source_code)
+    blocks = module.blocks
     result = []
-    while line_idx < len(afile):
-        line_idx += 1
-        line = afile[line_idx - 1]
+    line_index = 0
+    sorted_lines = sorted(list(lines))
 
-        if blank_re.match(line):
-            continue
+    for current_block in sorted(blocks, key=lambda x: x.start):
+        try:
+            while sorted_lines[line_index] < current_block.start:
+                line_index += 1
+            if sorted_lines[line_index] <= current_block.end:
+                result.append(current_block.checksum)
+        except IndexError:
+            break
 
-        if (
-            line_idx in special_blocks
-            and line_idx not in coverage
-            and not covered_unused_statement(
-                line_idx + 1, special_blocks[line_idx], coverage
-            )
-        ):
-            fingerprints, line_idx = gap_marks_until(
-                afile, line_idx - 1, special_blocks[line_idx]
-            )
-            result.extend(fingerprints)
-        else:
-            result.append(line)
+    result = encode_lines(result)
     return result
 
-
-def file_has_lines(full_lines, fingerprints):
-    file_idx = 0
-    fingerprint_idx = 0
-
-    while file_idx < len(full_lines) and fingerprint_idx < len(fingerprints):
-
-        searching_indent = INVERTED_GAP_MARKS_CHECKSUMS.get(
-            fingerprints[fingerprint_idx]
-        )
-        if searching_indent is not None:
-            while (
-                file_idx < len(full_lines)
-                and get_indent_level(full_lines[file_idx]) > searching_indent
-            ):
-                file_idx += 1
-        else:
-            if encode_lines([full_lines[file_idx]])[0] != fingerprints[fingerprint_idx]:
-                return False
-            file_idx += 1
-
-        fingerprint_idx += 1
-
-    if file_idx >= len(full_lines) and fingerprint_idx >= len(fingerprints):
-        return True
-    else:
-        return False
