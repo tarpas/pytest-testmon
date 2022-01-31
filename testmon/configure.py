@@ -13,8 +13,8 @@ def _is_coverage():
     return isinstance(sys.gettrace(), CTracer)
 
 
-def _is_xdist(options):
-    return ("dist" in options and options["dist"] != "no") or "slaveinput" in options
+def _deactivate_on_xdist(options):
+    return options.get('numprocesses', None)
 
 
 def _get_notestmon_reasons(options, xdist):
@@ -136,6 +136,6 @@ def header_collect_select(config, coverage_stack, cov_plugin=None):
         options,
         debugger=_is_debugger(),
         coverage=_is_coverage(),
-        xdist=_is_xdist(options),
+        xdist=_deactivate_on_xdist(options),
         cov_plugin=cov_plugin,
     )
