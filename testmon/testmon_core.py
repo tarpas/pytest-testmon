@@ -32,8 +32,6 @@ DB_FILENAME = ".testmondata"
 
 
 class CachedProperty(object):
-    
-
     def __init__(self, func):
         self.__doc__ = getattr(func, "__doc__")
         self.func = func
@@ -43,8 +41,6 @@ class CachedProperty(object):
             return self
         value = obj.__dict__[self.func.__name__] = self.func(obj)
         return value
-
-
 
 
 def _get_python_lib_paths():
@@ -68,8 +64,6 @@ class TestmonException(Exception):
 
 
 class SourceTree:
-    
-
     def __init__(self, rootdir="", libraries=None):
         self.rootdir = rootdir
         self.libraries = libraries
@@ -126,9 +120,7 @@ def split_filter(disk, function, records: [T]) -> ([T], [T]):
 
 
 def get_measured_relfiles(rootdir, cov, test_file):
-    files = {
-        test_file: set()
-    }
+    files = {test_file: set()}
     c = cov.config
     cov_data = cov.get_data()
     for filename in cov_data.measured_files():
@@ -144,7 +136,6 @@ def get_measured_relfiles(rootdir, cov, test_file):
 
 
 class TestmonData(object):
-
     def __init__(self, rootdir="", environment=None, libraries=None):
 
         self.environment = environment if environment else "default"
@@ -222,8 +213,6 @@ class TestmonData(object):
             database.delete_nodes(set(self.all_nodes) - collected)
 
     def run_filters(self, filenames_fingerprints):
-        
-
 
         library_misses = []
         mtime_misses = []
@@ -246,7 +235,6 @@ class TestmonData(object):
                 for checksum_miss in (checksum_misses + library_misses)
             },
         )
-
 
         fingerprint_hits, fingerprint_misses = split_filter(
             self.source_tree, check_fingerprint, changed_file_data
@@ -309,7 +297,7 @@ class TestmonData(object):
 
 
 def get_new_mtimes(filesystem, hits):
-    
+
     for hit in hits:
         module = filesystem.get_file(hit[0])
         if module:
@@ -346,18 +334,14 @@ class Testmon(object):
             "omit": _get_python_lib_paths(),
         }
 
-
-
         self.cov = Coverage(data_file=self.sub_cov_file, config_file=False, **params)
         self.cov._warn_no_data = False
-
 
     def start(self):
 
         Testmon.coverage_stack.append(self.cov)
         self.cov.erase()
         self.cov.start()
-
 
     def stop(self):
         self.cov.stop()
@@ -382,7 +366,9 @@ class Testmon(object):
             }
         )
         testmon_data.db.insert_node_fingerprints(
-            nodeid, nodes_fingerprints, result,
+            nodeid,
+            nodes_fingerprints,
+            result,
         )
 
     def close(self):

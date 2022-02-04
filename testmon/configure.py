@@ -4,7 +4,6 @@ import re
 from coverage.tracer import CTracer
 
 
-
 def _is_debugger():
     return sys.gettrace() and not isinstance(sys.gettrace(), CTracer)
 
@@ -14,7 +13,11 @@ def _is_coverage():
 
 
 def _deactivate_on_xdist(options):
-    return options.get('numprocesses', None)
+    return (
+        options.get("numprocesses", False)
+        or options.get("distload", False)
+        or options.get("dist", "no") != "no"
+    )
 
 
 def _get_notestmon_reasons(options, xdist):
@@ -42,11 +45,14 @@ def _get_notestmon_reasons(options, xdist):
 
 
 def _get_nocollect_reasons(
-    options, debugger=False, coverage=False, dogfooding=False, cov_plugin=False,
+    options,
+    debugger=False,
+    coverage=False,
+    dogfooding=False,
+    cov_plugin=False,
 ):
     if options["testmon_nocollect"]:
         return [None]
-
 
     if coverage and not dogfooding:
         return ["it's not compatible with coverage.py"]

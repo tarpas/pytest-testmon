@@ -129,7 +129,6 @@ class DB(object):
             )
             node_id = cursor.lastrowid
 
-
             for record in fingerprint_records:
                 fingerprint_id = self.fetch_or_create_fingerprint(
                     record["filename"],
@@ -233,7 +232,10 @@ class DB(object):
                 f.id IN (%s)
             """
             % in_clause_questionsmarks,
-            [self.env,] + list(changed_fingerprints),
+            [
+                self.env,
+            ]
+            + list(changed_fingerprints),
         ):
             result.append(
                 ChangedFileData(

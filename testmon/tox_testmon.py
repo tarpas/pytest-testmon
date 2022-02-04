@@ -1,4 +1,3 @@
-
 import os
 
 import pluggy
@@ -9,7 +8,7 @@ hookimpl = pluggy.HookimplMarker("tox")
 
 
 def _uses_testmon(envconfig):
-    
+
     for command in envconfig.commands:
         if "--testmon" in command:
             return True

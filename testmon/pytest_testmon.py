@@ -1,4 +1,3 @@
-
 import os
 from collections import defaultdict
 
@@ -198,7 +197,12 @@ def pytest_report_header(config):
 
 
 def changed_message(
-    config, environment, libraries_miss, should_select, stable_files, unstable_files,
+    config,
+    environment,
+    libraries_miss,
+    should_select,
+    stable_files,
+    unstable_files,
 ):
     message = ""
     if should_select:
@@ -257,7 +261,9 @@ class TestmonCollect(object):
                 self.testmon.stop()
             else:
                 self.testmon.stop_and_save(
-                    self.testmon_data, item.nodeid, self.reports[item.nodeid],
+                    self.testmon_data,
+                    item.nodeid,
+                    self.reports[item.nodeid],
                 )
         else:
             yield
