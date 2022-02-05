@@ -105,7 +105,7 @@ def check_fingerprint(disk, record: db.ChangedFileData):
     fingerprint = record.checksums
 
     module = disk.get_file(file)
-    return module and match_fingerprint(module.source_code, fingerprint)
+    return module and match_fingerprint(module, fingerprint)
 
 
 def split_filter(disk, function, records: [T]) -> ([T], [T]):
@@ -181,7 +181,7 @@ class TestmonData(object):
         for filename, covered in measured_files.items():
             if os.path.exists(os.path.join(self.rootdir, filename)):
                 module = self.source_tree.get_file(filename)
-                fingerprint = create_fingerprint(module.source_code, covered)
+                fingerprint = create_fingerprint(module, covered)
                 nodes_fingerprints.append(
                     {
                         "filename": filename,

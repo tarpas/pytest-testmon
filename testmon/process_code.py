@@ -177,16 +177,24 @@ def read_file_with_checksum(absfilename):
     return source, zlib.adler32(source.encode("UTF-8"))
 
 
-def match_fingerprint(source_code, fingerprint):
+def match_fingerprint_source(source_code, fingerprint):
     module = Module(source_code=source_code)
+    return match_fingerprint(module, fingerprint)
+
+
+def match_fingerprint(module, fingerprint):
     if set(fingerprint) - set(module.checksums):
         return False
     else:
         return True
 
 
-def create_fingerprint(source_code, lines):
+def create_fingerprint_source(source_code, lines):
     module = Module(source_code=source_code)
+    return create_fingerprint(module, lines)
+
+
+def create_fingerprint(module, lines):
     blocks = module.blocks
     result = []
     line_index = 0
