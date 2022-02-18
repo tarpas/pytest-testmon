@@ -4,7 +4,6 @@ from collections import defaultdict
 import pytest
 import pkg_resources
 
-from _pytest.python import Function
 from _pytest.config import ExitCode
 
 from testmon.testmon_core import (
@@ -150,6 +149,7 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
                     cov_plugin=cov_plugin,
                 ),
                 config.testmon_data,
+                is_worker=hasattr(config, "workerinput"),
             ),
             "TestmonCollect",
         )
@@ -229,9 +229,10 @@ def pytest_unconfigure(config):
 
 
 class TestmonCollect(object):
-    def __init__(self, testmon, testmon_data):
+    def __init__(self, testmon, testmon_data, is_worker=None):
         self.testmon_data: TestmonData = testmon_data
         self.testmon = testmon
+        self._is_worker = is_worker
 
         self.reports = defaultdict(lambda: {})
         self.raw_nodeids = []
@@ -248,31 +249,42 @@ class TestmonCollect(object):
             pass
 
     def pytest_collection_modifyitems(self, session, config, items):
-        _, should_collect, should_select = config.testmon_config
-        if should_collect and not session.testsfailed:
-            config.testmon_data.sync_db_fs_nodes(retain=set(self.raw_nodeids))
+        should_sync = getattr(config, "workerinput", {}).get("workerid", "gw0") == "gw0"
+        if not session.testsfailed:
+            config.testmon_data.sync_db_fs_nodes(
+                retain=set(self.raw_nodeids), should_sync=should_sync
+            )
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_protocol(self, item, nextitem):
-        if isinstance(item, Function) and item.config.testmon_config[1]:
-            self.testmon.start()
-            result = yield
-            if result.excinfo and issubclass(result.excinfo[0], BaseException):
-                self.testmon.stop()
-            else:
-                self.testmon.stop_and_save(
-                    self.testmon_data,
-                    item.nodeid,
-                    self.reports[item.nodeid],
-                )
-        else:
-            yield
+        self.testmon.start()
+        result = yield
+        if result.excinfo and issubclass(result.excinfo[0], BaseException):
+            self.testmon.stop()
 
+    @pytest.hookimpl(hookwrapper=True)
+    def pytest_runtest_makereport(self, item, call):
+        result = yield
+
+        if call.when == "teardown":
+            report = result.get_result()
+            report.node_fingerprints = self.testmon.stop_and_process(
+                self.testmon_data, item.nodeid
+            )
+            result.force_result(report)
+
+    @pytest.hookimpl
     def pytest_runtest_logreport(self, report):
-        assert report.when not in self.reports, "{} {} {}".format(
-            report.nodeid, report.when, self.reports
-        )
-        self.reports[report.nodeid][report.when] = serialize_report(report)
+
+        if not self._is_worker:
+            self.reports[report.nodeid][report.when] = serialize_report(report)
+            if report.when == "teardown" and hasattr(report, "node_fingerprints"):
+                self.testmon.save_fingerprints(
+                    self.testmon_data,
+                    report.nodeid,
+                    report.node_fingerprints,
+                    self.reports[report.nodeid],
+                )
 
     def pytest_sessionfinish(self, session):
         self.testmon_data.db.remove_unused_fingerprints()

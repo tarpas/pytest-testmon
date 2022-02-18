@@ -108,7 +108,7 @@ def _header_collect_select(
 
     if notestmon_reasons == "not mentioned":
         return None, False, False
-    elif notestmon_reasons:
+    if notestmon_reasons:
         return "testmon: " + notestmon_reasons, False, False
 
     nocollect_reasons = _get_nocollect_reasons(

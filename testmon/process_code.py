@@ -27,11 +27,11 @@ def debug_encode_lines(lines):
 
 
 def debug_fingerprint_to_blob(checksums):
-    return "\n".join(checksums)
+    return ";\n".join(checksums)
 
 
 def debug_blob_to_fingerprint(blob):
-    return blob.split("\n")
+    return blob.split(";\n")
 
 
 def prod_encode_lines(lines):
@@ -106,18 +106,21 @@ def _next_lineno(nodes, i, end):
 
 
 class Module(object):
-    def __init__(self, source_code=None, mtime=None):
+    def __init__(self, source_code=None, mtime=None, ext="py"):
         self.blocks = []
         self.counter = 0
         self.mtime = mtime
         self.source_code = textwrap.dedent(source_code)
 
         lines = self.source_code.splitlines()
-        try:
-            tree = ast.parse(self.source_code, filename="<unknown>")
-            self.dump_and_block(tree, len(lines), name="<module>")
-        except SyntaxError as e:
-            pass
+        if ext == "py":
+            try:
+                tree = ast.parse(self.source_code, filename="<unknown>")
+                self.dump_and_block(tree, len(lines), name="<module>")
+            except SyntaxError as e:
+                pass
+        else:
+            self.blocks = [Block(1, len(lines), self.source_code)]
 
     def dump_and_block(self, node, end, name="unknown", into_block=False):
 
@@ -177,8 +180,8 @@ def read_file_with_checksum(absfilename):
     return source, zlib.adler32(source.encode("UTF-8"))
 
 
-def match_fingerprint_source(source_code, fingerprint):
-    module = Module(source_code=source_code)
+def match_fingerprint_source(source_code, fingerprint, ext="py"):
+    module = Module(source_code=source_code, ext=ext)
     return match_fingerprint(module, fingerprint)
 
 
@@ -189,8 +192,8 @@ def match_fingerprint(module, fingerprint):
         return True
 
 
-def create_fingerprint_source(source_code, lines):
-    module = Module(source_code=source_code)
+def create_fingerprint_source(source_code, lines, ext="py"):
+    module = Module(source_code=source_code, ext=ext)
     return create_fingerprint(module, lines)
 
 

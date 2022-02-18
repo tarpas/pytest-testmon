@@ -76,7 +76,9 @@ class SourceTree:
             )
             if checksum:
                 fs_mtime = os.path.getmtime(os.path.join(self.rootdir, filename))
-                self.cache[filename] = Module(source_code=code, mtime=fs_mtime)
+                self.cache[filename] = Module(
+                    source_code=code, mtime=fs_mtime, ext=filename.rsplit(".", 1)[1]
+                )
             else:
                 self.cache[filename] = None
         return self.cache[filename]
@@ -120,7 +122,7 @@ def split_filter(disk, function, records: [T]) -> ([T], [T]):
 
 
 def get_measured_relfiles(rootdir, cov, test_file):
-    files = {test_file: set()}
+    files = {test_file: set([1])}
     c = cov.config
     cov_data = cov.get_data()
     for filename in cov_data.measured_files():
@@ -192,24 +194,25 @@ class TestmonData(object):
                 )
         return nodes_fingerprints
 
-    def sync_db_fs_nodes(self, retain):
+    def sync_db_fs_nodes(self, retain, should_sync=True):
         collected = retain.union(set(self.stable_nodeids))
         with self.db as database:
             add = collected - set(self.all_nodes)
 
-            for nodeid in add:
-                if is_python_file(home_file(nodeid)):
-                    database.insert_node_fingerprints(
-                        nodeid=nodeid,
-                        fingerprint_records=(
-                            {
-                                "filename": home_file(nodeid),
-                                "fingerprint": encode_lines(["0match"]),
-                                "mtime": None,
-                                "checksum": None,
-                            },
-                        ),
-                    )
+            if should_sync:
+                for nodeid in add:
+                    if is_python_file(home_file(nodeid)):
+                        database.insert_node_fingerprints(
+                            nodeid=nodeid,
+                            fingerprint_records=(
+                                {
+                                    "filename": home_file(nodeid),
+                                    "fingerprint": encode_lines(["0match"]),
+                                    "mtime": None,
+                                    "checksum": None,
+                                },
+                            ),
+                        )
             database.delete_nodes(set(self.all_nodes) - collected)
 
     def run_filters(self, filenames_fingerprints):
@@ -345,9 +348,10 @@ class Testmon(object):
 
     def stop(self):
         self.cov.stop()
-        Testmon.coverage_stack.pop()
+        if Testmon.coverage_stack:
+            Testmon.coverage_stack.pop()
 
-    def stop_and_save(self, testmon_data: TestmonData, nodeid, result):
+    def stop_and_process(self, testmon_data: TestmonData, nodeid):
         self.stop()
         if self.sub_cov_file:
             self.cov.combine()
@@ -355,9 +359,9 @@ class Testmon(object):
             self.rootdir, self.cov, home_file(nodeid)
         )
 
-        nodes_fingerprints = testmon_data.get_nodes_fingerprints(measured_files)
+        node_fingerprints = testmon_data.get_nodes_fingerprints(measured_files)
 
-        nodes_fingerprints.append(
+        node_fingerprints.append(
             {
                 "filename": LIBRARIES_KEY,
                 "checksum": testmon_data.libraries,
@@ -365,9 +369,12 @@ class Testmon(object):
                 "fingerprint": encode_lines([testmon_data.libraries]),
             }
         )
+        return node_fingerprints
+
+    def save_fingerprints(self, testmon_data, nodeid, node_fingerprints, result):
         testmon_data.db.insert_node_fingerprints(
             nodeid,
-            nodes_fingerprints,
+            node_fingerprints,
             result,
         )
 
