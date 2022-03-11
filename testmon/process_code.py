@@ -91,9 +91,9 @@ class Block:
         return not self.__eq__(other)
 
 
-@lru_cache(100)
+@lru_cache(300)
 def string_checksum(s):
-    return zlib.adler32(s.encode("UTF-8"))
+    return str(zlib.adler32(s.encode("UTF-8")))
 
 
 def _next_lineno(nodes, i, end):
@@ -107,20 +107,12 @@ def _next_lineno(nodes, i, end):
 
 class Module(object):
     def __init__(self, source_code=None, mtime=None, ext="py"):
-        self.blocks = []
+        self._blocks = None
         self.counter = 0
         self.mtime = mtime
         self.source_code = textwrap.dedent(source_code)
-
-        lines = self.source_code.splitlines()
-        if ext == "py":
-            try:
-                tree = ast.parse(self.source_code, filename="<unknown>")
-                self.dump_and_block(tree, len(lines), name="<module>")
-            except SyntaxError as e:
-                pass
-        else:
-            self.blocks = [Block(1, len(lines), self.source_code)]
+        self.fs_checksum = string_checksum(self.source_code)
+        self.ext = ext
 
     def dump_and_block(self, node, end, name="unknown", into_block=False):
 
@@ -153,7 +145,7 @@ class Module(object):
                     self.dump_and_block(item, _next_lineno(node, i, end))
                 )
             if into_block and node:
-                self.blocks.append(
+                self._blocks.append(
                     Block(
                         node[0].lineno,
                         end,
@@ -170,6 +162,21 @@ class Module(object):
     @property
     def checksums(self):
         return encode_lines([block.checksum for block in self.blocks])
+
+    @property
+    def blocks(self):
+        if self._blocks is None:
+            self._blocks = []
+            lines = self.source_code.splitlines()
+            if self.ext == "py":
+                try:
+                    tree = ast.parse(self.source_code, filename="<unknown>")
+                    self.dump_and_block(tree, len(lines), name="<module>")
+                except SyntaxError as e:
+                    pass
+            else:
+                self._blocks = [Block(1, len(lines), self.source_code)]
+        return self._blocks
 
 
 def read_file_with_checksum(absfilename):

@@ -97,7 +97,7 @@ def check_mtime(file_system, record):
 
 def check_checksum(file_system, record):
     cache_module = file_system.get_file(record["file_name"])
-    fs_checksum = string_checksum(cache_module.source_code) if cache_module else None
+    fs_checksum = cache_module.fs_checksum if cache_module else None
 
     return record["checksum"] == fs_checksum
 
