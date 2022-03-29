@@ -121,17 +121,16 @@ def testmon_options(config):
 
 
 def init_testmon_data(config, read_source=True):
-    if not hasattr(config, "testmon_data"):
-        environment = config.getoption("environment_expression") or eval_environment(
-            config.getini("environment_expression")
-        )
-        libraries = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
-        testmon_data = TestmonData(
-            config.rootdir.strpath, environment=environment, libraries=libraries
-        )
-        if read_source:
-            testmon_data.determine_stable()
-        config.testmon_data = testmon_data
+    environment = config.getoption("environment_expression") or eval_environment(
+        config.getini("environment_expression")
+    )
+    libraries = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
+    testmon_data = TestmonData(
+        config.rootdir.strpath, environment=environment, libraries=libraries
+    )
+    if read_source:
+        testmon_data.determine_stable()
+    config.testmon_data = testmon_data
 
 
 def register_plugins(config, should_select, should_collect, cov_plugin):
@@ -213,8 +212,8 @@ def changed_message(
         if changed_files_msg == "0" and len(stable_files) == 0:
             message += "new DB, "
         else:
-            message += "changed files{}: {}, skipping collection of {} files, ".format(
-                "(libraries upgrade/install)" if libraries_miss else "",
+            message += "{}changed files: {}, skipping collection of {} files, ".format(
+                "libraries upgrade, " if libraries_miss else "",
                 changed_files_msg,
                 len(stable_files),
             )
@@ -248,12 +247,11 @@ class TestmonCollect(object):
         except TypeError:
             pass
 
+    @pytest.hookimpl(tryfirst=True)
     def pytest_collection_modifyitems(self, session, config, items):
-        should_sync = getattr(config, "workerinput", {}).get("workerid", "gw0") == "gw0"
-        if not session.testsfailed:
-            config.testmon_data.sync_db_fs_nodes(
-                retain=set(self.raw_nodeids), should_sync=should_sync
-            )
+        should_sync = not session.testsfailed
+        if should_sync:
+            config.testmon_data.sync_db_fs_nodes(retain=set(self.raw_nodeids))
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_protocol(self, item, nextitem):

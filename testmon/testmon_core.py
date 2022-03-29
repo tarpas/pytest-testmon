@@ -194,25 +194,24 @@ class TestmonData(object):
                 )
         return nodes_fingerprints
 
-    def sync_db_fs_nodes(self, retain, should_sync=True):
+    def sync_db_fs_nodes(self, retain):
         collected = retain.union(set(self.stable_nodeids))
         with self.db as database:
             add = collected - set(self.all_nodes)
 
-            if should_sync:
-                for nodeid in add:
-                    if is_python_file(home_file(nodeid)):
-                        database.insert_node_fingerprints(
-                            nodeid=nodeid,
-                            fingerprint_records=(
-                                {
-                                    "filename": home_file(nodeid),
-                                    "fingerprint": encode_lines(["0match"]),
-                                    "mtime": None,
-                                    "checksum": None,
-                                },
-                            ),
-                        )
+            for nodeid in add:
+                if is_python_file(home_file(nodeid)):
+                    database.insert_node_fingerprints(
+                        nodeid=nodeid,
+                        fingerprint_records=(
+                            {
+                                "filename": home_file(nodeid),
+                                "fingerprint": encode_lines(["0match"]),
+                                "mtime": None,
+                                "checksum": None,
+                            },
+                        ),
+                    )
             database.delete_nodes(set(self.all_nodes) - collected)
 
     def run_filters(self, filenames_fingerprints):
