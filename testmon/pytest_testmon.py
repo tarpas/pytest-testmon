@@ -148,7 +148,6 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
                     cov_plugin=cov_plugin,
                 ),
                 config.testmon_data,
-                is_worker=hasattr(config, "workerinput"),
             ),
             "TestmonCollect",
         )
@@ -274,18 +273,18 @@ class TestmonCollect(object):
     @pytest.hookimpl
     def pytest_runtest_logreport(self, report):
 
-        if not self._is_worker:
-            self.reports[report.nodeid][report.when] = serialize_report(report)
-            if report.when == "teardown" and hasattr(report, "node_fingerprints"):
-                self.testmon.save_fingerprints(
-                    self.testmon_data,
-                    report.nodeid,
-                    report.node_fingerprints,
-                    self.reports[report.nodeid],
-                )
+        self.reports[report.nodeid][report.when] = serialize_report(report)
+        if report.when == "teardown" and hasattr(report, "node_fingerprints"):
+            self.testmon.save_fingerprints(
+                self.testmon_data,
+                report.nodeid,
+                report.node_fingerprints,
+                self.reports[report.nodeid],
+            )
 
     def pytest_sessionfinish(self, session):
-        self.testmon_data.db.remove_unused_fingerprints()
+        if not self._is_worker:
+            self.testmon_data.db.remove_unused_fingerprints()
         self.testmon.close()
 
 
