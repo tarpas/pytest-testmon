@@ -24,6 +24,7 @@ class DB(object):
         self.con = connection
         self.env = environment
 
+        connection.execute("PRAGMA synchronous = OFF")
         connection.execute("PRAGMA foreign_keys = TRUE ")
         connection.execute("PRAGMA recursive_triggers = TRUE ")
         connection.row_factory = sqlite3.Row
