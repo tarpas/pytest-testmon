@@ -1,9 +1,12 @@
-This is a pytest plug-in which automatically selects and re-executes only tests affected by recent changes. How is this possible in dynamic language like Python and how reliable is it? Read here: `Determining affected tests <https://testmon.org/determining-affected-tests.html>`_
+# Testmon
 
-Quickstart
-===========
+---
+This is a pytest plug-in which automatically selects and re-executes
+only tests affected by recent changes. How is this possible in dynamic
+language like Python and how reliable is it? Read here: [Determining
+affected tests](https://testmon.org/determining-affected-tests.html)
 
-::
+## Quickstart
 
     pip install pytest-testmon
 
@@ -15,5 +18,12 @@ Quickstart
     # only run tests affected by recent changes
     pytest --testmon
 
+To learn more about different options you can use with testmon, please
+head to [testmon.org](https://testmon.org)
 
-To learn more about specifying multiple project directories and troubleshooting, please head to `testmon.org <https://testmon.org>`_
+## Call for opensource projects: try testmon in CI with no effort or risk.
+
+We would like to run testmon within your project, collect data and improve!
+We'll prepare the PR for you and set everything up so that no tests are deselected initially.
+You can start using the full functionality whenever the reliability and time savings seem right!
+Please <a href="https://testmon.org/ci.html">get in touch</a> and we'll contact you shortly.
