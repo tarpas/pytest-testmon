@@ -1,6 +1,5 @@
 # Testmon
 
----
 This is a pytest plug-in which automatically selects and re-executes
 only tests affected by recent changes. How is this possible in dynamic
 language like Python and how reliable is it? Read here: [Determining
