@@ -2,7 +2,6 @@ import json
 import os
 import sqlite3
 
-from functools import lru_cache
 from collections import namedtuple, defaultdict
 
 from testmon.process_code import blob_to_fingerprint, fingerprint_to_blob
@@ -70,7 +69,6 @@ class DB(object):
                 """
             )
 
-    @lru_cache(None)
     def fetch_or_create_fingerprint(self, filename, mtime, checksum, fingerprint):
         cursor = self.con.cursor()
         try:
