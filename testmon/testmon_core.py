@@ -249,7 +249,7 @@ class TestmonData(object):
             library_misses,
         )
 
-    def determine_stable(self):
+    def determine_stable(self, include_changed_source_files=False):
 
         filenames_fingerprints = self.filenames_fingerprints
 
@@ -267,6 +267,8 @@ class TestmonData(object):
         for fingerprint_miss in fingerprint_misses:
             self.unstable_nodeids.add(fingerprint_miss[1])
             self.unstable_files.add(fingerprint_miss[1].split("::", 1)[0])
+            if include_changed_source_files:
+                self.unstable_files.add(fingerprint_miss[0].split("::", 1)[0])
 
         self.stable_nodeids = set(self.all_nodes) - self.unstable_nodeids
         self.stable_files = self.all_files - self.unstable_files

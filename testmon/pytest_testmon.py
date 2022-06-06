@@ -129,7 +129,7 @@ def init_testmon_data(config, read_source=True):
         config.rootdir.strpath, environment=environment, libraries=libraries
     )
     if read_source:
-        testmon_data.determine_stable()
+        testmon_data.determine_stable(include_changed_source_files=config.getoption("pylint"))
     config.testmon_data = testmon_data
 
 
