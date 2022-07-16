@@ -2,50 +2,59 @@ import json
 import os
 import sqlite3
 
-from functools import lru_cache
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 
-from testmon.process_code import blob_to_fingerprint, fingerprint_to_blob
+from testmon.process_code import (
+    blob_to_checksums,
+    checksums_to_blob,
+    Fingerprint,
+    Fingerprints,
+)
 
-DATA_VERSION = 9
+DATA_VERSION = 0
 
-ChangedFileData = namedtuple("ChangedFileData", "file_name name checksums id failed")
+ChangedFileData = namedtuple(
+    "ChangedFileData", "filename name method_checksums id failed"
+)
 
 
 class TestmonDbException(Exception):
     pass
 
 
-class DB(object):
+def connect(datafile):
+    connection = sqlite3.connect(datafile)
+
+    connection.execute("PRAGMA synchronous = OFF")
+    connection.execute("PRAGMA foreign_keys = TRUE ")
+    connection.execute("PRAGMA recursive_triggers = TRUE ")
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
+class DB:
     def __init__(self, datafile, environment="default"):
         new_db = not os.path.exists(datafile)
 
-        connection = sqlite3.connect(datafile)
+        connection = connect(datafile)
         self.con = connection
         self.env = environment
 
-        connection.execute("PRAGMA synchronous = OFF")
-        connection.execute("PRAGMA foreign_keys = TRUE ")
-        connection.execute("PRAGMA recursive_triggers = TRUE ")
-        connection.row_factory = sqlite3.Row
+        old_format = self._check_data_version(datafile)
 
-        if new_db:
+        if new_db or old_format:
             self.init_tables()
-
-        self._check_data_version(datafile)
 
     def _check_data_version(self, datafile):
         stored_data_version = self._fetch_data_version()
 
         if int(stored_data_version) == DATA_VERSION:
-            return
+            return False
 
-        msg = (
-            "The stored data file {} version ({}) "
-            "is not compatible with current version ({})."
-            " You must delete the stored data to continue."
-        ).format(datafile, stored_data_version, DATA_VERSION)
-        raise TestmonDbException(msg)
+        self.con.close()
+        os.remove(datafile)
+        self.con = connect(datafile)
+        return True
 
     def __enter__(self):
         self.con = self.con.__enter__()
@@ -71,23 +80,22 @@ class DB(object):
                 """
             )
 
-    @lru_cache(None)
-    def fetch_or_create_fingerprint(self, filename, mtime, checksum, fingerprint):
+    def fetch_or_create_fingerprint(self, filename, mtime, checksum, method_checksums):
         cursor = self.con.cursor()
         try:
             cursor.execute(
                 """
                 INSERT INTO fingerprint
-                (file_name, fingerprint, mtime, checksum)
+                (filename, method_checksums, mtime, checksum)
                 VALUES (?, ?, ?, ?)
                 """,
-                (filename, fingerprint, mtime, checksum),
+                (filename, method_checksums, mtime, checksum),
             )
 
             fingerprint_id = cursor.lastrowid
         except sqlite3.IntegrityError:
 
-            fingerprint_id, db_mtime, db_checksum = cursor.execute(
+            fingerprint_id, *_ = cursor.execute(
                 """
                 SELECT
                     id,
@@ -96,46 +104,41 @@ class DB(object):
                 FROM
                     fingerprint
                 WHERE
-                    file_name = ? AND fingerprint = ?
+                    filename = ? AND method_checksums = ?
                 """,
-                (filename, fingerprint),
+                (filename, method_checksums),
             ).fetchone()
 
             self.update_mtimes([(mtime, checksum, fingerprint_id)])
         return fingerprint_id
 
-    def insert_node_fingerprints(self, nodeid: str, fingerprint_records, result={}):
+    def insert_node_fingerprints(
+        self, nodeid, fingerprints, failed=False, duration=None
+    ):
         with self.con as con:
-            failed = any(r.get("outcome") == "failed" for r in result.values())
-            durations = defaultdict(
-                float,
-                {key: value.get("duration", 0.0) for key, value in result.items()},
-            )
             cursor = con.cursor()
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO node
-                (environment, name, setup_duration,
-                call_duration, teardown_duration, failed)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (environment, name, duration, failed)
+                VALUES (?, ?, ?, ?)
                 """,
                 (
                     self.env,
                     nodeid,
-                    durations["setup"],
-                    durations["call"],
-                    durations["teardown"],
-                    failed,
+                    duration,
+                    1 if failed else 0,
                 ),
             )
             node_id = cursor.lastrowid
 
-            for record in fingerprint_records:
+            # record: Fingerprint
+            for record in fingerprints:
                 fingerprint_id = self.fetch_or_create_fingerprint(
                     record["filename"],
                     record["mtime"],
                     record["checksum"],
-                    fingerprint_to_blob(record["fingerprint"]),
+                    checksums_to_blob(record["method_checksums"]),
                 )
 
                 cursor.execute(
@@ -164,8 +167,7 @@ class DB(object):
         result = cursor.fetchone()
         if result:
             return json.loads(result[0])
-        else:
-            return default
+        return default
 
     def init_tables(self):
         connection = self.con
@@ -178,9 +180,7 @@ class DB(object):
                 id INTEGER PRIMARY KEY ASC,
                 environment TEXT,
                 name TEXT,
-                setup_duration FLOAT,
-                call_duration FLOAT,
-                teardown_duration FLOAT,
+                duration FLOAT,
                 failed BIT,
                 UNIQUE (environment, name)
             )
@@ -203,49 +203,50 @@ class DB(object):
             CREATE table fingerprint
             (
                 id INTEGER PRIMARY KEY,
-                file_name TEXT,
-                fingerprint TEXT,
+                filename TEXT,
+                method_checksums BLOB,
                 mtime FLOAT,
                 checksum TEXT,
-                UNIQUE (file_name, fingerprint)
+                UNIQUE (filename, method_checksums)
             )
             """
         )
 
         connection.execute(f"PRAGMA user_version = {DATA_VERSION}")
 
-    def get_changed_file_data(self, changed_fingerprints) -> [ChangedFileData]:
+    def get_changed_file_data(self, changed_fingerprints):
         in_clause_questionsmarks = ", ".join("?" * len(changed_fingerprints))
         result = []
         for row in self.con.execute(
-            """
+            f"""
             SELECT
-                f.file_name,
+                f.filename,
                 n.name,
-                f.fingerprint,
+                f.method_checksums,
                 f.id,
-                n.failed
+                n.failed,
+                n.duration
             FROM node n, node_fingerprint nfp, fingerprint f
             WHERE
                 n.environment = ? AND
                 n.id = nfp.node_id AND
                 nfp.fingerprint_id = f.id AND
-                f.id IN (%s)
-            """
-            % in_clause_questionsmarks,
+                f.id IN ({in_clause_questionsmarks})
+            """,
             [
                 self.env,
             ]
             + list(changed_fingerprints),
         ):
             result.append(
-                ChangedFileData(
-                    row["file_name"],
+                [
+                    row["filename"],
                     row["name"],
-                    blob_to_fingerprint(row["fingerprint"]),
+                    blob_to_checksums(row["method_checksums"]),
                     row["id"],
                     row["failed"],
-                )
+                    row["duration"],
+                ]
             )
 
         return result
@@ -263,13 +264,13 @@ class DB(object):
     def all_nodes(self):
         return {
             row[0]: {
-                "durations": {"setup": row[1], "call": row[2], "teardown": row[3]},
-                "failed": row[4],
+                "duration": row[1],
+                "failed": row[2],
             }
             for row in self.con.execute(
                 """
                 SELECT
-                    name, setup_duration, call_duration, teardown_duration, failed
+                    name, duration, failed
                 FROM node
                 WHERE environment = ?
                 """,
@@ -278,10 +279,10 @@ class DB(object):
         }
 
     def filenames_fingerprints(self):
-        return self.con.execute(
+        cursor = self.con.execute(
             """
             SELECT DISTINCT
-                f.file_name,
+                f.filename,
                 f.mtime,
                 f.checksum,
                 f.id as fingerprint_id,
@@ -293,7 +294,9 @@ class DB(object):
                 nfp.fingerprint_id = f.id AND
                 environment = ?
             GROUP BY
-                f.file_name, f.mtime, f.checksum, f.id
+                f.filename, f.mtime, f.checksum, f.id
             """,
             (self.env,),
-        ).fetchall()
+        )
+
+        return [dict(row) for row in cursor]

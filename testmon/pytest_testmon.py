@@ -3,6 +3,7 @@ from collections import defaultdict
 
 import pytest
 import pkg_resources
+import py
 
 from _pytest.config import ExitCode
 
@@ -16,23 +17,22 @@ from testmon.testmon_core import (
     get_node_module_name,
     LIBRARIES_KEY,
 )
-from testmon import configure as configure
+from testmon import configure
 
 
 def serialize_report(rep):
-    import py
 
-    d = rep.__dict__.copy()
+    rep_dict = rep.__dict__.copy()
     if hasattr(rep.longrepr, "toterminal"):
-        d["longrepr"] = str(rep.longrepr)
+        rep_dict["longrepr"] = str(rep.longrepr)
     else:
-        d["longrepr"] = rep.longrepr
-    for name in d:
-        if isinstance(d[name], py.path.local):
-            d[name] = str(d[name])
+        rep_dict["longrepr"] = rep.longrepr
+    for name in rep_dict:
+        if isinstance(rep_dict[name], py.path.local):
+            rep_dict[name] = str(rep_dict[name])
         elif name == "result":
-            d[name] = None
-    return d
+            rep_dict[name] = None
+    return rep_dict
 
 
 def pytest_addoption(parser):
@@ -134,7 +134,7 @@ def init_testmon_data(config, read_source=True):
 
 
 def register_plugins(config, should_select, should_collect, cov_plugin):
-    if should_select:
+    if should_select or should_collect:
         config.pluginmanager.register(
             TestmonSelect(config, config.testmon_data), "TestmonSelect"
         )
@@ -167,8 +167,8 @@ def pytest_configure(config):
         try:
             init_testmon_data(config)
             register_plugins(config, should_select, should_collect, cov_plugin)
-        except TestmonException as e:
-            pytest.exit(str(e))
+        except TestmonException as error:
+            pytest.exit(str(error))
 
 
 def pytest_report_header(config):
@@ -211,13 +211,12 @@ def changed_message(
         if changed_files_msg == "0" and len(stable_files) == 0:
             message += "new DB, "
         else:
-            message += "{}changed files: {}, skipping collection of {} files, ".format(
-                "libraries upgrade, " if libraries_miss else "",
-                changed_files_msg,
-                len(stable_files),
+            message += (
+                f"{'libraries upgrade, ' if libraries_miss else ''}changed files: {changed_files_msg}, "
+                f"skipping collection of {len(stable_files)} files, "
             )
     if config.testmon_data.environment:
-        message += "environment: {}".format(environment)
+        message += f"environment: {environment}"
     return message
 
 
@@ -226,9 +225,16 @@ def pytest_unconfigure(config):
         config.testmon_data.close_connection()
 
 
-class TestmonCollect(object):
+def process_result(result):
+
+    failed = any(r.get("outcome") == "failed" for r in result.values())
+    duration = sum(value.get("duration", 0.0) for key, value in result.items())
+    return (failed, duration)
+
+
+class TestmonCollect:
     def __init__(self, testmon, testmon_data, is_worker=None):
-        self.testmon_data: TestmonData = testmon_data
+        self.testmon_data = testmon_data
         self.testmon = testmon
         self._is_worker = is_worker
 
@@ -279,7 +285,7 @@ class TestmonCollect(object):
                 self.testmon_data,
                 report.nodeid,
                 report.node_fingerprints,
-                self.reports[report.nodeid],
+                *process_result(self.reports[report.nodeid]),
             )
 
     def pytest_sessionfinish(self, session):
@@ -301,9 +307,16 @@ def get_failing(all_nodes):
     return failing_files, failing_nodes
 
 
+def sort_items_by_duration(items, avg_durations):
+
+    items.sort(key=lambda item: avg_durations[item.nodeid])
+    items.sort(key=lambda item: avg_durations[get_node_class_name(item.nodeid)])
+    items.sort(key=lambda item: avg_durations[get_node_module_name(item.nodeid)])
+
+
 class TestmonSelect:
     def __init__(self, config, testmon_data):
-        self.testmon_data: TestmonData = testmon_data
+        self.testmon_data = testmon_data
         self.config = config
 
         failing_files, failing_nodes = get_failing(testmon_data.all_nodes)
@@ -315,23 +328,11 @@ class TestmonSelect:
             node for node in testmon_data.stable_nodeids if node not in failing_nodes
         ]
 
-    def sort_items_by_duration(self, items) -> None:
-        def duration_or_zero(key) -> float:
-            try:
-                return avg_durations[key]
-            except KeyError:
-                return 0
-
-        avg_durations = self.testmon_data.nodes_classes_modules_avg_durations
-
-        items.sort(key=lambda item: duration_or_zero(item.nodeid))
-        items.sort(key=lambda item: duration_or_zero(get_node_class_name(item.nodeid)))
-        items.sort(key=lambda item: duration_or_zero(get_node_module_name(item.nodeid)))
-
     def pytest_ignore_collect(self, path, config):
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
-        if strpath in self.deselected_files:
+        if strpath in self.deselected_files and self.config.testmon_config[2]:
             return True
+        return False
 
     @pytest.mark.trylast
     def pytest_collection_modifyitems(self, session, config, items):
@@ -342,17 +343,25 @@ class TestmonSelect:
             )
 
         selected = []
+        deselected = []
         for item in items:
-            if item.nodeid not in self.deselected_nodes:
+            if item.nodeid in self.deselected_nodes:
+                deselected.append(item)
+            else:
                 selected.append(item)
-        items[:] = selected
 
-        if self.testmon_data.all_nodes:
-            self.sort_items_by_duration(items)
+        sort_items_by_duration(selected, self.testmon_data.avg_durations)
 
-        session.config.hook.pytest_deselected(
-            items=([FakeItemFromTestmon(session.config)] * len(self.deselected_nodes))
-        )
+        if self.config.testmon_config[2]:
+            items[:] = selected
+            session.config.hook.pytest_deselected(
+                items=(
+                    [FakeItemFromTestmon(session.config)] * len(self.deselected_nodes)
+                )
+            )
+        else:
+            sort_items_by_duration(deselected, self.testmon_data.avg_durations)
+            items[:] = selected + deselected
 
     @pytest.hookimpl(trylast=True)
     def pytest_sessionfinish(self, session, exitstatus):
@@ -360,6 +369,6 @@ class TestmonSelect:
             session.exitstatus = ExitCode.OK
 
 
-class FakeItemFromTestmon(object):
+class FakeItemFromTestmon:
     def __init__(self, config):
         self.config = config

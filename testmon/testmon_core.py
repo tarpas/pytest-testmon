@@ -4,12 +4,13 @@ import random
 import sys
 import textwrap
 
+from typing import TypeVar
+from collections import defaultdict
+
 import coverage
 import pkg_resources
 
-from collections import defaultdict
 from packaging import version
-from typing import TypeVar
 
 from coverage import Coverage
 
@@ -20,8 +21,9 @@ from testmon.process_code import (
     create_fingerprint,
     encode_lines,
     string_checksum,
+    Fingerprints,
 )
-from testmon.process_code import Module, fingerprint_to_blob
+from testmon.process_code import Module
 
 T = TypeVar("T")
 
@@ -31,7 +33,11 @@ CHECKUMS_ARRAY_TYPE = "I"
 DB_FILENAME = ".testmondata"
 
 
-class CachedProperty(object):
+def get_data_file_path(rootdir):
+    return os.environ.get("TESTMON_DATAFILE", os.path.join(rootdir, DB_FILENAME))
+
+
+class CachedProperty:
     def __init__(self, func):
         self.__doc__ = getattr(func, "__doc__")
         self.func = func
@@ -85,9 +91,9 @@ class SourceTree:
 
 
 def check_mtime(file_system, record):
-    absfilename = os.path.join(file_system.rootdir, record["file_name"])
+    absfilename = os.path.join(file_system.rootdir, record["filename"])
 
-    cache_module = file_system.cache.get(record["file_name"], None)
+    cache_module = file_system.cache.get(record["filename"], None)
     try:
         fs_mtime = cache_module.mtime if cache_module else os.path.getmtime(absfilename)
     except OSError:
@@ -96,21 +102,21 @@ def check_mtime(file_system, record):
 
 
 def check_checksum(file_system, record):
-    cache_module = file_system.get_file(record["file_name"])
+    cache_module = file_system.get_file(record["filename"])
     fs_checksum = cache_module.fs_checksum if cache_module else None
 
     return record["checksum"] == fs_checksum
 
 
-def check_fingerprint(disk, record: db.ChangedFileData):
-    file = record.file_name
-    fingerprint = record.checksums
+def check_fingerprint(disk, record):
+    file = record[0]
+    fingerprint = record[2]
 
     module = disk.get_file(file)
     return module and match_fingerprint(module, fingerprint)
 
 
-def split_filter(disk, function, records: [T]) -> ([T], [T]):
+def split_filter(disk, function, records):
     first = []
     second = []
     for record in records:
@@ -123,7 +129,7 @@ def split_filter(disk, function, records: [T]) -> ([T], [T]):
 
 def get_measured_relfiles(rootdir, cov, test_file):
     files = {test_file: set([1])}
-    c = cov.config
+    conf = cov.config
     cov_data = cov.get_data()
     for filename in cov_data.measured_files():
         if not is_python_file(filename):
@@ -132,12 +138,12 @@ def get_measured_relfiles(rootdir, cov, test_file):
         files[relfilename] = cov_data.lines(filename)
         assert files[relfilename] is not None, (
             f"{filename} is in measured_files but wasn't measured! cov.config: "
-            f"{c.config_files}, {c._omit}, {c._include}, {c.source}"
+            f"{conf.config_files}, {conf._omit}, {conf._include}, {conf.source}"
         )
     return files
 
 
-class TestmonData(object):
+class TestmonData:
     def __init__(self, rootdir="", environment=None, libraries=None):
 
         self.environment = environment if environment else "default"
@@ -145,14 +151,14 @@ class TestmonData(object):
         self.unstable_files = None
         self.source_tree = SourceTree(rootdir=self.rootdir)
         if libraries is None:
-            libraries = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
+            libraries = ", ".join(
+                sorted(str(p) for p in pkg_resources.working_set or [])
+            )
 
         self.libraries = libraries
 
         self.connection = None
-        self.datafile = os.environ.get(
-            "TESTMON_DATAFILE", os.path.join(self.rootdir, DB_FILENAME)
-        )
+        self.datafile = get_data_file_path(self.rootdir)
         self.db = db.DB(self.datafile, self.environment)
 
         self.libraries_miss = set()
@@ -171,13 +177,13 @@ class TestmonData(object):
 
     @property
     def all_files(self):
-        return {row["file_name"] for row in self.filenames_fingerprints}
+        return {row["filename"] for row in self.filenames_fingerprints}
 
     @CachedProperty
     def all_nodes(self):
         return self.db.all_nodes()
 
-    def get_nodes_fingerprints(self, measured_files, default=None):
+    def get_nodes_fingerprints(self, measured_files):
         nodes_fingerprints = []
 
         for filename, covered in measured_files.items():
@@ -189,7 +195,7 @@ class TestmonData(object):
                         "filename": filename,
                         "mtime": module.mtime,
                         "checksum": string_checksum(module.source_code),
-                        "fingerprint": fingerprint,
+                        "method_checksums": fingerprint,
                     }
                 )
         return nodes_fingerprints
@@ -202,17 +208,17 @@ class TestmonData(object):
             for nodeid in add:
                 if is_python_file(home_file(nodeid)):
                     database.insert_node_fingerprints(
-                        nodeid=nodeid,
-                        fingerprint_records=(
+                        nodeid,
+                        (
                             {
                                 "filename": home_file(nodeid),
-                                "fingerprint": encode_lines(["0match"]),
+                                "method_checksums": encode_lines(["0match"]),
                                 "mtime": None,
                                 "checksum": None,
                             },
                         ),
                     )
-            database.delete_nodes(set(self.all_nodes) - collected)
+            database.delete_nodes(list(set(self.all_nodes) - collected))
 
     def run_filters(self, filenames_fingerprints):
 
@@ -220,7 +226,7 @@ class TestmonData(object):
         mtime_misses = []
 
         for record in filenames_fingerprints:
-            if record["file_name"] == LIBRARIES_KEY:
+            if record["filename"] == LIBRARIES_KEY:
                 if record["checksum"] != self.libraries:
                     library_misses.append(record)
             else:
@@ -232,10 +238,10 @@ class TestmonData(object):
         )
 
         changed_file_data = self.db.get_changed_file_data(
-            {
+            [
                 checksum_miss["fingerprint_id"]
                 for checksum_miss in (checksum_misses + library_misses)
-            },
+            ],
         )
 
         fingerprint_hits, fingerprint_misses = split_filter(
@@ -271,11 +277,11 @@ class TestmonData(object):
         self.stable_nodeids = set(self.all_nodes) - self.unstable_nodeids
         self.stable_files = self.all_files - self.unstable_files
 
-        self.db.update_mtimes(get_new_mtimes(self.source_tree, checksum_hits))
-        self.db.update_mtimes(get_new_mtimes(self.source_tree, fingerprint_hits))
+        self.db.update_mtimes(list(get_new_mtimes(self.source_tree, checksum_hits)))
+        self.db.update_mtimes(list(get_new_mtimes(self.source_tree, fingerprint_hits)))
 
     @property
-    def nodes_classes_modules_avg_durations(self) -> dict:
+    def avg_durations(self):
         stats = defaultdict(lambda: {"node_count": 0, "sum_duration": 0})
 
         for node_id, report in self.all_nodes.items():
@@ -284,41 +290,47 @@ class TestmonData(object):
                 module_name = get_node_module_name(node_id)
 
                 stats[node_id]["node_count"] += 1
-                stats[node_id]["sum_duration"] = sum(report["durations"].values())
+                stats[node_id]["sum_duration"] = report.get("duration") or 0
                 if class_name:
                     stats[class_name]["node_count"] += 1
                     stats[class_name]["sum_duration"] += stats[node_id]["sum_duration"]
                 stats[module_name]["node_count"] += 1
                 stats[module_name]["sum_duration"] += stats[node_id]["sum_duration"]
 
-        avg_durations = {}
+        durations = defaultdict(lambda: 0)
         for key, stats in stats.items():
-            avg_durations[key] = stats["sum_duration"] / stats["node_count"]
+            durations[key] = stats["sum_duration"] / stats["node_count"]
 
-        return avg_durations
+        return durations
 
 
 def get_new_mtimes(filesystem, hits):
 
-    for hit in hits:
-        module = filesystem.get_file(hit[0])
-        if module:
-            yield module.mtime, string_checksum(module.source_code), hit[3]
+    try:
+        for hit in hits:
+            module = filesystem.get_file(hit[0])
+            if module:
+                yield module.mtime, string_checksum(module.source_code), hit[3]
+    except KeyError:
+        for hit in hits:
+            module = filesystem.get_file(hit["filename"])
+            if module:
+                yield module.mtime, string_checksum(module.source_code), hit[
+                    "fingerprint_id"
+                ]
 
 
 def get_node_class_name(node_id):
-
     if len(node_id.split("::")) > 2:
         return node_id.split("::")[1]
-    else:
-        return None
+    return None
 
 
 def get_node_module_name(node_id):
     return node_id.split("::")[0]
 
 
-class Testmon(object):
+class Testmon:
     coverage_stack = []
 
     def __init__(self, rootdir="", testmon_labels=None, cov_plugin=None):
@@ -350,7 +362,7 @@ class Testmon(object):
         if Testmon.coverage_stack:
             Testmon.coverage_stack.pop()
 
-    def stop_and_process(self, testmon_data: TestmonData, nodeid):
+    def stop_and_process(self, testmon_data, nodeid):
         self.stop()
         if self.sub_cov_file:
             self.cov.combine()
@@ -365,16 +377,15 @@ class Testmon(object):
                 "filename": LIBRARIES_KEY,
                 "checksum": testmon_data.libraries,
                 "mtime": None,
-                "fingerprint": encode_lines([testmon_data.libraries]),
+                "method_checksums": encode_lines([testmon_data.libraries]),
             }
         )
         return node_fingerprints
 
-    def save_fingerprints(self, testmon_data, nodeid, node_fingerprints, result):
+    @staticmethod
+    def save_fingerprints(testmon_data, nodeid, node_fingerprints, failed, duration):
         testmon_data.db.insert_node_fingerprints(
-            nodeid,
-            node_fingerprints,
-            result,
+            nodeid, node_fingerprints, failed, duration
         )
 
     def close(self):
@@ -387,13 +398,13 @@ def eval_environment(environment, **kwargs):
     if not environment:
         return ""
 
-    def md5(s):
-        return hashlib.md5(s.encode()).hexdigest()
+    def md5(string):
+        return hashlib.md5(string.encode()).hexdigest()
 
     eval_globals = {"os": os, "sys": sys, "hashlib": hashlib, "md5": md5}
     eval_globals.update(kwargs)
 
     try:
         return str(eval(environment, eval_globals))
-    except Exception as e:
-        return repr(e)
+    except Exception as error:
+        return repr(error)

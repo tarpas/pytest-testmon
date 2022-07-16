@@ -55,7 +55,7 @@ def _get_nocollect_reasons(
         return [None]
 
     if coverage and not dogfooding:
-        return ["it's not compatible with coverage.py"]
+        return ["coverage.py was detected and simultaneous collection is not supported"]
 
     if debugger and not dogfooding:
         return ["it's not compatible with debugger"]
@@ -67,7 +67,7 @@ def _get_noselect_reasons(options):
     if options["testmon_forceselect"]:
         return []
 
-    elif options["testmon_noselect"]:
+    if options["testmon_noselect"]:
         return [None]
 
     if options["keyword"]:
@@ -92,8 +92,7 @@ def _formulate_deactivation(what, reasons):
             if reasons[0]
             else what + " deactivated, "
         ]
-    else:
-        return []
+    return []
 
 
 def _header_collect_select(

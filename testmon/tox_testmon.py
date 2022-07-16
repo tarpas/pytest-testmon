@@ -1,5 +1,6 @@
 import os
 
+from pathlib import Path
 import pluggy
 
 from tox.config import DepConfig
@@ -16,7 +17,7 @@ def _uses_testmon(envconfig):
 
 
 def touch_stampfile(venv):
-    open(venv.path.join(".testmon_installed"), "a").close()
+    Path(venv.path.join(".testmon_installed")).touch()
 
 
 def installed_testmon(venv):
@@ -27,10 +28,10 @@ def installed_testmon(venv):
 def tox_runenvreport(venv, action):
     if "TESTMON_DATAFILE" in venv.envconfig.setenv:
         datafile = venv.envconfig.setenv["TESTMON_DATAFILE"]
-        action.setactivity("testmon", "keeping TESTMON_DATAFILE=%s" % datafile)
+        action.setactivity("testmon", f"keeping TESTMON_DATAFILE={datafile}")
     else:
         datafile = str(venv.path.join(".testmondata"))
-        action.setactivity("testmon", "setting TESTMON_DATAFILE=%s" % datafile)
+        action.setactivity("testmon", f"setting TESTMON_DATAFILE={datafile}")
         venv.envconfig.setenv["TESTMON_DATAFILE"] = datafile
 
     if _uses_testmon(venv.envconfig) and "pytest-testmon" not in (

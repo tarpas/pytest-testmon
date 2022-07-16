@@ -1,14 +1,8 @@
 import ast
-import hashlib
 import textwrap
 import zlib
-import os
 from functools import lru_cache
-
-import re
 import sqlite3
-
-from functools import lru_cache
 
 from array import array
 
@@ -19,44 +13,66 @@ try:
 except ImportError:
     from coverage.misc import NoSource
 
-CHECKUMS_ARRAY_TYPE = "I"
+
+try:
+    from typing import TypedDict, List
+
+    class Fingerprint(TypedDict):
+        # filename: str
+        mtime = None
+        checksum = None
+        method_checksums = None
+        fingerprint_id = None
+
+except ImportError:
+    Fingerprint = dict
+
+Fingerprints = [Fingerprint]
+
+
+CHECKUMS_ARRAY_TYPE = "i"
+
+
+def to_signed(unsigned33):
+    unsigned33 = unsigned33 & 0xFFFFFFFF
+    return (unsigned33 ^ 0x80000000) - 0x80000000
 
 
 def debug_encode_lines(lines):
     return lines
 
 
-def debug_fingerprint_to_blob(checksums):
+def debug_code_to_blob(checksums):
     return ";\n".join(checksums)
 
 
-def debug_blob_to_fingerprint(blob):
+def debug_blob_to_code(blob):
     return blob.split(";\n")
 
 
 def prod_encode_lines(lines):
     checksums = []
     for line in lines:
-        checksums.append(zlib.adler32(line.encode("UTF-8")))
+        checksums.append(to_signed(zlib.adler32(line.encode("UTF-8"))))
 
     return checksums
 
 
-def prod_fingerprint_to_blob(checksums):
+def prod_list_to_blob(checksums):
     blob = array(CHECKUMS_ARRAY_TYPE, checksums)
     data = blob.tobytes()
     return sqlite3.Binary(data)
 
 
-def prod_blob_to_fingerprint(blob):
-    a = array(CHECKUMS_ARRAY_TYPE)
-    a.frombytes(blob)
-    return a.tolist()
+def prod_blob_to_list(blob):
+    arr = array(CHECKUMS_ARRAY_TYPE)
+    arr.frombytes(blob)
+    return arr.tolist()
 
 
 encode_lines = prod_encode_lines
-fingerprint_to_blob = prod_fingerprint_to_blob
-blob_to_fingerprint = prod_blob_to_fingerprint
+checksums_to_blob = prod_list_to_blob
+blob_to_checksums = prod_blob_to_list
 
 
 GAP_MARKS = {i: f"{i}GAP" for i in range(-1, 64)}
@@ -75,9 +91,7 @@ class Block:
         return self.code
 
     def __repr__(self):
-        return "{}-{} h: {}, n:{}, repr:{}".format(
-            self.start, self.end, self.checksum, self.name, self.code
-        )
+        return f"{self.start}-{self.end} h: {self.checksum}, n:{self.name}, repr:{self.code}"
 
     def __eq__(self, other):
         return (self.start, self.end, self.checksum, self.name) == (
@@ -92,8 +106,8 @@ class Block:
 
 
 @lru_cache(300)
-def string_checksum(s):
-    return str(zlib.adler32(s.encode("UTF-8")))
+def string_checksum(string):
+    return str(zlib.adler32(string.encode("UTF-8")))
 
 
 def _next_lineno(nodes, i, end):
@@ -105,7 +119,7 @@ def _next_lineno(nodes, i, end):
         return None
 
 
-class Module(object):
+class Module:
     def __init__(self, source_code=None, mtime=None, ext="py"):
         self._blocks = None
         self.counter = 0
@@ -134,11 +148,8 @@ class Module(object):
                         ),
                     )
                 )
-            return "%s(%s)" % (
-                class_name,
-                ", ".join((field_value for field_name, field_value in fields)),
-            )
-        elif isinstance(node, list):
+            return f"{class_name}({', '.join((field_value for field_name, field_value in fields))})"
+        if isinstance(node, list):
             representations = []
             for i, item in enumerate(node):
                 representations.append(
@@ -155,8 +166,7 @@ class Module(object):
                 )
                 self.counter += 1
                 return "transformed_into_block"
-            else:
-                return ", ".join(representations)
+            return ", ".join(representations)
         return repr(node)
 
     @property
@@ -172,7 +182,7 @@ class Module(object):
                 try:
                     tree = ast.parse(self.source_code, filename="<unknown>")
                     self.dump_and_block(tree, len(lines), name="<module>")
-                except SyntaxError as e:
+                except SyntaxError:
                     pass
             else:
                 self._blocks = [Block(1, len(lines), self.source_code)]
@@ -195,8 +205,7 @@ def match_fingerprint_source(source_code, fingerprint, ext="py"):
 def match_fingerprint(module, fingerprint):
     if set(fingerprint) - set(module.checksums):
         return False
-    else:
-        return True
+    return True
 
 
 def create_fingerprint_source(source_code, lines, ext="py"):
