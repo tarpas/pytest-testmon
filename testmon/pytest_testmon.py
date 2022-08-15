@@ -1,11 +1,13 @@
 import os
 from collections import defaultdict
+from pathlib import Path
 
 import pytest
 import pkg_resources
 import py
 
 from _pytest.config import ExitCode
+from _pytest.main import pytest_ignore_collect as _pytest_ignore_collect
 
 from testmon.testmon_core import (
     Testmon,
@@ -329,6 +331,9 @@ class TestmonSelect:
         ]
 
     def pytest_ignore_collect(self, path, config):
+        # Handle --ignore and --ignore-glob first using the upstream pytest implementation
+        if _pytest_ignore_collect(Path(path), config):
+            return True
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
         if strpath in self.deselected_files and self.config.testmon_config[2]:
             return True
