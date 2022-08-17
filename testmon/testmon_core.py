@@ -341,6 +341,7 @@ class Testmon:
         self.cov = None
         self.sub_cov_file = None
         self.setup_coverage(not ("singleprocess" in testmon_labels), cov_plugin)
+        self.is_started = False
 
     def setup_coverage(self, subprocess, cov_plugin=None):
         params = {
@@ -352,12 +353,16 @@ class Testmon:
         self.cov._warn_no_data = False
 
     def start(self):
+        if self.is_started:
+            return
+        self.is_started = True
 
         Testmon.coverage_stack.append(self.cov)
         self.cov.erase()
         self.cov.start()
 
     def stop(self):
+        self.is_started = False
         self.cov.stop()
         if Testmon.coverage_stack:
             Testmon.coverage_stack.pop()
