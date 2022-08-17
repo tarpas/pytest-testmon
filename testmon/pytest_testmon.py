@@ -3,7 +3,6 @@ from collections import defaultdict
 
 import pytest
 import pkg_resources
-import py
 
 from _pytest.config import ExitCode
 
@@ -18,21 +17,6 @@ from testmon.testmon_core import (
     LIBRARIES_KEY,
 )
 from testmon import configure
-
-
-def serialize_report(rep):
-
-    rep_dict = rep.__dict__.copy()
-    if hasattr(rep.longrepr, "toterminal"):
-        rep_dict["longrepr"] = str(rep.longrepr)
-    else:
-        rep_dict["longrepr"] = rep.longrepr
-    for name in rep_dict:
-        if isinstance(rep_dict[name], py.path.local):
-            rep_dict[name] = str(rep_dict[name])
-        elif name == "result":
-            rep_dict[name] = None
-    return rep_dict
 
 
 def pytest_addoption(parser):
@@ -226,10 +210,9 @@ def pytest_unconfigure(config):
 
 
 def process_result(result):
-
-    failed = any(r.get("outcome") == "failed" for r in result.values())
-    duration = sum(value.get("duration", 0.0) for key, value in result.items())
-    return (failed, duration)
+    failed = any(r.outcome == "failed" for r in result.values())
+    duration = sum(value.duration for value in result.values())
+    return failed, duration
 
 
 class TestmonCollect:
@@ -279,7 +262,7 @@ class TestmonCollect:
     @pytest.hookimpl
     def pytest_runtest_logreport(self, report):
 
-        self.reports[report.nodeid][report.when] = serialize_report(report)
+        self.reports[report.nodeid][report.when] = report
         if report.when == "teardown" and hasattr(report, "node_fingerprints"):
             self.testmon.save_fingerprints(
                 self.testmon_data,
@@ -287,6 +270,7 @@ class TestmonCollect:
                 report.node_fingerprints,
                 *process_result(self.reports[report.nodeid]),
             )
+            del self.reports[report.nodeid]
 
     def pytest_sessionfinish(self, session):
         if not self._is_worker:
@@ -332,7 +316,6 @@ class TestmonSelect:
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
         if strpath in self.deselected_files and self.config.testmon_config[2]:
             return True
-        return False
 
     @pytest.mark.trylast
     def pytest_collection_modifyitems(self, session, config, items):
