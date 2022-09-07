@@ -3,13 +3,9 @@ import os
 import sqlite3
 
 from collections import namedtuple
+from functools import lru_cache
 
-from testmon.process_code import (
-    blob_to_checksums,
-    checksums_to_blob,
-    Fingerprint,
-    Fingerprints,
-)
+from testmon.process_code import blob_to_checksums, checksums_to_blob
 
 DATA_VERSION = 0
 
@@ -18,12 +14,26 @@ ChangedFileData = namedtuple(
 )
 
 
+class CachedProperty:
+    def __init__(self, func):
+        self.__doc__ = getattr(func, "__doc__")
+        self.func = func
+
+    def __get__(self, obj, cls):
+        if obj is None:
+            return self
+        value = obj.__dict__[self.func.__name__] = self.func(obj)
+        return value
+
+
 class TestmonDbException(Exception):
     pass
 
 
-def connect(datafile):
-    connection = sqlite3.connect(datafile)
+def connect(datafile, readonly=False):
+    connection = sqlite3.connect(
+        f"file:{datafile}{'?mode=ro' if readonly else''}", uri=True
+    )
 
     connection.execute("PRAGMA synchronous = OFF")
     connection.execute("PRAGMA foreign_keys = TRUE ")
@@ -69,7 +79,7 @@ class DB:
                 "UPDATE fingerprint SET mtime=?, checksum=? WHERE id = ?", new_mtimes
             )
 
-    def remove_unused_fingerprints(self):
+    def remove_unused_file_fps(self):
         with self.con as con:
             con.execute(
                 """
@@ -80,7 +90,7 @@ class DB:
                 """
             )
 
-    def fetch_or_create_fingerprint(self, filename, mtime, checksum, method_checksums):
+    def fetch_or_create_file_fp(self, filename, mtime, checksum, method_checksums):
         cursor = self.con.cursor()
         try:
             cursor.execute(
@@ -112,39 +122,41 @@ class DB:
             self.update_mtimes([(mtime, checksum, fingerprint_id)])
         return fingerprint_id
 
-    def insert_node_fingerprints(
-        self, nodeid, fingerprints, failed=False, duration=None
-    ):
+    def insert_node_file_fps(self, nodes_fingerprints, fa_durs=None):
+        if fa_durs is None:
+            fa_durs = {}
         with self.con as con:
             cursor = con.cursor()
-            cursor.execute(
-                """
-                INSERT OR REPLACE INTO node
-                (environment, name, duration, failed)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    self.env,
-                    nodeid,
-                    duration,
-                    1 if failed else 0,
-                ),
-            )
-            node_id = cursor.lastrowid
-
-            # record: Fingerprint
-            for record in fingerprints:
-                fingerprint_id = self.fetch_or_create_fingerprint(
-                    record["filename"],
-                    record["mtime"],
-                    record["checksum"],
-                    checksums_to_blob(record["method_checksums"]),
-                )
-
+            for nodeid in nodes_fingerprints:
+                fingerprints = nodes_fingerprints[nodeid]
+                failed, duration = fa_durs.get(nodeid, (0, None))
                 cursor.execute(
-                    "INSERT INTO node_fingerprint VALUES (?, ?)",
-                    (node_id, fingerprint_id),
+                    """
+                    INSERT OR REPLACE INTO node
+                    (environment, name, duration, failed)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        self.env,
+                        nodeid,
+                        duration,
+                        1 if failed else 0,
+                    ),
                 )
+                node_id = cursor.lastrowid
+
+                for record in fingerprints:
+                    fingerprint_id = self.fetch_or_create_file_fp(
+                        record["filename"],
+                        record["mtime"],
+                        record["checksum"],
+                        checksums_to_blob(record["method_checksums"]),
+                    )
+
+                    cursor.execute(
+                        "INSERT INTO node_fingerprint VALUES (?, ?)",
+                        (node_id, fingerprint_id),
+                    )
 
     def _fetch_data_version(self):
         con = self.con
@@ -172,10 +184,16 @@ class DB:
     def init_tables(self):
         connection = self.con
 
-        connection.execute("CREATE TABLE metadata (dataid TEXT PRIMARY KEY, data TEXT)")
-
-        connection.execute(
+        connection.executescript(
             """
+            CREATE TABLE metadata (dataid TEXT PRIMARY KEY, data TEXT);
+
+            CREATE TABLE environment (
+                id INTEGER PRIMARY KEY ASC,
+                name TEXT,
+                libraries TEXT
+            );
+
             CREATE TABLE node (
                 id INTEGER PRIMARY KEY ASC,
                 environment TEXT,
@@ -183,23 +201,15 @@ class DB:
                 duration FLOAT,
                 failed BIT,
                 UNIQUE (environment, name)
-            )
-            """
-        )
+            );
 
-        connection.execute(
-            """
             CREATE TABLE node_fingerprint (
                 node_id INTEGER,
                 fingerprint_id INTEGER,
                 FOREIGN KEY(node_id) REFERENCES node(id) ON DELETE CASCADE,
                 FOREIGN KEY(fingerprint_id) REFERENCES fingerprint(id)
-            )
-            """
-        )
+            );
 
-        connection.execute(
-            """
             CREATE table fingerprint
             (
                 id INTEGER PRIMARY KEY,
@@ -208,7 +218,7 @@ class DB:
                 mtime FLOAT,
                 checksum TEXT,
                 UNIQUE (filename, method_checksums)
-            )
+            );
             """
         )
 
@@ -278,6 +288,7 @@ class DB:
             )
         }
 
+    @lru_cache(128)
     def filenames_fingerprints(self):
         cursor = self.con.execute(
             """

@@ -1,18 +1,26 @@
 import sys
 import re
 
-from coverage.tracer import CTracer
+try:
+    from coverage.tracer import CTracer as Tracer
+except ImportError:
+    from coverage.pytracer import PyTracer as Tracer
+
+
+def _is_dogfooding(coverage_stack):
+    return coverage_stack
 
 
 def _is_debugger():
-    return sys.gettrace() and not isinstance(sys.gettrace(), CTracer)
+    return sys.gettrace() and not isinstance(sys.gettrace(), Tracer)
 
 
 def _is_coverage():
-    return isinstance(sys.gettrace(), CTracer)
+    return False
 
 
 def _deactivate_on_xdist(options):
+    return False
     return (
         options.get("numprocesses", False)
         or options.get("distload", False)
@@ -53,6 +61,9 @@ def _get_nocollect_reasons(
 ):
     if options["testmon_nocollect"]:
         return [None]
+
+    if cov_plugin:
+        return []
 
     if coverage and not dogfooding:
         return ["coverage.py was detected and simultaneous collection is not supported"]
@@ -141,6 +152,7 @@ def header_collect_select(config, coverage_stack, cov_plugin=None):
         options,
         debugger=_is_debugger(),
         coverage=_is_coverage(),
+        dogfooding=_is_dogfooding(coverage_stack),
         xdist=_deactivate_on_xdist(options),
         cov_plugin=cov_plugin,
     )

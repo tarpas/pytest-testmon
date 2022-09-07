@@ -14,22 +14,6 @@ except ImportError:
     from coverage.misc import NoSource
 
 
-try:
-    from typing import TypedDict, List
-
-    class Fingerprint(TypedDict):
-        # filename: str
-        mtime = None
-        checksum = None
-        method_checksums = None
-        fingerprint_id = None
-
-except ImportError:
-    Fingerprint = dict
-
-Fingerprints = [Fingerprint]
-
-
 CHECKUMS_ARRAY_TYPE = "i"
 
 
@@ -135,7 +119,7 @@ class Module:
             fields = []
             for field_name, field_value in ast.iter_fields(node):
                 transform_into_block = (
-                    class_name in ("FunctionDef", "Module")
+                    class_name in ("AsyncFunctionDef", "FunctionDef", "Module")
                 ) and field_name == "body"
                 fields.append(
                     (

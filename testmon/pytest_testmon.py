@@ -1,4 +1,5 @@
 import os
+import xmlrpc
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -15,6 +16,7 @@ from testmon.testmon_core import (
     TestmonException,
     get_node_class_name,
     get_node_module_name,
+    nofili2fingerprints,
     LIBRARIES_KEY,
 )
 from testmon import configure
@@ -93,6 +95,7 @@ def pytest_addoption(parser):
     )
 
     parser.addini("environment_expression", "environment expression", default="")
+    parser.addini("testmon_port", "testmon port", default="")
 
 
 def testmon_options(config):
@@ -111,13 +114,34 @@ def init_testmon_data(config, read_source=True):
     environment = config.getoption("environment_expression") or eval_environment(
         config.getini("environment_expression")
     )
+    remote_port = config.getini("testmon_port")
+
+    rpc_client = None
+    if remote_port:
+        url = f"http://localhost:{remote_port}"
+        print(f"using remote server at {url}")
+        rpc_client = xmlrpc.client.ServerProxy(url, allow_none=True)
+
     libraries = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
     testmon_data = TestmonData(
-        config.rootdir.strpath, environment=environment, libraries=libraries
+        config.rootdir.strpath,
+        environment=environment,
+        libraries=libraries,
+        rpc=rpc_client,
     )
     if read_source:
         testmon_data.determine_stable()
     config.testmon_data = testmon_data
+
+
+def parallelism_status(config):
+    if hasattr(config, "workerinput"):
+        return "worker"
+
+    if getattr(config.option, "dist", "no") == "no":
+        return "single"
+
+    return "controller"
 
 
 def register_plugins(config, should_select, should_collect, cov_plugin):
@@ -135,6 +159,7 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
                     cov_plugin=cov_plugin,
                 ),
                 config.testmon_data,
+                host=parallelism_status(config),
             ),
             "TestmonCollect",
         )
@@ -142,8 +167,15 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
 
 def pytest_configure(config):
     coverage_stack = None
+    try:
+        from tmnet.testmon_core import Testmon as UberTestmon
+
+        coverage_stack = UberTestmon.coverage_stack
+    except ImportError:
+        pass
 
     cov_plugin = None
+    cov_plugin = config.pluginmanager.get_plugin("_cov")
 
     message, should_collect, should_select = configure.header_collect_select(
         config, coverage_stack, cov_plugin=cov_plugin
@@ -196,7 +228,10 @@ def pytest_report_header(config):
             )
 
         if show_survey_notification:
-            message += "\nWe'd like to hear from testmon users! Please go to https://testmon.org/survey to leave feedback."
+            message += (
+                "\nWe'd like to hear from testmon users! "
+                "🙏🙏 go to https://testmon.org/survey to leave feedback ✅❌"
+            )
 
     return message
 
@@ -239,13 +274,14 @@ def process_result(result):
 
 
 class TestmonCollect:
-    def __init__(self, testmon, testmon_data, is_worker=None):
+    def __init__(self, testmon, testmon_data, host="single", cov_plugin=None):
         self.testmon_data = testmon_data
         self.testmon = testmon
-        self._is_worker = is_worker
+        self._host = host
 
         self.reports = defaultdict(lambda: {})
         self.raw_nodeids = []
+        self.cov_plugin = cov_plugin
 
     @pytest.hookimpl(tryfirst=True, hookwrapper=True)
     def pytest_pycollect_makeitem(self, collector, name, obj):
@@ -261,15 +297,17 @@ class TestmonCollect:
     @pytest.hookimpl(tryfirst=True)
     def pytest_collection_modifyitems(self, session, config, items):
         should_sync = not session.testsfailed
+        if getattr(config, "workerinput", {}).get("workerid", "gw0") != "gw0":
+            should_sync = False
         if should_sync:
             config.testmon_data.sync_db_fs_nodes(retain=set(self.raw_nodeids))
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_protocol(self, item, nextitem):
-        self.testmon.start()
+        self.testmon.start_testmon(item.nodeid, nextitem.nodeid if nextitem else None)
         result = yield
         if result.excinfo and issubclass(result.excinfo[0], BaseException):
-            self.testmon.stop()
+            self.testmon.discard_current()
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_makereport(self, item, call):
@@ -277,27 +315,43 @@ class TestmonCollect:
 
         if call.when == "teardown":
             report = result.get_result()
-            report.node_fingerprints = self.testmon.stop_and_process(
-                self.testmon_data, item.nodeid
-            )
+            report.nodes_files_lines = self.testmon.get_batch_coverage_data()
             result.force_result(report)
 
     @pytest.hookimpl
     def pytest_runtest_logreport(self, report):
+        if self._host == "worker":
+            return
 
         self.reports[report.nodeid][report.when] = report
-        if report.when == "teardown" and hasattr(report, "node_fingerprints"):
-            self.testmon.save_fingerprints(
-                self.testmon_data,
-                report.nodeid,
-                report.node_fingerprints,
-                *process_result(self.reports[report.nodeid]),
+        if report.when == "teardown" and hasattr(report, "nodes_files_lines"):
+            nodes_fingerprints = nofili2fingerprints(
+                report.nodes_files_lines, self.testmon_data
             )
-            del self.reports[report.nodeid]
+            fa_durs = {
+                nodeid: process_result(self.reports[nodeid])
+                for nodeid in nodes_fingerprints
+            }
+            self.testmon_data.db.insert_node_file_fps(nodes_fingerprints, fa_durs)
+
+    def pytest_keyboard_interrupt(self, excinfo):
+        if self._host == "single":
+
+            nodes_files_lines = self.testmon.get_batch_coverage_data()
+
+            nodes_fingerprints = nofili2fingerprints(
+                nodes_files_lines, self.testmon_data
+            )
+            fa_durs = {
+                nodeid: process_result(self.reports[nodeid])
+                for nodeid in nodes_fingerprints
+            }
+            self.testmon_data.db.insert_node_file_fps(nodes_fingerprints, fa_durs)
+            self.testmon.close()
 
     def pytest_sessionfinish(self, session):
-        if not self._is_worker:
-            self.testmon_data.db.remove_unused_fingerprints()
+        if self._host in ("single", "controller"):
+            self.testmon_data.db.remove_unused_file_fps()
         self.testmon.close()
 
 
@@ -339,6 +393,7 @@ class TestmonSelect:
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
         if strpath in self.deselected_files and self.config.testmon_config[2]:
             return True
+        return None
 
     @pytest.mark.trylast
     def pytest_collection_modifyitems(self, session, config, items):
