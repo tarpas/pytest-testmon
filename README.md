@@ -1,3 +1,4 @@
+<br>
 <img src=https://user-images.githubusercontent.com/135344/189406660-601f16b2-2bb1-4f4d-a764-f7ceed093cb7.svg width=400>
 
 This is a pytest plug-in which automatically selects and re-executes
