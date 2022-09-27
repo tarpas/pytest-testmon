@@ -1,5 +1,6 @@
 import os
 from collections import defaultdict
+from datetime import date, timedelta
 
 import pytest
 import pkg_resources
@@ -17,6 +18,8 @@ from testmon.testmon_core import (
     LIBRARIES_KEY,
 )
 from testmon import configure
+
+SURVEY_NOTIFICATION_INTERVAL = timedelta(days=28)
 
 
 def pytest_addoption(parser):
@@ -174,6 +177,26 @@ def pytest_report_header(config):
             stable_files,
             unstable_files,
         )
+
+        show_survey_notification = True
+        last_notification_date = config.testmon_data.db._fetch_attribute(
+            "last_survey_notification_date"
+        )
+        if last_notification_date:
+            last_notification_date = date.fromisoformat(last_notification_date)
+            if date.today() - last_notification_date < SURVEY_NOTIFICATION_INTERVAL:
+                show_survey_notification = False
+            else:
+                config.testmon_data.db._write_attribute(
+                    "last_survey_notification_date", date.today().isoformat()
+                )
+        else:
+            config.testmon_data.db._write_attribute(
+                "last_survey_notification_date", date.today().isoformat()
+            )
+
+        if show_survey_notification:
+            message += "\nWe'd like to hear from testmon users! Please go to https://testmon.org/survey to leave feedback."
 
     return message
 
