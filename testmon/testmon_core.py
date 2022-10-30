@@ -448,7 +448,7 @@ class Testmon:
 
         nodes_files_lines = {}
 
-        if (
+        if self.cov and (
             len(self.batched_nodeids) >= TEST_BATCH_SIZE
             or self._next_nodeid is None
             or self._interrupted_at
