@@ -5,6 +5,7 @@ import sys
 import textwrap
 from functools import lru_cache
 from collections import defaultdict
+
 import pkg_resources
 import pytest
 from coverage import Coverage, CoverageData
@@ -20,8 +21,8 @@ from testmon.process_code import (
 )
 from testmon.process_code import Module
 
-TEST_BATCH_SIZE = 100
 
+TEST_BATCH_SIZE = 100
 
 LIBRARIES_KEY = "/libraries_checksum_testmon_name"
 
@@ -340,7 +341,9 @@ class Testmon:
 
     def __init__(self, rootdir="", testmon_labels=None, cov_plugin=None):
         try:
-            from testmon.testmon_core import Testmon as UberTestmon
+            from testmon.testmon_core import (
+                Testmon as UberTestmon,
+            )
 
             Testmon.coverage_stack = UberTestmon.coverage_stack
         except ImportError:
@@ -488,7 +491,7 @@ class Testmon:
             for lineno, contexts in contexts_by_lineno.items():
                 for context in contexts:
                     nodes_files_lines.setdefault(context, {}).setdefault(
-                        relfilename, set()
+                        relfilename.replace(os.sep, "/"), set()
                     ).add(lineno)
                     files_lines.setdefault(file, set()).add(lineno)
         nodes_files_lines.pop(dont_include, None)

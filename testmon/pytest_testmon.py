@@ -168,7 +168,9 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
 def pytest_configure(config):
     coverage_stack = None
     try:
-        from tmnet.testmon_core import Testmon as UberTestmon
+        from tmnet.testmon_core import (
+            Testmon as UberTestmon,
+        )
 
         coverage_stack = UberTestmon.coverage_stack
     except ImportError:
@@ -336,7 +338,6 @@ class TestmonCollect:
 
     def pytest_keyboard_interrupt(self, excinfo):
         if self._host == "single":
-
             nodes_files_lines = self.testmon.get_batch_coverage_data()
 
             nodes_fingerprints = nofili2fingerprints(
@@ -369,7 +370,6 @@ def get_failing(all_nodes):
 
 
 def sort_items_by_duration(items, avg_durations):
-
     items.sort(key=lambda item: avg_durations[item.nodeid])
     items.sort(key=lambda item: avg_durations[get_node_class_name(item.nodeid)])
     items.sort(key=lambda item: avg_durations[get_node_module_name(item.nodeid)])
@@ -395,7 +395,7 @@ class TestmonSelect:
             return True
         return None
 
-    @pytest.mark.trylast
+    @pytest.hookimpl(trylast=True)
     def pytest_collection_modifyitems(self, session, config, items):
         selected = []
         deselected = []
