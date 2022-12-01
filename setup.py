@@ -8,7 +8,7 @@ setup(
     name="pytest-testmon",
     description="selects tests affected by changed files and methods",
     long_description=long_description,
-    version="1.0.2.post10",
+    version="1.0.2.post11",
     license="AGPL",
     platforms=["linux", "osx", "win32"],
     packages=["testmon",],
@@ -19,7 +19,7 @@ setup(
         "pytest11": ["testmon = testmon.pytest_testmon",],
         "tox": ["testmon = testmon.tox_testmon",],
     },
-    install_requires=["pytest>=3,<6", "coverage>=4,<6"],
+    install_requires=["pytest>=3,<8", "coverage>=4,<6"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
