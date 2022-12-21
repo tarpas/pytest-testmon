@@ -502,12 +502,6 @@ class Testmon:
                 nodes_files_lines[nodeid].setdefault(home_file(nodeid), {1})
         return nodes_files_lines, files_lines
 
-    @staticmethod
-    def save_fingerprints(testmon_data, nodeid, node_fingerprints, failed, duration):
-        testmon_data.db.insert_node_file_fps(
-            nodeid, node_fingerprints, failed, duration
-        )
-
     def close(self):
         if self.cov is None:
             return
