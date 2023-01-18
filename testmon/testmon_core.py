@@ -112,15 +112,9 @@ def split_filter(disk, function, records):
     return first, second
 
 
-def get_measured_relfiles(rootdir, test_file, lines_data=None):
-    files = {test_file: set([1])}
-    for filename, lines in lines_data.items():
-        if not is_python_file(filename):
-            continue
-        relfilename = cached_relpath(filename, rootdir)
-        if lines:
-            files[relfilename] = lines
-    return files
+@lru_cache(maxsize=1000)
+def should_include(cov, filename):
+    return cov._should_trace(str(filename), None).trace
 
 
 class TestmonData:
@@ -417,14 +411,6 @@ class Testmon:
 
         self.start_cov()
 
-    class DummyFrame:
-        f_globals = None
-
-    @lru_cache(1000)
-    def filter_parent(self, parent_cov, filename):
-        check_include_omit_etc = parent_cov._inorout.check_include_omit_etc
-        return check_include_omit_etc(filename, self.DummyFrame)
-
     def start_testmon(self, nodeid, next_nodeid=None):
         self._next_nodeid = next_nodeid
 
@@ -468,7 +454,7 @@ class Testmon:
                 filtered_lines_data = {
                     file: data
                     for file, data in lines_data.items()
-                    if not self.filter_parent(Testmon.coverage_stack[-2], file)
+                    if should_include(Testmon.coverage_stack[-2], file)
                 }
                 Testmon.coverage_stack[-2].get_data().add_lines(filtered_lines_data)
 
