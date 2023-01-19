@@ -327,7 +327,7 @@ def get_node_module_name(node_id):
 
 @lru_cache(1000)
 def cached_relpath(path, basepath):
-    return os.path.relpath(path, basepath)
+    return os.path.relpath(path, basepath).replace(os.sep, "/")
 
 
 class Testmon:
@@ -477,7 +477,7 @@ class Testmon:
             for lineno, contexts in contexts_by_lineno.items():
                 for context in contexts:
                     nodes_files_lines.setdefault(context, {}).setdefault(
-                        relfilename.replace(os.sep, "/"), set()
+                        relfilename, set()
                     ).add(lineno)
                     files_lines.setdefault(file, set()).add(lineno)
         nodes_files_lines.pop(dont_include, None)

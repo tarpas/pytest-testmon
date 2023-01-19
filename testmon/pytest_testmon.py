@@ -1,4 +1,3 @@
-import os
 import xmlrpc
 from collections import defaultdict
 from datetime import date, timedelta
@@ -18,6 +17,7 @@ from testmon.testmon_core import (
     get_node_module_name,
     nofili2fingerprints,
     LIBRARIES_KEY,
+    cached_relpath,
 )
 from testmon import configure
 
@@ -390,7 +390,7 @@ class TestmonSelect:
         ]
 
     def pytest_ignore_collect(self, path, config):
-        strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
+        strpath = cached_relpath(path.strpath, config.rootdir.strpath)
         if strpath in self.deselected_files and self.config.testmon_config[2]:
             return True
         return None
