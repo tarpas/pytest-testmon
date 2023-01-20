@@ -10,21 +10,18 @@ import pkg_resources
 import pytest
 from coverage import Coverage, CoverageData
 
-from testmon.db import CachedProperty
 from testmon import db
 from testmon.process_code import (
     read_file_with_checksum,
     match_fingerprint,
     create_fingerprint,
-    encode_lines,
+    methods_to_checksums,
     string_checksum,
+    Module,
 )
-from testmon.process_code import Module
 
 
 TEST_BATCH_SIZE = 100
-
-LIBRARIES_KEY = "/libraries_checksum_testmon_name"
 
 CHECKUMS_ARRAY_TYPE = "I"
 DB_FILENAME = ".testmondata"
@@ -42,8 +39,8 @@ def _get_python_lib_paths():
     return [os.path.join(d, "*") for d in res]
 
 
-def home_file(node_name):
-    return node_name.split("::", 1)[0]
+def home_file(test_execution_name):
+    return test_execution_name.split("::", 1)[0]
 
 
 def is_python_file(file_path):
@@ -55,9 +52,9 @@ class TestmonException(Exception):
 
 
 class SourceTree:
-    def __init__(self, rootdir="", libraries=None):
+    def __init__(self, rootdir="", packages=None):
         self.rootdir = rootdir
-        self.libraries = libraries
+        self.packages = packages
         self.cache = {}
 
     def get_file(self, filename):
@@ -68,7 +65,10 @@ class SourceTree:
             if checksum:
                 fs_mtime = os.path.getmtime(os.path.join(self.rootdir, filename))
                 self.cache[filename] = Module(
-                    source_code=code, mtime=fs_mtime, ext=filename.rsplit(".", 1)[1]
+                    source_code=code,
+                    mtime=fs_mtime,
+                    ext=filename.rsplit(".", 1)[1],
+                    fs_checksum=checksum,
                 )
             else:
                 self.cache[filename] = None
@@ -118,30 +118,45 @@ def should_include(cov, filename):
 
 
 class TestmonData:
-    def __init__(self, rootdir="", environment=None, libraries=None, rpc=None):
-
+    def __init__(
+        self,
+        rootdir="",
+        environment=None,
+        system_packages=None,
+        remote_db=None,
+        datafile=None,
+        python_version=None,
+    ):
         self.environment = environment if environment else "default"
         self.rootdir = rootdir
         self.unstable_files = None
         self.source_tree = SourceTree(rootdir=self.rootdir)
-        if libraries is None:
-            libraries = ", ".join(
+        if system_packages is None:
+            system_packages = ", ".join(
                 sorted(str(p) for p in pkg_resources.working_set or [])
             )
-
-        self.libraries = libraries
-
         self.connection = None
-        self.datafile = get_data_file_path(self.rootdir)
-        if rpc:
-            self.db = rpc
-        else:
-            self.db = db.DB(self.datafile, self.environment)
+        self.datafile = datafile or get_data_file_path(self.rootdir)
+        self.remote_db = None
 
-        self.libraries_miss = set()
-        self.unstable_nodeids = set()
+        if remote_db:
+            self.db = remote_db
+        else:
+            self.db = db.DB(self.datafile)
+
+        if not python_version:
+            python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        result = self.db.initiate_execution(
+            self.environment, system_packages, python_version
+        )
+
+        self.exec_id = result["exec_id"]
+        self.all_files = set(result["filenames"])
+
+        self.system_packages_change = result["packages_changed"]
+        self.unstable_test_names = set()
         self.unstable_files = set()
-        self.stable_nodeids = set()
+        self.stable_test_names = set()
         self.stable_files = set()
 
     def close_connection(self):
@@ -149,21 +164,17 @@ class TestmonData:
             self.connection.close()
 
     @property
-    def all_files(self):
-        return {row["filename"] for row in self.db.filenames_fingerprints()}
+    def all_tests(self):
+        return self.db.all_test_executions(self.exec_id)
 
-    @CachedProperty
-    def all_nodes(self):
-        return self.db.all_nodes()
+    def get_tests_fingerprints(self, files_lines):
+        tests_fingerprints = []
 
-    def get_nodes_fingerprints(self, measured_files):
-        nodes_fingerprints = []
-
-        for filename, covered in measured_files.items():
+        for filename, covered in files_lines.items():
             if os.path.exists(os.path.join(self.rootdir, filename)):
                 module = self.source_tree.get_file(filename)
                 fingerprint = create_fingerprint(module, covered)
-                nodes_fingerprints.append(
+                tests_fingerprints.append(
                     {
                         "filename": filename,
                         "mtime": module.mtime,
@@ -171,132 +182,130 @@ class TestmonData:
                         "method_checksums": fingerprint,
                     }
                 )
-        return nodes_fingerprints
+        return tests_fingerprints
 
-    def sync_db_fs_nodes(self, retain):
-        collected = retain.union(set(self.stable_nodeids))
+    def sync_db_fs_tests(self, retain):
+        collected = retain.union(set(self.stable_test_names))
         with self.db as database:
-            add = collected - set(self.all_nodes)
+            add = collected - set(self.all_tests)
 
-            for nodeid in add:
-                if is_python_file(home_file(nodeid)):
-                    database.insert_node_file_fps(
-                        {
-                            nodeid: (
-                                {
-                                    "filename": home_file(nodeid),
-                                    "method_checksums": encode_lines(["0match"]),
-                                    "mtime": None,
-                                    "checksum": None,
-                                },
-                            )
-                        },
-                    )
-            database.delete_nodes(list(set(self.all_nodes) - collected))
+            test_execution_file_fps = {
+                test_name: (
+                    {
+                        "filename": home_file(test_name),
+                        "method_checksums": methods_to_checksums(["0match"]),
+                        "mtime": None,
+                        "checksum": None,
+                    },
+                )
+                for test_name in add
+                if is_python_file(home_file(test_name))
+            }
+            if test_execution_file_fps:
+                self.save_test_execution_file_fps(test_execution_file_fps)
 
-    def run_filters(self, filenames_fingerprints):
-
-        library_misses = []
-        mtime_misses = []
-
-        for record in filenames_fingerprints:
-            if record["filename"] == LIBRARIES_KEY:
-                if record["checksum"] != self.libraries:
-                    library_misses.append(record)
-            else:
-                if not check_mtime(self.source_tree, record):
-                    mtime_misses.append(record)
-
-        checksum_hits, checksum_misses = split_filter(
-            self.source_tree, check_checksum, mtime_misses
-        )
-
-        changed_file_data = self.db.get_changed_file_data(
-            [
-                checksum_miss["fingerprint_id"]
-                for checksum_miss in (checksum_misses + library_misses)
-            ],
-        )
-
-        fingerprint_hits, fingerprint_misses = split_filter(
-            self.source_tree, check_fingerprint, changed_file_data
-        )
-
-        return (
-            fingerprint_hits,
-            fingerprint_misses,
-            checksum_hits,
-            library_misses,
-        )
+            to_delete = list(set(self.all_tests) - collected)
+            database.delete_test_executions(to_delete, self.exec_id)
 
     def determine_stable(self):
 
-        filenames_fingerprints = self.db.filenames_fingerprints()
+        files_checksums = {}
+        for filename in self.all_files:
+            module = self.source_tree.get_file(filename)
+            if module:
+                files_checksums[filename] = module.fs_checksum
 
-        (
-            fingerprint_hits,
-            fingerprint_misses,
-            checksum_hits,
-            libraries_miss,
-        ) = self.run_filters(filenames_fingerprints)
+        new_changed_file_data = self.db.new_fetch_changed_file_data(
+            files_checksums, self.exec_id
+        )
 
-        self.libraries_miss = libraries_miss
-        self.unstable_nodeids = set()
+        filenames_fingerprints = self.db.filenames_fingerprints(self.exec_id)
+
+        _, checksum_misses = split_filter(
+            self.source_tree, check_checksum, filenames_fingerprints
+        )
+
+        changed_file_data = self.db.fetch_changed_file_data(
+            [checksum_miss["fingerprint_id"] for checksum_miss in (checksum_misses)],
+            self.exec_id,
+        )
+
+        _, fingerprint_misses = split_filter(
+            self.source_tree, check_fingerprint, changed_file_data
+        )
+
+        _, new_fingerprint_misses = split_filter(
+            self.source_tree, check_fingerprint, new_changed_file_data
+        )
+
+        fingerprint_misses = new_fingerprint_misses
+
+        self.unstable_test_names = set()
         self.unstable_files = set()
 
         for fingerprint_miss in fingerprint_misses:
-            self.unstable_nodeids.add(fingerprint_miss[1])
+            self.unstable_test_names.add(fingerprint_miss[1])
             self.unstable_files.add(fingerprint_miss[1].split("::", 1)[0])
 
-        self.stable_nodeids = set(self.all_nodes) - self.unstable_nodeids
-        self.stable_files = self.all_files - self.unstable_files
+        self.stable_test_names = set(self.all_tests) - self.unstable_test_names
+        self.stable_files = set(self.all_files) - self.unstable_files
 
-        self.db.update_mtimes(list(get_new_mtimes(self.source_tree, checksum_hits)))
-        self.db.update_mtimes(list(get_new_mtimes(self.source_tree, fingerprint_hits)))
+        _, new_fingerprint_misses = split_filter(
+            self.source_tree, check_fingerprint, new_changed_file_data
+        )
+
+        assert fingerprint_misses == new_fingerprint_misses
 
     @property
     def avg_durations(self):
-        stats = defaultdict(lambda: {"node_count": 0, "sum_duration": 0})
+        stats = defaultdict(lambda: {"test_execution": 0, "sum_duration": 0})
 
-        for node_id, report in self.all_nodes.items():
+        for (
+            test_execution_id,
+            report,
+        ) in self.all_tests.items():
             if report:
-                class_name = get_node_class_name(node_id)
-                module_name = get_node_module_name(node_id)
+                class_name = get_test_execution_class_name(test_execution_id)
+                module_name = get_test_execution_module_name(test_execution_id)
 
-                stats[node_id]["node_count"] += 1
-                stats[node_id]["sum_duration"] = report.get("duration") or 0
+                stats[test_execution_id]["test_execution"] += 1
+                stats[test_execution_id]["sum_duration"] = report.get("duration") or 0
                 if class_name:
-                    stats[class_name]["node_count"] += 1
-                    stats[class_name]["sum_duration"] += stats[node_id]["sum_duration"]
-                stats[module_name]["node_count"] += 1
-                stats[module_name]["sum_duration"] += stats[node_id]["sum_duration"]
+                    stats[class_name]["test_execution"] += 1
+                    stats[class_name]["sum_duration"] += stats[test_execution_id][
+                        "sum_duration"
+                    ]
+                stats[module_name]["test_execution"] += 1
+                stats[module_name]["sum_duration"] += stats[test_execution_id][
+                    "sum_duration"
+                ]
 
         durations = defaultdict(lambda: 0)
         for key, stats in stats.items():
-            durations[key] = stats["sum_duration"] / stats["node_count"]
+            durations[key] = stats["sum_duration"] / stats["test_execution"]
 
         return durations
+
+    def save_test_execution_file_fps(self, test_executions_fingerprints, fa_durs=None):
+        if self.remote_db:
+            self.remote_db.tmnet_insert_test_files_fps(
+                test_executions_fingerprints, fa_durs
+            )
+        self.db.insert_test_file_fps(
+            test_executions_fingerprints, fa_durs, self.exec_id
+        )
 
 
 def nofili2fingerprints(nodes_files_lines, testmon_data):
 
-    nodes_fingerprints = {}
+    test_executions_fingerprints = {}
     for context in nodes_files_lines:
-        node_fingerprints = testmon_data.get_nodes_fingerprints(
+        node_fingerprints = testmon_data.get_tests_fingerprints(
             nodes_files_lines[context]
         )
 
-        node_fingerprints.append(
-            {
-                "filename": LIBRARIES_KEY,
-                "checksum": testmon_data.libraries,
-                "mtime": None,
-                "method_checksums": encode_lines([testmon_data.libraries]),
-            }
-        )
-
-        nodes_fingerprints[context] = node_fingerprints
-    return nodes_fingerprints
+        test_executions_fingerprints[context] = node_fingerprints
+    return test_executions_fingerprints
 
 
 def get_new_mtimes(filesystem, hits):
@@ -315,13 +324,13 @@ def get_new_mtimes(filesystem, hits):
                 ]
 
 
-def get_node_class_name(node_id):
+def get_test_execution_class_name(node_id):
     if len(node_id.split("::")) > 2:
         return node_id.split("::")[1]
     return None
 
 
-def get_node_module_name(node_id):
+def get_test_execution_module_name(node_id):
     return node_id.split("::")[0]
 
 
@@ -330,7 +339,7 @@ def cached_relpath(path, basepath):
     return os.path.relpath(path, basepath).replace(os.sep, "/")
 
 
-class Testmon:
+class TestmonCollector:
     coverage_stack = []
 
     def __init__(self, rootdir="", testmon_labels=None, cov_plugin=None):
@@ -339,7 +348,7 @@ class Testmon:
                 Testmon as UberTestmon,
             )
 
-            Testmon.coverage_stack = UberTestmon.coverage_stack
+            TestmonCollector.coverage_stack = UberTestmon.coverage_stack
         except ImportError:
             pass
         if testmon_labels is None:
@@ -349,31 +358,31 @@ class Testmon:
         self.cov = None
         self.sub_cov_file = None
         self.cov_plugin = cov_plugin
-        self._nodeid = None
-        self._next_nodeid = None
-        self.batched_nodeids = set()
+        self._test_name = None
+        self._next_test_name = None
+        self.batched_test_names = set()
         self.check_stack = []
         self.is_started = False
         self._interrupted_at = None
 
     def start_cov(self):
         if not self.cov._started:
-            Testmon.coverage_stack.append(self.cov)
+            TestmonCollector.coverage_stack.append(self.cov)
             self.cov.start()
 
     def stop_cov(self):
         if self.cov is None:
             return
-        assert self.cov in Testmon.coverage_stack
-        if Testmon.coverage_stack:
-            while Testmon.coverage_stack[-1] != self.cov:
-                cov = Testmon.coverage_stack.pop()
+        assert self.cov in TestmonCollector.coverage_stack
+        if TestmonCollector.coverage_stack:
+            while TestmonCollector.coverage_stack[-1] != self.cov:
+                cov = TestmonCollector.coverage_stack.pop()
                 cov.stop()
         if self.cov._started:
             self.cov.stop()
-            Testmon.coverage_stack.pop()
-        if Testmon.coverage_stack:
-            Testmon.coverage_stack[-1].start()
+            TestmonCollector.coverage_stack.pop()
+        if TestmonCollector.coverage_stack:
+            TestmonCollector.coverage_stack[-1].start()
 
     def setup_coverage(self, subprocess=False):
         params = {
@@ -383,7 +392,7 @@ class Testmon:
 
         if self.cov_plugin and self.cov_plugin._started:
             cov = self.cov_plugin.cov_controller.cov
-            Testmon.coverage_stack.append(cov)
+            TestmonCollector.coverage_stack.append(cov)
             if cov.config.source:
                 params["include"] = list(
                     set(
@@ -406,40 +415,40 @@ class Testmon:
 
         self.cov = Coverage(data_file=self.sub_cov_file, config_file=False, **params)
         self.cov._warn_no_data = False
-        if Testmon.coverage_stack:
-            Testmon.coverage_stack[-1].stop()
+        if TestmonCollector.coverage_stack:
+            TestmonCollector.coverage_stack[-1].stop()
 
         self.start_cov()
 
-    def start_testmon(self, nodeid, next_nodeid=None):
-        self._next_nodeid = next_nodeid
+    def start_testmon(self, test_name, next_test_name=None):
+        self._next_test_name = next_test_name
 
-        self.batched_nodeids.add(nodeid)
+        self.batched_test_names.add(test_name)
         if self.cov is None:
             self.setup_coverage()
 
         self.start_cov()
-        self._nodeid = nodeid
-        self.cov.switch_context(nodeid)
-        self.check_stack = Testmon.coverage_stack.copy()
+        self._test_name = test_name
+        self.cov.switch_context(test_name)
+        self.check_stack = TestmonCollector.coverage_stack.copy()
 
     def discard_current(self):
-        self._interrupted_at = self._nodeid
+        self._interrupted_at = self._test_name
 
     def get_batch_coverage_data(self):
 
-        if self.check_stack != Testmon.coverage_stack:
+        if self.check_stack != TestmonCollector.coverage_stack:
             pytest.exit(
                 f"Exiting pytest!!!! This test corrupts Testmon.coverage_stack: "
-                f"{self._nodeid} {self.check_stack}, {Testmon.coverage_stack}",
+                f"{self._test_name} {self.check_stack}, {TestmonCollector.coverage_stack}",
                 returncode=3,
             )
 
         nodes_files_lines = {}
 
         if self.cov and (
-            len(self.batched_nodeids) >= TEST_BATCH_SIZE
-            or self._next_nodeid is None
+            len(self.batched_test_names) >= TEST_BATCH_SIZE
+            or self._next_test_name is None
             or self._interrupted_at
         ):
             self.cov.stop()
@@ -448,19 +457,21 @@ class Testmon:
             )
 
             if (
-                len(Testmon.coverage_stack) > 1
-                and Testmon.coverage_stack[-1] == self.cov
+                len(TestmonCollector.coverage_stack) > 1
+                and TestmonCollector.coverage_stack[-1] == self.cov
             ):
                 filtered_lines_data = {
                     file: data
                     for file, data in lines_data.items()
-                    if should_include(Testmon.coverage_stack[-2], file)
+                    if should_include(TestmonCollector.coverage_stack[-2], file)
                 }
-                Testmon.coverage_stack[-2].get_data().add_lines(filtered_lines_data)
+                TestmonCollector.coverage_stack[-2].get_data().add_lines(
+                    filtered_lines_data
+                )
 
             self.cov.erase()
             self.cov.start()
-            self.batched_nodeids = set()
+            self.batched_test_names = set()
         return nodes_files_lines
 
     def get_nodes_files_lines(self, dont_include):
@@ -481,30 +492,30 @@ class Testmon:
                     ).add(lineno)
                     files_lines.setdefault(file, set()).add(lineno)
         nodes_files_lines.pop(dont_include, None)
-        self.batched_nodeids.discard(dont_include)
+        self.batched_test_names.discard(dont_include)
         nodes_files_lines.pop("", None)
-        for nodeid in self.batched_nodeids:
-            if home_file(nodeid) not in nodes_files_lines.setdefault(nodeid, {}):
-                nodes_files_lines[nodeid].setdefault(home_file(nodeid), {1})
+        for test_name in self.batched_test_names:
+            if home_file(test_name) not in nodes_files_lines.setdefault(test_name, {}):
+                nodes_files_lines[test_name].setdefault(home_file(test_name), {1})
         return nodes_files_lines, files_lines
 
     def close(self):
         if self.cov is None:
             return
-        assert self.cov in Testmon.coverage_stack
-        if Testmon.coverage_stack:
-            while Testmon.coverage_stack[-1] != self.cov:
-                cov = Testmon.coverage_stack.pop()
+        assert self.cov in TestmonCollector.coverage_stack
+        if TestmonCollector.coverage_stack:
+            while TestmonCollector.coverage_stack[-1] != self.cov:
+                cov = TestmonCollector.coverage_stack.pop()
                 cov.stop()
         if self.cov._started:
             self.cov.stop()
-            Testmon.coverage_stack.pop()
+            TestmonCollector.coverage_stack.pop()
         if self.sub_cov_file:
             os.remove(self.sub_cov_file + "_rc")
         os.environ.pop("COVERAGE_PROCESS_START", None)
         self.cov = None
-        if Testmon.coverage_stack:
-            Testmon.coverage_stack[-1].start()
+        if TestmonCollector.coverage_stack:
+            TestmonCollector.coverage_stack[-1].start()
 
 
 def eval_environment(environment, **kwargs):

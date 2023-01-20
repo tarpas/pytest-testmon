@@ -13,7 +13,6 @@ try:
 except ImportError:
     from coverage.misc import NoSource
 
-
 CHECKUMS_ARRAY_TYPE = "i"
 
 
@@ -34,10 +33,10 @@ def debug_blob_to_code(blob):
     return blob.split(";\n")
 
 
-def prod_encode_lines(lines):
+def methods_to_checksums(blocks):
     checksums = []
-    for line in lines:
-        checksums.append(to_signed(zlib.adler32(line.encode("UTF-8"))))
+    for block in blocks:
+        checksums.append(to_signed(zlib.adler32(block.encode("UTF-8"))))
 
     return checksums
 
@@ -54,13 +53,13 @@ def prod_blob_to_list(blob):
     return arr.tolist()
 
 
-encode_lines = prod_encode_lines
 checksums_to_blob = prod_list_to_blob
 blob_to_checksums = prod_blob_to_list
 
-
 GAP_MARKS = {i: f"{i}GAP" for i in range(-1, 64)}
-INVERTED_GAP_MARKS_CHECKSUMS = {encode_lines([f"{i}GAP"])[0]: i for i in range(-1, 64)}
+INVERTED_GAP_MARKS_CHECKSUMS = {
+    methods_to_checksums([f"{i}GAP"])[0]: i for i in range(-1, 64)
+}
 
 
 class Block:
@@ -104,12 +103,12 @@ def _next_lineno(nodes, i, end):
 
 
 class Module:
-    def __init__(self, source_code=None, mtime=None, ext="py"):
+    def __init__(self, source_code=None, mtime=None, ext="py", fs_checksum=None):
         self._blocks = None
         self.counter = 0
         self.mtime = mtime
         self.source_code = textwrap.dedent(source_code)
-        self.fs_checksum = string_checksum(self.source_code)
+        self.fs_checksum = fs_checksum or string_checksum(self.source_code)
         self.ext = ext
 
     def dump_and_block(self, node, end, name="unknown", into_block=False):
@@ -155,7 +154,7 @@ class Module:
 
     @property
     def checksums(self):
-        return encode_lines([block.checksum for block in self.blocks])
+        return methods_to_checksums([block.checksum for block in self.blocks])
 
     @property
     def blocks(self):
@@ -197,20 +196,19 @@ def create_fingerprint_source(source_code, lines, ext="py"):
     return create_fingerprint(module, lines)
 
 
-def create_fingerprint(module, lines):
+def create_fingerprint(module, covered_lines):
     blocks = module.blocks
-    result = []
+    method_reprs = []
     line_index = 0
-    sorted_lines = sorted(list(lines))
+    sorted_lines = sorted(covered_lines)
 
     for current_block in sorted(blocks, key=lambda x: x.start):
         try:
             while sorted_lines[line_index] < current_block.start:
                 line_index += 1
             if sorted_lines[line_index] <= current_block.end:
-                result.append(current_block.checksum)
+                method_reprs.append(current_block.code)
         except IndexError:
             break
 
-    result = encode_lines(result)
-    return result
+    return methods_to_checksums(method_reprs)
