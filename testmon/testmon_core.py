@@ -12,11 +12,10 @@ from coverage import Coverage, CoverageData
 
 from testmon import db
 from testmon.process_code import (
-    read_file_with_checksum,
+    read_source_checksum,
     match_fingerprint,
     create_fingerprint,
     methods_to_checksums,
-    string_checksum,
     Module,
 )
 
@@ -59,9 +58,7 @@ class SourceTree:
 
     def get_file(self, filename):
         if filename not in self.cache:
-            code, checksum = read_file_with_checksum(
-                os.path.join(self.rootdir, filename)
-            )
+            code, checksum = read_source_checksum(os.path.join(self.rootdir, filename))
             if checksum:
                 fs_mtime = os.path.getmtime(os.path.join(self.rootdir, filename))
                 self.cache[filename] = Module(
@@ -178,33 +175,37 @@ class TestmonData:
                     {
                         "filename": filename,
                         "mtime": module.mtime,
-                        "checksum": string_checksum(module.source_code),
+                        "checksum": module.fs_checksum,
                         "method_checksums": fingerprint,
                     }
                 )
         return tests_fingerprints
 
     def sync_db_fs_tests(self, retain):
+
         collected = retain.union(set(self.stable_test_names))
+        add = list(collected - set(self.all_tests))
+        page_size = 500
+        for i in range(0, len(add), page_size):
+            page = add[i : i + page_size]
+            with self.db as database:
+                test_execution_file_fps = {
+                    test_name: (
+                        {
+                            "filename": home_file(test_name),
+                            "method_checksums": methods_to_checksums(["0match"]),
+                            "mtime": None,
+                            "checksum": None,
+                        },
+                    )
+                    for test_name in page
+                    if is_python_file(home_file(test_name))
+                }
+                if test_execution_file_fps:
+                    self.save_test_execution_file_fps(test_execution_file_fps)
+
+        to_delete = list(set(self.all_tests) - collected)
         with self.db as database:
-            add = collected - set(self.all_tests)
-
-            test_execution_file_fps = {
-                test_name: (
-                    {
-                        "filename": home_file(test_name),
-                        "method_checksums": methods_to_checksums(["0match"]),
-                        "mtime": None,
-                        "checksum": None,
-                    },
-                )
-                for test_name in add
-                if is_python_file(home_file(test_name))
-            }
-            if test_execution_file_fps:
-                self.save_test_execution_file_fps(test_execution_file_fps)
-
-            to_delete = list(set(self.all_tests) - collected)
             database.delete_test_executions(to_delete, self.exec_id)
 
     def determine_stable(self):
@@ -314,14 +315,12 @@ def get_new_mtimes(filesystem, hits):
         for hit in hits:
             module = filesystem.get_file(hit[0])
             if module:
-                yield module.mtime, string_checksum(module.source_code), hit[3]
+                yield module.mtime, module.fs_checksum, hit[3]
     except KeyError:
         for hit in hits:
             module = filesystem.get_file(hit["filename"])
             if module:
-                yield module.mtime, string_checksum(module.source_code), hit[
-                    "fingerprint_id"
-                ]
+                yield module.mtime, module.fs_checksum, hit["fingerprint_id"]
 
 
 def get_test_execution_class_name(node_id):

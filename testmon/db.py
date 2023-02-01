@@ -7,7 +7,7 @@ from functools import lru_cache
 
 from testmon.process_code import blob_to_checksums, checksums_to_blob
 
-DATA_VERSION = 0
+DATA_VERSION = 2
 
 ChangedFileData = namedtuple(
     "ChangedFileData", "filename name method_checksums id failed"
@@ -35,6 +35,7 @@ def connect(datafile, readonly=False):
         f"file:{datafile}{'?mode=ro' if readonly else ''}", uri=True
     )
 
+    connection.execute("PRAGMA journal_mode = WAL")
     connection.execute("PRAGMA synchronous = OFF")
     connection.execute("PRAGMA foreign_keys = TRUE ")
     connection.execute("PRAGMA recursive_triggers = TRUE ")
@@ -98,16 +99,17 @@ class DB:
                 """
             )
 
-    def fetch_or_create_file_fp(self, filename, mtime, checksum, method_checksums):
+    @lru_cache(1000)
+    def fetch_or_create_file_fp(self, filename, checksum, method_checksums):
         cursor = self.con.cursor()
         try:
             cursor.execute(
                 """
                 INSERT INTO file_fp
-                (filename, method_checksums, mtime, checksum)
-                VALUES (?, ?, ?, ?)
+                (filename, method_checksums, checksum)
+                VALUES (?, ?, ?)
                 """,
-                (filename, method_checksums, mtime, checksum),
+                (filename, method_checksums, checksum),
             )
 
             fingerprint_id = cursor.lastrowid
@@ -116,9 +118,7 @@ class DB:
             fingerprint_id, *_ = cursor.execute(
                 """
                 SELECT
-                    id,
-                    mtime,
-                    checksum
+                    id
                 FROM
                     file_fp
                 WHERE
@@ -127,32 +127,31 @@ class DB:
                 (filename, method_checksums),
             ).fetchone()
 
-            self.update_mtimes([(mtime, checksum, fingerprint_id)])
         return fingerprint_id
 
     def _insert_test_execution(
         self,
+        con,
         test_name,
         duration,
         failed,
         exec_id,
     ):
-        with self.con as con:
-            cursor = con.cursor()
-            cursor.execute(
-                f"""
-                    INSERT OR REPLACE INTO test_execution
-                    ({self._test_execution_fk_column()}, test_name, duration, failed)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                (
-                    exec_id,
-                    test_name,
-                    duration,
-                    1 if failed else 0,
-                ),
-            )
-            return cursor.lastrowid
+        cursor = con.cursor()
+        cursor.execute(
+            f"""
+                INSERT OR REPLACE INTO test_execution
+                ({self._test_execution_fk_column()}, test_name, duration, failed)
+                VALUES (?, ?, ?, ?)
+                """,
+            (
+                exec_id,
+                test_name,
+                duration,
+                1 if failed else 0,
+            ),
+        )
+        return cursor.lastrowid
 
     def insert_test_file_fps(self, tests_fingerprints, fa_durs=None, exec_id=None):
         assert exec_id
@@ -160,25 +159,27 @@ class DB:
             fa_durs = {}
         with self.con as con:
             cursor = con.cursor()
+
+            test_execution_file_fps = []
             for test_name in tests_fingerprints:
                 fingerprints = tests_fingerprints[test_name]
                 failed, duration = fa_durs.get(test_name, (0, None))
                 te_id = self._insert_test_execution(
-                    test_name, duration, failed, exec_id=exec_id
+                    con, test_name, duration, failed, exec_id=exec_id
                 )
 
                 for record in fingerprints:
                     fingerprint_id = self.fetch_or_create_file_fp(
                         record["filename"],
-                        None,
                         record["checksum"],
                         checksums_to_blob(record["method_checksums"]),
                     )
 
-                    cursor.execute(
-                        "INSERT INTO test_execution_file_fp VALUES (?, ?)",
-                        (te_id, fingerprint_id),
-                    )
+                    test_execution_file_fps.append((te_id, fingerprint_id))
+            cursor.executemany(
+                "INSERT INTO test_execution_file_fp VALUES (?, ?)",
+                test_execution_file_fps,
+            )
 
     def _fetch_data_version(self):
         con = self.con
