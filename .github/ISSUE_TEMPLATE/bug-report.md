@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 *What is your setup and what steps did you do?*
-Please show us also the command/s you executed.
+Please show us also the command/s you executed. What is the code you used?
 
 *What was the outcome*?
 Please also copy (redacted if need be) pytest output including the pytest version, plugins list and versions and pytest rootdir here
