@@ -37,19 +37,23 @@ def merge_dbs(merged_datafile, db_1: "DB", db_2: "DB") -> "DB":
     if db_1.env != db_2.env:
         raise
 
-    merged_db = DB(merged_datafile, environment=db_1.env)
-    with merged_db:
+    memory_db = DB(":memory:", environment=db_1.env)
+    file_db = DB(merged_datafile, environment=db_1.env)
+    with memory_db:
         with db_1:
             for data in db_1.all_data():
-                merged_db.insert_node_fingerprints(data["name"], fingerprints=[data], failed=data["failed"],
+                memory_db.insert_node_fingerprints(data["name"], fingerprints=[data], failed=data["failed"],
                                                    duration=data["duration"])
 
         with db_2:
             for data in db_2.all_data():
-                merged_db.insert_node_fingerprints(data["name"], fingerprints=[data], failed=data["failed"],
+                memory_db.insert_node_fingerprints(data["name"], fingerprints=[data], failed=data["failed"],
                                                    duration=data["duration"])
 
-    return merged_db
+        with file_db:
+            memory_db.con.backup(file_db.con)
+
+    return file_db
 
 
 class DB:
@@ -324,7 +328,7 @@ class DB:
     def all_data(self) -> List[dict]:
         cursor = self.con.execute(
             """
-            SELECT 
+            SELECT
                 n.name,
                 n.duration,
                 n.failed,
