@@ -210,19 +210,6 @@ class DB:
                 [dataid, json.dumps(data)],
             )
 
-    def incerement_attributes(self, attr_values, exec_id=None):
-        result = []
-        with self.con as con:
-            for attribute in attr_values.keys():
-                data = attr_values[attribute]
-                dataid = f"{exec_id}:{attribute}"
-                con.execute(
-                    "UPDATE metadata SET data = (data + ?) WHERE dataid = ?",
-                    [data, dataid],
-                )
-                result.append(self.fetch_attribute(attribute, 0, exec_id))
-        return result
-
     def fetch_attribute(self, attribute, default=None, exec_id=None):
         cursor = self.con.execute(
             "SELECT data FROM metadata WHERE dataid=?",
@@ -294,15 +281,6 @@ class DB:
         )
 
         connection.execute(f"PRAGMA user_version = {DATA_VERSION}")
-        self.write_attribute("potential_time_saved", 0)
-        self.write_attribute("potential_time_all", 0)
-        self.write_attribute("potential_tests_saved", 0)
-        self.write_attribute("potential_tests_all", 0)
-
-        self.write_attribute("time_saved", 0)
-        self.write_attribute("time_all", 0)
-        self.write_attribute("tests_saved", 0)
-        self.write_attribute("tests_all", 0)
 
     def fetch_changed_file_data(self, changed_fingerprints, exec_id):
         in_clause_questionsmarks = ", ".join("?" * len(changed_fingerprints))

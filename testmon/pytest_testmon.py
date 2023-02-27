@@ -6,7 +6,6 @@ import pytest
 import pkg_resources
 
 from _pytest.config import ExitCode, Config
-from _pytest.terminal import TerminalReporter
 
 from testmon.configure import TmConf
 
@@ -399,12 +398,6 @@ def sort_items_by_duration(items, avg_durations):
     )
 
 
-def format_time_saved(seconds):
-    if seconds >= 3600:
-        return f"{int(seconds / 3600)}h {int((seconds % 3600) / 60)}m"
-    return f"{int(seconds / 60)}m {int((seconds % 60) % 60)}s"
-
-
 class TestmonSelect:
     def __init__(self, config, testmon_data):
         self.testmon_data = testmon_data
@@ -437,6 +430,7 @@ class TestmonSelect:
                 deselected.append(item)
             else:
                 selected.append(item)
+
         sort_items_by_duration(selected, self.testmon_data.avg_durations)
 
         if self.config.testmon_config.select:
@@ -454,49 +448,6 @@ class TestmonSelect:
     def pytest_sessionfinish(self, session, exitstatus):
         if len(self.deselected_tests) and exitstatus == ExitCode.NO_TESTS_COLLECTED:
             session.exitstatus = ExitCode.OK
-
-    @pytest.hookimpl(trylast=True)
-    def pytest_terminal_summary(self):
-        if self._interrupted:
-            return
-
-        self.testmon_data.write_statistics(
-            self.config.testmon_config.select, self.deselected_tests
-        )
-
-        if not self.config.option.verbose >= 2:
-            return
-
-        potential = "" if (self.config.testmon_config.select) else "potential "
-        terminal_reporter = TerminalReporter(self.config)
-        terminal_reporter.section(
-            f"Testmon {potential}savings (deselected/no testmon)",
-            "=",
-            **{"blue": True},
-        )
-
-        tests_all = (
-            f"{self.testmon_data.total_tests_saved}/{self.testmon_data.total_tests_all}"
-        )
-        tests_all_ratio = f"{100.0*self.testmon_data.total_tests_saved/self.testmon_data.total_tests_all:.0f}"
-        tests_current = f"{len(self.deselected_tests)}"
-        tests_current += f"/{len(self.testmon_data.all_tests)}"
-        tests_current_ratio = (
-            f"{(100.0*len(self.deselected_tests))/len(self.testmon_data.all_tests):.0f}"
-        )
-        msg = f"this run: {tests_current} ({tests_current_ratio}%) tests, "
-        msg += (
-            format_time_saved(self.testmon_data.tests_duration(self.deselected_tests))
-            + "/"
-            + format_time_saved(self.testmon_data.all_tests_duration)
-        )
-        msg += f", all runs: {tests_all} ({tests_all_ratio}%) tests, "
-        msg += (
-            format_time_saved(self.testmon_data.total_time_saved)
-            + "/"
-            + format_time_saved(self.testmon_data.total_time_all)
-        )
-        terminal_reporter.write_line(msg)
 
     def pytest_keyboard_interrupt(self, excinfo):
         self._interrupted = True

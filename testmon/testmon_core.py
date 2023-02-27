@@ -151,11 +151,6 @@ class TestmonData:
         self.stable_test_names = set()
         self.stable_files = set()
 
-        self.total_time_saved = None
-        self.total_time_all = None
-        self.total_tests_saved = None
-        self.total_tests_all = None
-
     def close_connection(self):
         if self.connection:
             self.connection.close()
@@ -163,23 +158,6 @@ class TestmonData:
     @property
     def all_tests(self):
         return self.db.all_test_executions(self.exec_id)
-
-    @property
-    def all_tests_duration(self):
-        return sum(
-            self.all_tests[test_name]["duration"]
-            if self.all_tests[test_name]["duration"]
-            else 0
-            for test_name in self.all_tests.keys()
-        )
-
-    def tests_duration(self, test_names=()):
-        return sum(
-            self.all_tests[test_name]["duration"]
-            if test_name in test_names and self.all_tests[test_name]["duration"]
-            else 0
-            for test_name in self.all_tests.keys()
-        )
 
     def get_tests_fingerprints(self, files_lines):
         tests_fingerprints = []
@@ -309,28 +287,6 @@ class TestmonData:
         self.db.insert_test_file_fps(
             test_executions_fingerprints, fa_durs, self.exec_id
         )
-
-    def write_statistics(self, select, deselected_tests):
-        attribute_prefix = ""
-        if not select:
-            attribute_prefix = "potential_"
-
-        attributes_to_increment = {}
-        attributes_to_increment[f"{attribute_prefix}time_saved"] = self.tests_duration(
-            deselected_tests
-        )
-        attributes_to_increment[f"{attribute_prefix}time_all"] = self.all_tests_duration
-        attributes_to_increment[f"{attribute_prefix}tests_saved"] = len(
-            deselected_tests
-        )
-        attributes_to_increment[f"{attribute_prefix}tests_all"] = len(self.all_tests)
-
-        (
-            self.total_time_saved,
-            self.total_time_all,
-            self.total_tests_saved,
-            self.total_tests_all,
-        ) = self.db.incerement_attributes(attributes_to_increment)
 
 
 def nofili2fingerprints(nodes_files_lines, testmon_data):
