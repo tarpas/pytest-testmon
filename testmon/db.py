@@ -7,7 +7,7 @@ from functools import lru_cache
 
 from testmon.process_code import blob_to_checksums, checksums_to_blob
 
-DATA_VERSION = 2
+DATA_VERSION = 5
 
 ChangedFileData = namedtuple(
     "ChangedFileData", "filename name method_checksums id failed"
@@ -89,6 +89,7 @@ class DB:
             )
 
     def remove_unused_file_fps(self):
+        self.fetch_or_create_file_fp.cache_clear()
         with self.con as con:
             con.execute(
                 """
@@ -114,7 +115,6 @@ class DB:
 
             fingerprint_id = cursor.lastrowid
         except sqlite3.IntegrityError:
-
             fingerprint_id, *_ = cursor.execute(
                 """
                 SELECT
@@ -140,7 +140,7 @@ class DB:
         cursor = con.cursor()
         cursor.execute(
             f"""
-                INSERT OR REPLACE INTO test_execution
+                INSERT INTO test_execution
                 ({self._test_execution_fk_column()}, test_name, duration, failed)
                 VALUES (?, ?, ?, ?)
                 """,
@@ -159,6 +159,18 @@ class DB:
             fa_durs = {}
         with self.con as con:
             cursor = con.cursor()
+
+            cursor.executemany(
+                f"DELETE FROM test_execution_file_fp "
+                f"WHERE test_execution_id in "
+                f"      (SELECT id FROM test_execution WHERE {self._test_execution_fk_column()}=? AND test_name=?)",
+                [(exec_id, test_name) for test_name in tests_fingerprints],
+            )
+
+            cursor.executemany(
+                f"DELETE FROM test_execution WHERE {self._test_execution_fk_column()}=? AND test_name=?",
+                [(exec_id, test_name) for test_name in tests_fingerprints],
+            )
 
             test_execution_file_fps = []
             for test_name in tests_fingerprints:
@@ -180,6 +192,10 @@ class DB:
                 "INSERT INTO test_execution_file_fp VALUES (?, ?)",
                 test_execution_file_fps,
             )
+            self.fetch_or_create_file_fp.cache_clear()
+            cursor.execute(
+                "DELETE FROM file_fp where id not in (select fingerprint_id from test_execution_file_fp)"
+            )
 
     def _fetch_data_version(self):
         con = self.con
@@ -194,6 +210,19 @@ class DB:
                 [dataid, json.dumps(data)],
             )
 
+    def incerement_attributes(self, attr_values, exec_id=None):
+        result = []
+        with self.con as con:
+            for attribute in attr_values.keys():
+                data = attr_values[attribute]
+                dataid = f"{exec_id}:{attribute}"
+                con.execute(
+                    "UPDATE metadata SET data = (data + ?) WHERE dataid = ?",
+                    [data, dataid],
+                )
+                result.append(self.fetch_attribute(attribute, 0, exec_id))
+        return result
+
     def fetch_attribute(self, attribute, default=None, exec_id=None):
         cursor = self.con.execute(
             "SELECT data FROM metadata WHERE dataid=?",
@@ -204,10 +233,10 @@ class DB:
             return json.loads(result[0])
         return default
 
-    def create_metadata_statement(self):
+    def _create_metadata_statement(self):
         return """CREATE TABLE metadata (dataid TEXT PRIMARY KEY, data TEXT);"""
 
-    def create_environment_statement(self):
+    def _create_environment_statement(self):
         return """
                 CREATE TABLE environment (
                 id INTEGER PRIMARY KEY ASC,
@@ -217,7 +246,7 @@ class DB:
                 UNIQUE (environment_name, system_packages, python_version)
             );"""
 
-    def create_test_execution_statement(self):
+    def _create_test_execution_statement(self):
         return f"""
                 CREATE TABLE test_execution (
                 id INTEGER PRIMARY KEY ASC,
@@ -225,11 +254,11 @@ class DB:
                 test_name TEXT,
                 duration FLOAT,
                 failed BIT,
-                UNIQUE ({self._test_execution_fk_column()}, test_name),
-                FOREIGN KEY({self._test_execution_fk_column()}) REFERENCES {self._test_execution_fk_table()}(id)
-            );"""
+                FOREIGN KEY({self._test_execution_fk_column()}) REFERENCES {self._test_execution_fk_table()}(id));
+                CREATE INDEX test_execution_fk_name ON test_execution ({self._test_execution_fk_column()}, test_name);
+            """
 
-    def create_file_fp_statement(self):
+    def _create_file_fp_statement(self):
         return """
             CREATE TABLE file_fp
             (
@@ -241,30 +270,39 @@ class DB:
                 UNIQUE (filename, method_checksums)
             );"""
 
-    def create_test_execution_ffp_statement(
+    def _create_test_execution_ffp_statement(
         self,
     ):
         return """
             CREATE TABLE test_execution_file_fp (
                 test_execution_id INTEGER,
                 fingerprint_id INTEGER,
-                FOREIGN KEY(test_execution_id) REFERENCES test_execution(id) ON DELETE CASCADE,
                 FOREIGN KEY(fingerprint_id) REFERENCES file_fp(id)
             );
+            CREATE INDEX test_execution_file_fp_te_id ON test_execution_file_fp (test_execution_id);
             """
 
     def init_tables(self):
         connection = self.con
 
         connection.executescript(
-            self.create_metadata_statement()
-            + self.create_environment_statement()
-            + self.create_test_execution_statement()
-            + self.create_file_fp_statement()
-            + self.create_test_execution_ffp_statement()
+            self._create_metadata_statement()
+            + self._create_environment_statement()
+            + self._create_test_execution_statement()
+            + self._create_file_fp_statement()
+            + self._create_test_execution_ffp_statement()
         )
 
         connection.execute(f"PRAGMA user_version = {DATA_VERSION}")
+        self.write_attribute("potential_time_saved", 0)
+        self.write_attribute("potential_time_all", 0)
+        self.write_attribute("potential_tests_saved", 0)
+        self.write_attribute("potential_tests_all", 0)
+
+        self.write_attribute("time_saved", 0)
+        self.write_attribute("time_all", 0)
+        self.write_attribute("tests_saved", 0)
+        self.write_attribute("tests_all", 0)
 
     def fetch_changed_file_data(self, changed_fingerprints, exec_id):
         in_clause_questionsmarks = ", ".join("?" * len(changed_fingerprints))
@@ -348,6 +386,15 @@ class DB:
         self.con.executemany(
             f"""
             DELETE
+            FROM test_execution_file_fp
+            WHERE test_execution_id IN
+                (SELECT id FROM test_execution WHERE {self._test_execution_fk_column()} = ? AND test_name = ?)
+                """,
+            [(exec_id, test_name) for test_name in test_names],
+        )
+        self.con.executemany(
+            f"""
+            DELETE
             FROM test_execution
             WHERE {self._test_execution_fk_column()} = ?
               AND test_name = ?""",
@@ -384,6 +431,18 @@ class DB:
                 te.{self._test_execution_fk_column()} = ?
                 """,
             (exec_id,),
+        )
+
+        return [row[0] for row in cursor]
+
+    def all_filenames(self):
+        cursor = self.con.execute(
+            """
+            SELECT DISTINCT
+                f.filename
+            FROM
+                file_fp f
+                """,
         )
 
         return [row[0] for row in cursor]

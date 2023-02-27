@@ -4,9 +4,10 @@ import zlib
 from functools import lru_cache
 import sqlite3
 import hashlib
+from pathlib import Path
 from typing import Optional, Union
 from array import array
-from subprocess import PIPE, run
+from subprocess import run, CalledProcessError
 
 from coverage.phystokens import source_encoding
 
@@ -99,44 +100,6 @@ def bytes_to_string_and_checksum(byte_stream):
     return byte_string, hsh.hexdigest()
 
 
-@lru_cache(300)
-def get_files_shas(directory=None):
-    if not directory:
-        try:
-            command = ["git", "rev-parse", "--show-toplevel"]
-            directory = run(
-                command, stdout=PIPE, stderr=PIPE, universal_newlines=True, check=True
-            ).stdout.strip()
-        except:
-            pass
-    all_shas = {}
-    try:
-        command = ["git", "ls-files", "--stage", "-m", "--full-name", directory]
-        result = run(
-            command, stdout=PIPE, stderr=PIPE, universal_newlines=True, check=True
-        )
-
-        for line in result.stdout.splitlines():
-            _, hsh, filename_with_junk = line.split(" ")
-            _, filename = filename_with_junk.split("\t")
-            all_shas[filename] = hsh
-    except:
-        pass
-    return all_shas
-
-
-@lru_cache(300)
-def get_file_sha(filename, directory=None):
-
-    sha = None
-    try:
-        sha = get_files_shas(directory)[filename]
-        return (sha, False)
-    except KeyError:
-        pass
-    return (read_source_checksum(filename)[1], True)
-
-
 def _next_lineno(nodes, i, end):
     try:
         return nodes[i + 1].lineno - 1
@@ -158,7 +121,6 @@ class Module:
         self.ext = ext
 
     def dump_and_block(self, node, end, name="unknown", into_block=False):
-
         if isinstance(node, ast.AST):
             class_name = node.__class__.__name__
             fields = []
@@ -218,7 +180,7 @@ class Module:
         return self._blocks
 
 
-def read_source_checksum(filename):
+def read_source_sha(filename):
     # source_bytes: Optional[bytes]
 
     try:
@@ -229,6 +191,40 @@ def read_source_checksum(filename):
 
     source, checksum = bytes_to_string_and_checksum(source_bytes)
     return source, checksum
+
+
+def get_files_shas(directory):
+    all_shas = {}
+    try:
+        result = run(
+            ["git", "ls-files", "--stage", "-m", directory],
+            capture_output=True,
+            universal_newlines=True,
+            check=True,
+        )
+    except (FileNotFoundError, CalledProcessError):
+        return all_shas
+
+    modified_files = set()
+    for line in result.stdout.splitlines():
+        _, hsh, filename_with_junk = line.split(" ")
+        _, filename = filename_with_junk.split("\t")
+        if filename in all_shas:
+            modified_files.add(filename)
+        else:
+            all_shas[filename] = hsh
+    for modified_file in modified_files:
+        del all_shas[modified_file]
+    return all_shas
+
+
+def get_source_sha(directory, filename):
+    try:
+        sha = get_files_shas(directory)[filename]
+        return (None, sha)
+    except KeyError:
+        pass
+    return read_source_sha(Path(directory) / filename)
 
 
 def match_fingerprint_source(source_code, fingerprint, ext="py"):

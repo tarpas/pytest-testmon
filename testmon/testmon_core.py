@@ -2,6 +2,7 @@ import hashlib
 import os
 import random
 import sys
+import sysconfig
 import textwrap
 from functools import lru_cache
 from collections import defaultdict
@@ -12,15 +13,15 @@ from coverage import Coverage, CoverageData
 
 from testmon import db
 from testmon.process_code import (
-    read_source_checksum,
     match_fingerprint,
     create_fingerprint,
     methods_to_checksums,
+    get_source_sha,
     Module,
 )
 
 
-TEST_BATCH_SIZE = 100
+TEST_BATCH_SIZE = 250
 
 CHECKUMS_ARRAY_TYPE = "I"
 DB_FILENAME = ".testmondata"
@@ -28,14 +29,6 @@ DB_FILENAME = ".testmondata"
 
 def get_data_file_path(rootdir):
     return os.environ.get("TESTMON_DATAFILE", os.path.join(rootdir, DB_FILENAME))
-
-
-def _get_python_lib_paths():
-    res = [sys.prefix]
-    for attr in ["exec_prefix", "real_prefix", "base_prefix"]:
-        if getattr(sys, attr, sys.prefix) not in res:
-            res.append(getattr(sys, attr))
-    return [os.path.join(d, "*") for d in res]
 
 
 def home_file(test_execution_name):
@@ -58,7 +51,9 @@ class SourceTree:
 
     def get_file(self, filename):
         if filename not in self.cache:
-            code, checksum = read_source_checksum(os.path.join(self.rootdir, filename))
+            code, checksum = get_source_sha(
+                directory=".", filename=os.path.join(self.rootdir, filename)
+            )
             if checksum:
                 fs_mtime = os.path.getmtime(os.path.join(self.rootdir, filename))
                 self.cache[filename] = Module(
@@ -156,6 +151,11 @@ class TestmonData:
         self.stable_test_names = set()
         self.stable_files = set()
 
+        self.total_time_saved = None
+        self.total_time_all = None
+        self.total_tests_saved = None
+        self.total_tests_all = None
+
     def close_connection(self):
         if self.connection:
             self.connection.close()
@@ -163,6 +163,23 @@ class TestmonData:
     @property
     def all_tests(self):
         return self.db.all_test_executions(self.exec_id)
+
+    @property
+    def all_tests_duration(self):
+        return sum(
+            self.all_tests[test_name]["duration"]
+            if self.all_tests[test_name]["duration"]
+            else 0
+            for test_name in self.all_tests.keys()
+        )
+
+    def tests_duration(self, test_names=()):
+        return sum(
+            self.all_tests[test_name]["duration"]
+            if test_name in test_names and self.all_tests[test_name]["duration"]
+            else 0
+            for test_name in self.all_tests.keys()
+        )
 
     def get_tests_fingerprints(self, files_lines):
         tests_fingerprints = []
@@ -182,12 +199,10 @@ class TestmonData:
         return tests_fingerprints
 
     def sync_db_fs_tests(self, retain):
-
         collected = retain.union(set(self.stable_test_names))
         add = list(collected - set(self.all_tests))
-        page_size = 500
-        for i in range(0, len(add), page_size):
-            page = add[i : i + page_size]
+        for i in range(0, len(add), TEST_BATCH_SIZE):
+            add_batch = add[i : i + TEST_BATCH_SIZE]
             with self.db as database:
                 test_execution_file_fps = {
                     test_name: (
@@ -198,7 +213,7 @@ class TestmonData:
                             "checksum": None,
                         },
                     )
-                    for test_name in page
+                    for test_name in add_batch
                     if is_python_file(home_file(test_name))
                 }
                 if test_execution_file_fps:
@@ -209,7 +224,6 @@ class TestmonData:
             database.delete_test_executions(to_delete, self.exec_id)
 
     def determine_stable(self):
-
         files_checksums = {}
         for filename in self.all_files:
             module = self.source_tree.get_file(filename)
@@ -296,9 +310,30 @@ class TestmonData:
             test_executions_fingerprints, fa_durs, self.exec_id
         )
 
+    def write_statistics(self, select, deselected_tests):
+        attribute_prefix = ""
+        if not select:
+            attribute_prefix = "potential_"
+
+        attributes_to_increment = {}
+        attributes_to_increment[f"{attribute_prefix}time_saved"] = self.tests_duration(
+            deselected_tests
+        )
+        attributes_to_increment[f"{attribute_prefix}time_all"] = self.all_tests_duration
+        attributes_to_increment[f"{attribute_prefix}tests_saved"] = len(
+            deselected_tests
+        )
+        attributes_to_increment[f"{attribute_prefix}tests_all"] = len(self.all_tests)
+
+        (
+            self.total_time_saved,
+            self.total_time_all,
+            self.total_tests_saved,
+            self.total_tests_all,
+        ) = self.db.incerement_attributes(attributes_to_increment)
+
 
 def nofili2fingerprints(nodes_files_lines, testmon_data):
-
     test_executions_fingerprints = {}
     for context in nodes_files_lines:
         node_fingerprints = testmon_data.get_tests_fingerprints(
@@ -310,7 +345,6 @@ def nofili2fingerprints(nodes_files_lines, testmon_data):
 
 
 def get_new_mtimes(filesystem, hits):
-
     try:
         for hit in hits:
             module = filesystem.get_file(hit[0])
@@ -341,7 +375,7 @@ def cached_relpath(path, basepath):
 class TestmonCollector:
     coverage_stack = []
 
-    def __init__(self, rootdir="", testmon_labels=None, cov_plugin=None):
+    def __init__(self, rootdir=".", testmon_labels=None, cov_plugin=None):
         try:
             from testmon.testmon_core import (
                 Testmon as UberTestmon,
@@ -386,9 +420,12 @@ class TestmonCollector:
     def setup_coverage(self, subprocess=False):
         params = {
             "include": [os.path.join(self.rootdir, "*")],
-            "omit": _get_python_lib_paths(),
+            "omit": {
+                os.path.join(value, "*")
+                for key, value in sysconfig.get_paths().items()
+                if key.endswith("lib")
+            },
         }
-
         if self.cov_plugin and self.cov_plugin._started:
             cov = self.cov_plugin.cov_controller.cov
             TestmonCollector.coverage_stack.append(cov)
@@ -435,7 +472,6 @@ class TestmonCollector:
         self._interrupted_at = self._test_name
 
     def get_batch_coverage_data(self):
-
         if self.check_stack != TestmonCollector.coverage_stack:
             pytest.exit(
                 f"Exiting pytest!!!! This test corrupts Testmon.coverage_stack: "
@@ -479,7 +515,6 @@ class TestmonCollector:
         nodes_files_lines = {}
         files_lines = {}
         for file in files:
-
             relfilename = cached_relpath(file, self.rootdir)
 
             contexts_by_lineno = cov_data.contexts_by_lineno(file)
