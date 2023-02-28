@@ -82,6 +82,17 @@ def pytest_addoption(parser):
     )
 
     group.addoption(
+        "--testmon-skip-libraries",
+        action="store_true",
+        dest="skip_libraries",
+        help=(
+            "Ignore changes to libraries when selecting tests.\n"
+            "Useful for CI/CD or when sharing a .testmondata file"
+            "among developers."
+        ),
+    )
+
+    group.addoption(
         "--testmon-env",
         action="store",
         type=str,
@@ -104,6 +115,7 @@ def testmon_options(config):
         "testmon",
         "no-testmon",
         "environment_expression",
+        "skip_libraries",
     ]:
         if config.getoption(label):
             result.append(label.replace("testmon_", ""))
@@ -122,12 +134,16 @@ def init_testmon_data(config, read_source=True):
         print(f"using remote server at {url}")
         rpc_client = xmlrpc.client.ServerProxy(url, allow_none=True)
 
-    libraries = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
+    libraries = None
+    skip_libraries = config.getoption("skip_libraries")
+    if not skip_libraries:
+        libraries = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
     testmon_data = TestmonData(
         config.rootdir.strpath,
         environment=environment,
         libraries=libraries,
         rpc=rpc_client,
+        skip_libraries=skip_libraries,
     )
     if read_source:
         testmon_data.determine_stable()

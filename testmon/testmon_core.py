@@ -118,13 +118,14 @@ def should_include(cov, filename):
 
 
 class TestmonData:
-    def __init__(self, rootdir="", environment=None, libraries=None, rpc=None):
+    def __init__(self, rootdir="", environment=None, libraries=None, rpc=None, skip_libraries=False):
 
         self.environment = environment if environment else "default"
         self.rootdir = rootdir
+        self.skip_libraries = skip_libraries
         self.unstable_files = None
         self.source_tree = SourceTree(rootdir=self.rootdir)
-        if libraries is None:
+        if libraries is None and not skip_libraries:
             libraries = ", ".join(
                 sorted(str(p) for p in pkg_resources.working_set or [])
             )
@@ -200,7 +201,7 @@ class TestmonData:
         mtime_misses = []
 
         for record in filenames_fingerprints:
-            if record["filename"] == LIBRARIES_KEY:
+            if not self.skip_libraries and record["file_name"] == LIBRARIES_KEY:
                 if record["checksum"] != self.libraries:
                     library_misses.append(record)
             else:
@@ -286,14 +287,15 @@ def nofili2fingerprints(nodes_files_lines, testmon_data):
             nodes_files_lines[context]
         )
 
-        node_fingerprints.append(
-            {
-                "filename": LIBRARIES_KEY,
-                "checksum": testmon_data.libraries,
-                "mtime": None,
-                "method_checksums": encode_lines([testmon_data.libraries]),
-            }
-        )
+        if testmon_data.libraries:
+            node_fingerprints.append(
+                {
+                    "filename": LIBRARIES_KEY,
+                    "checksum": testmon_data.libraries,
+                    "mtime": None,
+                    "method_checksums": encode_lines([testmon_data.libraries]),
+                }
+            )
 
         nodes_fingerprints[context] = node_fingerprints
     return nodes_fingerprints
