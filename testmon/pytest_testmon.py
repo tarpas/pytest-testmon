@@ -1,3 +1,4 @@
+import time
 import xmlrpc.client
 from collections import defaultdict
 from datetime import date, timedelta
@@ -17,7 +18,6 @@ from testmon.testmon_core import (
     TestmonException,
     get_test_execution_class_name,
     get_test_execution_module_name,
-    nofili2fingerprints,
     cached_relpath,
 )
 from testmon import configure
@@ -129,7 +129,7 @@ def init_testmon_data(config):
     api_key = config.getini("testmon_api_key")
     rpc_proxy = None
 
-    if config.testmon_config.tmnet:
+    if config.testmon_config.tmnet or getattr(config, "tmnet", None):
         rpc_proxy = getattr(config, "tmnet", None)
 
         if not url:
@@ -142,10 +142,9 @@ def init_testmon_data(config):
             rpc_proxy = xmlrpc.client.ServerProxy(project_url, allow_none=True)
 
     testmon_data = TestmonData(
-        config.rootdir.strpath,
+        database=rpc_proxy,
         environment=environment,
         system_packages=packages,
-        remote_db=rpc_proxy,
     )
     testmon_data.determine_stable()
     config.testmon_data = testmon_data
@@ -283,12 +282,6 @@ def pytest_unconfigure(config):
         config.testmon_data.close_connection()
 
 
-def process_result(result):
-    failed = any(r.outcome == "failed" for r in result.values())
-    duration = sum(value.duration for value in result.values())
-    return failed, duration
-
-
 class TestmonCollect:
     def __init__(self, testmon, testmon_data, host="single", cov_plugin=None):
         self.testmon_data = testmon_data
@@ -298,6 +291,7 @@ class TestmonCollect:
         self.reports = defaultdict(lambda: {})
         self.raw_test_names = []
         self.cov_plugin = cov_plugin
+        self._sessionstarttime = time.time()
 
     @pytest.hookimpl(tryfirst=True, hookwrapper=True)
     def pytest_pycollect_makeitem(self, collector, name, obj):
@@ -342,36 +336,28 @@ class TestmonCollect:
         self.reports[report.nodeid][report.when] = report
         if report.when == "teardown" and hasattr(report, "nodes_files_lines"):
             if report.nodes_files_lines:
-                test_executions_fingerprints = nofili2fingerprints(
-                    report.nodes_files_lines, self.testmon_data
+                test_executions_fingerprints = self.testmon_data.get_tests_fingerprints(
+                    report.nodes_files_lines, self.reports
                 )
-                test_outcomes = {
-                    test_name: process_result(self.reports[test_name])
-                    for test_name in test_executions_fingerprints
-                }
                 self.testmon_data.save_test_execution_file_fps(
-                    test_executions_fingerprints, test_outcomes
+                    test_executions_fingerprints
                 )
 
     def pytest_keyboard_interrupt(self, excinfo):
         if self._host == "single":
             nodes_files_lines = self.testmon.get_batch_coverage_data()
 
-            test_executions_fingerprints = nofili2fingerprints(
-                nodes_files_lines, self.testmon_data
+            test_executions_fingerprints = self.testmon_data.get_tests_fingerprints(
+                nodes_files_lines, self.reports
             )
-            fa_durs = {
-                test_name: process_result(self.reports[test_name])
-                for test_name in test_executions_fingerprints
-            }
-            self.testmon_data.save_test_execution_file_fps(
-                test_executions_fingerprints, fa_durs
-            )
+            self.testmon_data.save_test_execution_file_fps(test_executions_fingerprints)
             self.testmon.close()
 
     def pytest_sessionfinish(self, session):
         if self._host in ("single", "controller"):
-            self.testmon_data.db.remove_unused_file_fps()
+            self.testmon_data.db.finish_execution(
+                self.testmon_data.exec_id, time.time() - self._sessionstarttime
+            )
         self.testmon.close()
 
 

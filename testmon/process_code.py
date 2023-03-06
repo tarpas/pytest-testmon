@@ -34,25 +34,22 @@ def debug_blob_to_code(blob):
 def methods_to_checksums(blocks):
     checksums = []
     for block in blocks:
-        checksums.append(to_signed(zlib.adler32(block.encode("UTF-8"))))
+        checksums.append(to_signed(zlib.crc32(block.encode("UTF-8"))))
 
     return checksums
 
 
-def prod_list_to_blob(checksums):
+def checksums_to_blob(checksums):
     blob = array(CHECKUMS_ARRAY_TYPE, checksums)
     data = blob.tobytes()
     return sqlite3.Binary(data)
 
 
-def prod_blob_to_list(blob):
+def blob_to_checksums(blob):
     arr = array(CHECKUMS_ARRAY_TYPE)
     arr.frombytes(blob)
     return arr.tolist()
 
-
-checksums_to_blob = prod_list_to_blob
-blob_to_checksums = prod_blob_to_list
 
 GAP_MARKS = {i: f"{i}GAP" for i in range(-1, 64)}
 INVERTED_GAP_MARKS_CHECKSUMS = {
@@ -110,11 +107,16 @@ def _next_lineno(nodes, i, end):
 
 
 class Module:
-    def __init__(self, source_code=None, mtime=None, ext="py", fs_checksum=None):
+    def __init__(
+        self, source_code=None, mtime=None, ext="py", fs_checksum=None, filename=None
+    ):
+        self.filename = filename
         self._blocks = None
         self.counter = 0
         self.mtime = mtime
-        self.source_code = textwrap.dedent(source_code)
+        self._source_code = (
+            None if source_code is None else textwrap.dedent(source_code)
+        )
         self.fs_checksum = (
             fs_checksum or bytes_to_string_and_checksum(bytes(source_code, "utf-8"))[1]
         )
@@ -178,6 +180,16 @@ class Module:
             else:
                 self._blocks = [Block(1, len(lines), self.source_code)]
         return self._blocks
+
+    @property
+    def source_code(self):
+        if self._source_code is None:
+            self._source_code = read_source_sha(self.filename)[0]
+        return self._source_code
+
+    @property
+    def method_checksums(self):
+        return methods_to_checksums([block.checksum for block in self.blocks])
 
 
 def read_source_sha(filename):

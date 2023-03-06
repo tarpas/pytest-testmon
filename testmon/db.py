@@ -7,6 +7,7 @@ from functools import lru_cache
 
 from testmon.process_code import blob_to_checksums, checksums_to_blob
 
+
 DATA_VERSION = 5
 
 ChangedFileData = namedtuple(
@@ -88,7 +89,7 @@ class DB:
                 "UPDATE file_fp SET mtime=?, checksum=? WHERE id = ?", new_mtimes
             )
 
-    def remove_unused_file_fps(self):
+    def finish_execution(self, exec_id, duration=None):
         self.fetch_or_create_file_fp.cache_clear()
         with self.con as con:
             con.execute(
@@ -132,31 +133,31 @@ class DB:
     def _insert_test_execution(
         self,
         con,
+        exec_id,
         test_name,
         duration,
         failed,
-        exec_id,
+        forced,
     ):
         cursor = con.cursor()
         cursor.execute(
             f"""
                 INSERT INTO test_execution
-                ({self._test_execution_fk_column()}, test_name, duration, failed)
-                VALUES (?, ?, ?, ?)
+                ({self._test_execution_fk_column()}, test_name, duration, failed, forced)
+                VALUES (?, ?, ?, ?, ?)
                 """,
             (
                 exec_id,
                 test_name,
                 duration,
                 1 if failed else 0,
+                forced,
             ),
         )
         return cursor.lastrowid
 
-    def insert_test_file_fps(self, tests_fingerprints, fa_durs=None, exec_id=None):
+    def insert_test_file_fps(self, tests_deps_n_outcomes, exec_id=None):
         assert exec_id
-        if fa_durs is None:
-            fa_durs = {}
         with self.con as con:
             cursor = con.cursor()
 
@@ -164,22 +165,29 @@ class DB:
                 f"DELETE FROM test_execution_file_fp "
                 f"WHERE test_execution_id in "
                 f"      (SELECT id FROM test_execution WHERE {self._test_execution_fk_column()}=? AND test_name=?)",
-                [(exec_id, test_name) for test_name in tests_fingerprints],
+                [(exec_id, test_name) for test_name in tests_deps_n_outcomes],
             )
 
             cursor.executemany(
                 f"DELETE FROM test_execution WHERE {self._test_execution_fk_column()}=? AND test_name=?",
-                [(exec_id, test_name) for test_name in tests_fingerprints],
+                [(exec_id, test_name) for test_name in tests_deps_n_outcomes],
             )
 
             test_execution_file_fps = []
-            for test_name in tests_fingerprints:
-                fingerprints = tests_fingerprints[test_name]
-                failed, duration = fa_durs.get(test_name, (0, None))
+            for test_name, deps_n_outcomes in tests_deps_n_outcomes.items():
+                failed = deps_n_outcomes.get("failed", None)
+                duration = deps_n_outcomes.get("duration", None)
+                forced = deps_n_outcomes.get("forced", None)
                 te_id = self._insert_test_execution(
-                    con, test_name, duration, failed, exec_id=exec_id
+                    con,
+                    exec_id,
+                    test_name,
+                    duration,
+                    failed,
+                    forced,
                 )
 
+                fingerprints = deps_n_outcomes["deps"]
                 for record in fingerprints:
                     fingerprint_id = self.fetch_or_create_file_fp(
                         record["filename"],
@@ -241,6 +249,7 @@ class DB:
                 test_name TEXT,
                 duration FLOAT,
                 failed BIT,
+                forced BIT,
                 FOREIGN KEY({self._test_execution_fk_column()}) REFERENCES {self._test_execution_fk_table()}(id));
                 CREATE INDEX test_execution_fk_name ON test_execution ({self._test_execution_fk_column()}, test_name);
             """
@@ -320,9 +329,13 @@ class DB:
         return result
 
     def new_fetch_changed_file_data(self, files_checksums, exec_id):
-        with self.con:
-            self.con.execute("DELETE FROM temp_files_checksums")
-            self.con.executemany(
+        with self.con as con:
+            con.execute(
+                f"UPDATE test_execution set forced = NULL WHERE {self._test_execution_fk_column()} = ?",
+                [exec_id],
+            )
+            con.execute("DELETE FROM temp_files_checksums")
+            con.executemany(
                 "INSERT INTO temp_files_checksums VALUES (?, ?)",
                 files_checksums.items(),
             )
@@ -381,14 +394,11 @@ class DB:
 
     def all_test_executions(self, exec_id):
         return {
-            row[0]: {
-                "duration": row[1],
-                "failed": row[2],
-            }
+            row[0]: {"duration": row[1], "failed": row[2], "forced": row[3]}
             for row in self.con.execute(
                 f"""
                 SELECT
-                    test_name, duration, failed
+                    test_name, duration, failed, forced
                 FROM test_execution
                 WHERE {self._test_execution_fk_column()} = ?
                 """,

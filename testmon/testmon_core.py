@@ -6,12 +6,14 @@ import sysconfig
 import textwrap
 from functools import lru_cache
 from collections import defaultdict
+from xmlrpc.client import Fault
 
 import pkg_resources
 import pytest
 from coverage import Coverage, CoverageData
 
 from testmon import db
+from testmon.common import get_logger
 from testmon.process_code import (
     match_fingerprint,
     create_fingerprint,
@@ -26,9 +28,11 @@ TEST_BATCH_SIZE = 250
 CHECKUMS_ARRAY_TYPE = "I"
 DB_FILENAME = ".testmondata"
 
+logger = get_logger(__name__)
 
-def get_data_file_path(rootdir):
-    return os.environ.get("TESTMON_DATAFILE", os.path.join(rootdir, DB_FILENAME))
+
+def get_data_file_path():
+    return os.environ.get("TESTMON_DATAFILE", DB_FILENAME)
 
 
 def home_file(test_execution_name):
@@ -61,6 +65,7 @@ class SourceTree:
                     mtime=fs_mtime,
                     ext=filename.rsplit(".", 1)[1],
                     fs_checksum=checksum,
+                    filename=filename,
                 )
             else:
                 self.cache[filename] = None
@@ -110,71 +115,78 @@ def should_include(cov, filename):
 
 
 class TestmonData:
+    __test__ = False
+
     def __init__(
         self,
-        rootdir="",
+        database=None,
         environment=None,
         system_packages=None,
-        remote_db=None,
-        datafile=None,
         python_version=None,
     ):
         self.environment = environment if environment else "default"
-        self.rootdir = rootdir
-        self.unstable_files = None
-        self.source_tree = SourceTree(rootdir=self.rootdir)
+        self.source_tree = SourceTree(rootdir="")
         if system_packages is None:
             system_packages = ", ".join(
                 sorted(str(p) for p in pkg_resources.working_set or [])
             )
-        self.connection = None
-        self.datafile = datafile or get_data_file_path(self.rootdir)
-        self.remote_db = None
-
-        if remote_db:
-            self.db = remote_db
-        else:
-            self.db = db.DB(self.datafile)
-
         if not python_version:
             python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-        result = self.db.initiate_execution(
-            self.environment, system_packages, python_version
-        )
+
+        if database:
+            self.db = database
+        else:
+            self.db = db.DB(get_data_file_path())
+
+        try:
+            result = self.db.initiate_execution(
+                self.environment, system_packages, python_version
+            )
+        except (ConnectionRefusedError, Fault) as exc:
+            logger.error(
+                "%s error when communication with testmon.net. (falling back to .testmondata locally)",
+                exc,
+            )
+            self.db = db.DB(get_data_file_path())
 
         self.exec_id = result["exec_id"]
         self.all_files = set(result["filenames"])
 
         self.system_packages_change = result["packages_changed"]
-        self.unstable_test_names = set()
-        self.unstable_files = set()
-        self.stable_test_names = set()
-        self.stable_files = set()
+        self.unstable_test_names = None
+        self.unstable_files = None
+        self.stable_test_names = None
+        self.stable_files = None
 
     def close_connection(self):
-        if self.connection:
-            self.connection.close()
+        pass
 
     @property
     def all_tests(self):
         return self.db.all_test_executions(self.exec_id)
 
-    def get_tests_fingerprints(self, files_lines):
-        tests_fingerprints = []
+    def get_tests_fingerprints(self, nodes_files_lines, reports):
+        test_executions_fingerprints = {}
+        for context in nodes_files_lines:
+            deps_n_outcomes = {"deps": []}
 
-        for filename, covered in files_lines.items():
-            if os.path.exists(os.path.join(self.rootdir, filename)):
-                module = self.source_tree.get_file(filename)
-                fingerprint = create_fingerprint(module, covered)
-                tests_fingerprints.append(
-                    {
-                        "filename": filename,
-                        "mtime": module.mtime,
-                        "checksum": module.fs_checksum,
-                        "method_checksums": fingerprint,
-                    }
-                )
-        return tests_fingerprints
+            for filename, covered in nodes_files_lines[context].items():
+                if os.path.exists(filename):
+                    module = self.source_tree.get_file(filename)
+                    fingerprint = create_fingerprint(module, covered)
+                    deps_n_outcomes["deps"].append(
+                        {
+                            "filename": filename,
+                            "mtime": module.mtime,
+                            "checksum": module.fs_checksum,
+                            "method_checksums": fingerprint,
+                        }
+                    )
+
+            deps_n_outcomes.update(process_result(reports[context]))
+            deps_n_outcomes["forced"] = context in self.stable_test_names
+            test_executions_fingerprints[context] = deps_n_outcomes
+        return test_executions_fingerprints
 
     def sync_db_fs_tests(self, retain):
         collected = retain.union(set(self.stable_test_names))
@@ -183,14 +195,16 @@ class TestmonData:
             add_batch = add[i : i + TEST_BATCH_SIZE]
             with self.db as database:
                 test_execution_file_fps = {
-                    test_name: (
-                        {
-                            "filename": home_file(test_name),
-                            "method_checksums": methods_to_checksums(["0match"]),
-                            "mtime": None,
-                            "checksum": None,
-                        },
-                    )
+                    test_name: {
+                        "deps": (
+                            {
+                                "filename": home_file(test_name),
+                                "method_checksums": methods_to_checksums(["0match"]),
+                                "mtime": None,
+                                "checksum": None,
+                            },
+                        )
+                    }
                     for test_name in add_batch
                     if is_python_file(home_file(test_name))
                 }
@@ -212,6 +226,10 @@ class TestmonData:
             files_checksums, self.exec_id
         )
 
+        _, new_fingerprint_misses = split_filter(
+            self.source_tree, check_fingerprint, new_changed_file_data
+        )
+
         filenames_fingerprints = self.db.filenames_fingerprints(self.exec_id)
 
         _, checksum_misses = split_filter(
@@ -231,23 +249,19 @@ class TestmonData:
             self.source_tree, check_fingerprint, new_changed_file_data
         )
 
-        fingerprint_misses = new_fingerprint_misses
+        assert len(new_fingerprint_misses) == len(fingerprint_misses)
+        for fingerprint_miss in fingerprint_misses:
+            assert fingerprint_miss in new_fingerprint_misses
 
         self.unstable_test_names = set()
         self.unstable_files = set()
 
-        for fingerprint_miss in fingerprint_misses:
+        for fingerprint_miss in new_fingerprint_misses:
             self.unstable_test_names.add(fingerprint_miss[1])
             self.unstable_files.add(fingerprint_miss[1].split("::", 1)[0])
 
         self.stable_test_names = set(self.all_tests) - self.unstable_test_names
         self.stable_files = set(self.all_files) - self.unstable_files
-
-        _, new_fingerprint_misses = split_filter(
-            self.source_tree, check_fingerprint, new_changed_file_data
-        )
-
-        assert fingerprint_misses == new_fingerprint_misses
 
     @property
     def avg_durations(self):
@@ -279,25 +293,8 @@ class TestmonData:
 
         return durations
 
-    def save_test_execution_file_fps(self, test_executions_fingerprints, fa_durs=None):
-        if self.remote_db:
-            self.remote_db.tmnet_insert_test_files_fps(
-                test_executions_fingerprints, fa_durs
-            )
-        self.db.insert_test_file_fps(
-            test_executions_fingerprints, fa_durs, self.exec_id
-        )
-
-
-def nofili2fingerprints(nodes_files_lines, testmon_data):
-    test_executions_fingerprints = {}
-    for context in nodes_files_lines:
-        node_fingerprints = testmon_data.get_tests_fingerprints(
-            nodes_files_lines[context]
-        )
-
-        test_executions_fingerprints[context] = node_fingerprints
-    return test_executions_fingerprints
+    def save_test_execution_file_fps(self, test_executions_fingerprints):
+        self.db.insert_test_file_fps(test_executions_fingerprints, self.exec_id)
 
 
 def get_new_mtimes(filesystem, hits):
@@ -522,3 +519,9 @@ def eval_environment(environment, **kwargs):
         return str(eval(environment, eval_globals))
     except Exception as error:
         return repr(error)
+
+
+def process_result(result):
+    failed = any(r.outcome == "failed" for r in result.values())
+    duration = sum(value.duration for value in result.values())
+    return {"failed": failed, "duration": duration}
