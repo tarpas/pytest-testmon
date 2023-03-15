@@ -8,7 +8,7 @@ from functools import lru_cache
 from testmon.process_code import blob_to_checksums, checksums_to_blob
 
 
-DATA_VERSION = 5
+DATA_VERSION = 7
 
 ChangedFileData = namedtuple(
     "ChangedFileData", "filename name method_checksums id failed"
@@ -44,6 +44,17 @@ def connect(datafile, readonly=False):
     return connection
 
 
+def check_fingerprint_db(files_methods_checksums, record):
+    file = record[0]
+    fingerprint = record[2]
+
+    if file in files_methods_checksums and files_methods_checksums[file]:
+        if set(fingerprint) - set(files_methods_checksums[file]):
+            return False
+        return True
+    return False
+
+
 class DB:
     def __init__(self, datafile):
         new_db = not os.path.exists(datafile)
@@ -55,14 +66,13 @@ class DB:
         if new_db or old_format:
             self.init_tables()
 
-        self.con.execute(
-            "CREATE TEMPORARY TABLE temp_files_checksums (filename TEXT, checksum TEXT)"
-        )
+    def version_compatibility(self):
+        return DATA_VERSION
 
     def _check_data_version(self, datafile):
         stored_data_version = self._fetch_data_version()
 
-        if int(stored_data_version) == DATA_VERSION:
+        if int(stored_data_version) == self.version_compatibility():
             return False
 
         self.con.close()
@@ -89,7 +99,8 @@ class DB:
                 "UPDATE file_fp SET mtime=?, checksum=? WHERE id = ?", new_mtimes
             )
 
-    def finish_execution(self, exec_id, duration=None):
+    def finish_execution(self, exec_id, duration=None, select=True):
+        self.update_saving_stats(exec_id, select)
         self.fetch_or_create_file_fp.cache_clear()
         with self.con as con:
             con.execute(
@@ -100,6 +111,83 @@ class DB:
                 )
                 """
             )
+
+    def fetch_current_run_stats(self, exec_id):
+        with self.con as con:
+            cursor = con.cursor()
+            run_saved_tests, run_saved_time = cursor.execute(
+                f"""
+                    SELECT count(*), sum(te.duration) FROM test_execution te
+                    WHERE te.forced IS NOT False
+                    AND te.{self._test_execution_fk_column()} = ?
+                """,
+                (exec_id,),
+            ).fetchone()
+            run_all_tests, run_all_time = cursor.execute(
+                f"""
+                    SELECT count(*), sum(te.duration) FROM test_execution te
+                    WHERE te.{self._test_execution_fk_column()} = ?
+                """,
+                (exec_id,),
+            ).fetchone()
+
+        return (
+            run_saved_time,
+            run_all_time,
+            run_saved_tests,
+            run_all_tests,
+        )
+
+    def update_saving_stats(self, exec_id, select):
+        (
+            run_saved_time,
+            run_all_time,
+            run_saved_tests,
+            run_all_tests,
+        ) = self.fetch_current_run_stats(exec_id)
+
+        attribute_prefix = "" if select else "potential_"
+        self.increment_attributes(
+            {
+                f"{attribute_prefix}time_saved": run_saved_time,
+                f"{attribute_prefix}time_all": run_all_time,
+                f"{attribute_prefix}tests_saved": run_saved_tests,
+                f"{attribute_prefix}tests_all": run_all_tests,
+            },
+            exec_id=None,
+        )
+
+    def fetch_saving_stats(self, exec_id, select):
+        (
+            run_saved_time,
+            run_all_time,
+            run_saved_tests,
+            run_all_tests,
+        ) = self.fetch_current_run_stats(exec_id)
+        attribute_prefix = "" if select else "potential_"
+        total_saved_time = self.fetch_attribute(
+            attribute=f"{attribute_prefix}time_saved", default=0, exec_id=None
+        )
+        total_all_time = self.fetch_attribute(
+            attribute=f"{attribute_prefix}time_all", default=0, exec_id=None
+        )
+        total_saved_tests = self.fetch_attribute(
+            attribute=f"{attribute_prefix}tests_saved", default=0, exec_id=None
+        )
+        total_all_tests = self.fetch_attribute(
+            attribute=f"{attribute_prefix}tests_all", default=0, exec_id=None
+        )
+
+        return (
+            run_saved_time,
+            run_all_time,
+            run_saved_tests,
+            run_all_tests,
+            total_saved_time,
+            total_all_time,
+            total_saved_tests,
+            total_all_tests,
+        )
 
     @lru_cache(1000)
     def fetch_or_create_file_fp(self, filename, checksum, method_checksums):
@@ -228,6 +316,26 @@ class DB:
             return json.loads(result[0])
         return default
 
+    def increment_attributes(self, attributes_to_increment, exec_id=None):
+        def sum_with_none(*to_sum):
+            return sum(filter(None, to_sum))
+
+        for attribute_name in attributes_to_increment:
+            dataid = f"{exec_id}:{attribute_name}"
+            old_value = self.fetch_attribute(
+                attribute=attribute_name, default=0, exec_id=exec_id
+            )
+            with self.con as con:
+                con.execute(
+                    "INSERT OR REPLACE INTO metadata VALUES (?, ?)",
+                    [
+                        dataid,
+                        sum_with_none(
+                            old_value, attributes_to_increment[attribute_name]
+                        ),
+                    ],
+                )
+
     def _create_metadata_statement(self):
         return """CREATE TABLE metadata (dataid TEXT PRIMARY KEY, data TEXT);"""
 
@@ -252,6 +360,14 @@ class DB:
                 forced BIT,
                 FOREIGN KEY({self._test_execution_fk_column()}) REFERENCES {self._test_execution_fk_table()}(id));
                 CREATE INDEX test_execution_fk_name ON test_execution ({self._test_execution_fk_column()}, test_name);
+                                                
+                CREATE TABLE mcall_id (id INTEGER PRIMARY KEY ASC, exec_id INTEGER);
+
+                CREATE TABLE temp_files_checksums (mcall_id INTEGER, filename TEXT, checksum TEXT);
+                CREATE INDEX temp_files_checksums_mcall ON temp_files_checksums (mcall_ID);
+            
+                CREATE TABLE temp_filenames (mcall_id INTEGER, filename TEXT);
+                CREATE INDEX temp_filenames_mcall ON temp_filenames (mcall_id);
             """
 
     def _create_file_fp_statement(self):
@@ -273,9 +389,10 @@ class DB:
             CREATE TABLE test_execution_file_fp (
                 test_execution_id INTEGER,
                 fingerprint_id INTEGER,
+                FOREIGN KEY(test_execution_id) REFERENCES test_execution(id),                
                 FOREIGN KEY(fingerprint_id) REFERENCES file_fp(id)
             );
-            CREATE INDEX test_execution_file_fp_te_id ON test_execution_file_fp (test_execution_id);
+            CREATE INDEX test_execution_file_fp_both ON test_execution_file_fp (test_execution_id, fingerprint_id);
             """
 
     def init_tables(self):
@@ -289,7 +406,7 @@ class DB:
             + self._create_test_execution_ffp_statement()
         )
 
-        connection.execute(f"PRAGMA user_version = {DATA_VERSION}")
+        connection.execute(f"PRAGMA user_version = {self.version_compatibility()}")
 
     def fetch_changed_file_data(self, changed_fingerprints, exec_id):
         in_clause_questionsmarks = ", ".join("?" * len(changed_fingerprints))
@@ -328,50 +445,93 @@ class DB:
 
         return result
 
-    def new_fetch_changed_file_data(self, files_checksums, exec_id):
+    def fetch_unknown_files(self, files_checksums, exec_id):
         with self.con as con:
             con.execute(
                 f"UPDATE test_execution set forced = NULL WHERE {self._test_execution_fk_column()} = ?",
                 [exec_id],
             )
-            con.execute("DELETE FROM temp_files_checksums")
+            cursor = con.cursor()
+            cursor.execute("INSERT INTO mcall_id (exec_id) VALUES (?)", [exec_id])
+            mcall_id = cursor.lastrowid
+            self.con.execute("DELETE FROM temp_files_checksums")
             con.executemany(
-                "INSERT INTO temp_files_checksums VALUES (?, ?)",
-                files_checksums.items(),
+                "INSERT INTO temp_files_checksums VALUES (?, ?, ?)",
+                [
+                    (mcall_id, file, checksum)
+                    for file, checksum in files_checksums.items()
+                ],
             )
             result = []
             for row in self.con.execute(
                 f"""
-                SELECT
-                    f.filename,
-                    te.test_name,
-                    f.method_checksums,
-                    f.id,
-                    te.failed,
-                    te.duration
+                SELECT DISTINCT 
+                    f.filename
                 FROM test_execution te, test_execution_file_fp te_ffp, file_fp f
                 LEFT OUTER JOIN temp_files_checksums tfc
-                ON f.filename = tfc.filename and f.checksum = tfc.checksum
+                ON f.filename = tfc.filename and f.checksum = tfc.checksum AND tfc.mcall_id = ?
                 WHERE
                     te.{self._test_execution_fk_column()} = ? AND
                     te.id = te_ffp.test_execution_id AND
                     te_ffp.fingerprint_id = f.id AND
                     (f.checksum IS NULL OR tfc.checksum IS NULL OR f.checksum <> tfc.checksum)
                 """,
-                [exec_id],
+                [mcall_id, exec_id],
             ):
-                result.append(
+                result.append(row["filename"])
+
+            return result
+
+    def determine_tests(self, exec_id, files_mhashes):
+        with self.con as con:
+            cursor = con.cursor()
+            cursor.execute("INSERT INTO mcall_id (exec_id) VALUES (?)", [exec_id])
+            mcall_id = cursor.lastrowid
+            con.execute("DELETE FROM temp_filenames")
+            con.executemany(
+                "INSERT INTO temp_filenames VALUES (?, ?)",
+                list(
+                    (
+                        mcall_id,
+                        k,
+                    )
+                    for k in files_mhashes
+                ),
+            )
+
+            results = []
+            for row in self.con.execute(
+                f"""
+                SELECT
+                    f.filename,
+                    te.test_name,
+                    f.method_checksums,
+                    te.failed,
+                    te.duration
+                FROM test_execution te, test_execution_file_fp te_ffp, file_fp f, temp_filenames tf
+                WHERE
+                    tf.mcall_id = ? AND
+                    te.{self._test_execution_fk_column()} = ? AND
+                    te.id = te_ffp.test_execution_id AND
+                    te_ffp.fingerprint_id = f.id AND
+                    tf.filename = f.filename
+                """,
+                [mcall_id, exec_id],
+            ):
+                results.append(
                     [
                         row["filename"],
                         row["test_name"],
                         blob_to_checksums(row["method_checksums"]),
-                        row["id"],
-                        row["failed"],
-                        row["duration"],
                     ]
                 )
 
-            return result
+            new_method_misses = []
+            for result in results:
+                if not check_fingerprint_db(files_mhashes, result):
+                    new_method_misses.append(result[1])
+
+            return {"affected": new_method_misses}
 
     def delete_test_executions(self, test_names, exec_id):
         self.con.executemany(

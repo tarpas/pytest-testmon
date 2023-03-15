@@ -7,6 +7,7 @@ import pytest
 import pkg_resources
 
 from _pytest.config import ExitCode, Config
+from _pytest.terminal import TerminalReporter
 
 from testmon.configure import TmConf
 
@@ -356,7 +357,9 @@ class TestmonCollect:
     def pytest_sessionfinish(self, session):
         if self._host in ("single", "controller"):
             self.testmon_data.db.finish_execution(
-                self.testmon_data.exec_id, time.time() - self._sessionstarttime
+                self.testmon_data.exec_id,
+                time.time() - self._sessionstarttime,
+                session.config.testmon_config.select,
             )
         self.testmon.close()
 
@@ -382,6 +385,14 @@ def sort_items_by_duration(items, avg_durations):
     items.sort(
         key=lambda item: avg_durations[get_test_execution_module_name(item.nodeid)]
     )
+
+
+def format_time_saved(seconds):
+    if not seconds:
+        seconds = 0
+    if seconds >= 3600:
+        return f"{int(seconds / 3600)}h {int((seconds % 3600) / 60)}m"
+    return f"{int(seconds / 60)}m {int((seconds % 60) % 60)}s"
 
 
 class TestmonSelect:
@@ -422,9 +433,7 @@ class TestmonSelect:
         if self.config.testmon_config.select:
             items[:] = selected
             session.config.hook.pytest_deselected(
-                items=(
-                    [FakeItemFromTestmon(session.config)] * len(self.deselected_tests)
-                )
+                items=([FakeItemFromTestmon(session.config)] * len(deselected))
             )
         else:
             sort_items_by_duration(deselected, self.testmon_data.avg_durations)
@@ -434,6 +443,55 @@ class TestmonSelect:
     def pytest_sessionfinish(self, session, exitstatus):
         if len(self.deselected_tests) and exitstatus == ExitCode.NO_TESTS_COLLECTED:
             session.exitstatus = ExitCode.OK
+
+    @pytest.hookimpl(trylast=True)
+    def pytest_terminal_summary(self):
+        if self._interrupted:
+            return
+
+        if not self.config.option.verbose >= 2:
+            return
+
+        (
+            run_saved_time,
+            run_all_time,
+            run_saved_tests,
+            run_all_tests,
+            total_saved_time,
+            total_all_time,
+            total_saved_tests,
+            total_tests_all,
+        ) = self.testmon_data.fetch_saving_stats(self.config.testmon_config.select)
+
+        terminal_reporter = TerminalReporter(self.config)
+        potential_or_not = ""
+        if not self.config.testmon_config.select:
+            potential_or_not = "Potential t"
+        else:
+            potential_or_not = "T"
+        terminal_reporter.section(
+            f"{potential_or_not}estmon savings (deselected/no testmon)",
+            "=",
+            **{"blue": True},
+        )
+
+        try:
+            tests_all_ratio = f"{100.0*total_saved_tests/total_tests_all:.0f}"
+        except ZeroDivisionError:
+            tests_all_ratio = "0"
+        try:
+            tests_current_ratio = f"{100.0*run_saved_tests/run_all_tests:.0f}"
+        except ZeroDivisionError:
+            tests_current_ratio = "0"
+        msg = f"this run: {run_saved_tests}/{run_all_tests} ({tests_current_ratio}%) tests, "
+        msg += format_time_saved(run_saved_time) + "/" + format_time_saved(run_all_time)
+        msg += f", all runs: {total_saved_tests}/{total_tests_all} ({tests_all_ratio}%) tests, "
+        msg += (
+            format_time_saved(total_saved_time)
+            + "/"
+            + format_time_saved(total_all_time)
+        )
+        terminal_reporter.write_line(msg)
 
     def pytest_keyboard_interrupt(self, excinfo):
         self._interrupted = True

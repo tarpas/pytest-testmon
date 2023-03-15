@@ -14,6 +14,7 @@ from coverage import Coverage, CoverageData
 
 from testmon import db
 from testmon.common import get_logger
+
 from testmon.process_code import (
     match_fingerprint,
     create_fingerprint,
@@ -112,6 +113,14 @@ def split_filter(disk, function, records):
 @lru_cache(maxsize=1000)
 def should_include(cov, filename):
     return cov._should_trace(str(filename), None).trace
+
+
+def collect_mhashes(source_tree, new_changed_file_data):
+    files_mhashes = {}
+    for filename in new_changed_file_data:
+        module = source_tree.get_file(filename)
+        files_mhashes[filename] = module.method_checksums if module else None
+    return files_mhashes
 
 
 class TestmonData:
@@ -222,14 +231,29 @@ class TestmonData:
             if module:
                 files_checksums[filename] = module.fs_checksum
 
-        new_changed_file_data = self.db.new_fetch_changed_file_data(
+        new_changed_file_data = self.db.fetch_unknown_files(
             files_checksums, self.exec_id
         )
 
-        _, new_fingerprint_misses = split_filter(
-            self.source_tree, check_fingerprint, new_changed_file_data
-        )
+        files_mhashes = collect_mhashes(self.source_tree, new_changed_file_data)
 
+        affected_tests = self.db.determine_tests(self.exec_id, files_mhashes)[
+            "affected"
+        ]
+
+        self.assert_old_determin_stable(affected_tests)
+
+        self.unstable_test_names = set()
+        self.unstable_files = set()
+
+        for fingerprint_miss in affected_tests:
+            self.unstable_test_names.add(fingerprint_miss)
+            self.unstable_files.add(fingerprint_miss.split("::", 1)[0])
+
+        self.stable_test_names = set(self.all_tests) - self.unstable_test_names
+        self.stable_files = set(self.all_files) - self.unstable_files
+
+    def assert_old_determin_stable(self, new_fingerprint_misses):
         filenames_fingerprints = self.db.filenames_fingerprints(self.exec_id)
 
         _, checksum_misses = split_filter(
@@ -245,23 +269,9 @@ class TestmonData:
             self.source_tree, check_fingerprint, changed_file_data
         )
 
-        _, new_fingerprint_misses = split_filter(
-            self.source_tree, check_fingerprint, new_changed_file_data
+        assert {fingerprint_miss[1] for fingerprint_miss in fingerprint_misses} == set(
+            new_fingerprint_misses
         )
-
-        assert len(new_fingerprint_misses) == len(fingerprint_misses)
-        for fingerprint_miss in fingerprint_misses:
-            assert fingerprint_miss in new_fingerprint_misses
-
-        self.unstable_test_names = set()
-        self.unstable_files = set()
-
-        for fingerprint_miss in new_fingerprint_misses:
-            self.unstable_test_names.add(fingerprint_miss[1])
-            self.unstable_files.add(fingerprint_miss[1].split("::", 1)[0])
-
-        self.stable_test_names = set(self.all_tests) - self.unstable_test_names
-        self.stable_files = set(self.all_files) - self.unstable_files
 
     @property
     def avg_durations(self):
@@ -295,6 +305,9 @@ class TestmonData:
 
     def save_test_execution_file_fps(self, test_executions_fingerprints):
         self.db.insert_test_file_fps(test_executions_fingerprints, self.exec_id)
+
+    def fetch_saving_stats(self, select):
+        return self.db.fetch_saving_stats(self.exec_id, select)
 
 
 def get_new_mtimes(filesystem, hits):
