@@ -27,7 +27,9 @@ SURVEY_NOTIFICATION_INTERVAL = timedelta(days=28)
 
 
 def pytest_addoption(parser):
-    group = parser.getgroup("testmon")
+    group = parser.getgroup(
+        "automatically select tests affected by changes (pytest-testmon)"
+    )
 
     group.addoption(
         "--testmon",
@@ -42,23 +44,22 @@ def pytest_addoption(parser):
     )
 
     group.addoption(
+        "--testmon-noselect",
+        action="store_true",
+        dest="testmon_noselect",
+        help=(
+            "Reorder and prioritize the tests most likely to fail first, but don't deselect anything. "
+            "Forced if you use -m, -k, -l, -lf, test_file.py::test_name"
+        ),
+    )
+
+    group.addoption(
         "--testmon-nocollect",
         action="store_true",
         dest="testmon_nocollect",
         help=(
             "Run testmon but deactivate the collection and writing of testmon data. "
             "Forced if you run under debugger or coverage."
-        ),
-    )
-
-    group.addoption(
-        "--testmon-noselect",
-        action="store_true",
-        dest="testmon_noselect",
-        help=(
-            "Run testmon but deactivate selection, so all tests selected by other "
-            "means will be collected and executed. "
-            "Forced if you use -k, -l, -lf, test_file.py::test_name"
         ),
     )
 
@@ -100,7 +101,9 @@ def pytest_addoption(parser):
         "--tmnet",
         action="store_true",
         dest="tmnet",
-        help=("Run testmon in the network mode. "),
+        help=(
+            "This is used for internal beta. Please don't use. You can go to https://www.testmon.net/ to register."
+        ),
     )
 
     parser.addini("environment_expression", "environment expression", default="")
@@ -147,7 +150,7 @@ def init_testmon_data(config):
         environment=environment,
         system_packages=packages,
     )
-    testmon_data.determine_stable()
+    testmon_data.determine_stable(bool(rpc_proxy))
     config.testmon_data = testmon_data
 
 
@@ -271,7 +274,7 @@ def changed_message(
                 "The packages installed in your Python environment have been changed. "
                 "All tests have to be re-executed. "
                 if packages_change
-                else f"changed files: {changed_files_msg}, skipping collection of {len(stable_files)} files, "
+                else f"changed files: {changed_files_msg}, unchanged files: {len(stable_files)}, "
             )
     if config.testmon_data.environment:
         message += f"environment: {environment}"

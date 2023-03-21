@@ -8,7 +8,7 @@ from functools import lru_cache
 from testmon.process_code import blob_to_checksums, checksums_to_blob
 
 
-DATA_VERSION = 7
+DATA_VERSION = 8
 
 ChangedFileData = namedtuple(
     "ChangedFileData", "filename name method_checksums id failed"

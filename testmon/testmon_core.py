@@ -224,7 +224,7 @@ class TestmonData:
         with self.db as database:
             database.delete_test_executions(to_delete, self.exec_id)
 
-    def determine_stable(self):
+    def determine_stable(self, assert_old=True):
         files_checksums = {}
         for filename in self.all_files:
             module = self.source_tree.get_file(filename)
@@ -241,7 +241,8 @@ class TestmonData:
             "affected"
         ]
 
-        self.assert_old_determin_stable(affected_tests)
+        if assert_old:
+            self.assert_old_determin_stable(affected_tests)
 
         self.unstable_test_names = set()
         self.unstable_files = set()
