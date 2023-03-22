@@ -200,25 +200,23 @@ class TestmonData:
     def sync_db_fs_tests(self, retain):
         collected = retain.union(set(self.stable_test_names))
         add = list(collected - set(self.all_tests))
-        for i in range(0, len(add), TEST_BATCH_SIZE):
-            add_batch = add[i : i + TEST_BATCH_SIZE]
-            with self.db as database:
-                test_execution_file_fps = {
-                    test_name: {
-                        "deps": (
-                            {
-                                "filename": home_file(test_name),
-                                "method_checksums": methods_to_checksums(["0match"]),
-                                "mtime": None,
-                                "checksum": None,
-                            },
-                        )
-                    }
-                    for test_name in add_batch
-                    if is_python_file(home_file(test_name))
+        with self.db:
+            test_execution_file_fps = {
+                test_name: {
+                    "deps": (
+                        {
+                            "filename": home_file(test_name),
+                            "method_checksums": methods_to_checksums(["0match"]),
+                            "mtime": None,
+                            "checksum": None,
+                        },
+                    )
                 }
-                if test_execution_file_fps:
-                    self.save_test_execution_file_fps(test_execution_file_fps)
+                for test_name in add
+                if is_python_file(home_file(test_name))
+            }
+            if test_execution_file_fps:
+                self.save_test_execution_file_fps(test_execution_file_fps)
 
         to_delete = list(set(self.all_tests) - collected)
         with self.db as database:
