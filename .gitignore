@@ -40,3 +40,4 @@ nosetests.xml
 /htmlcov/
 /tags
 /tests/
+/tox.ini

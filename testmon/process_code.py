@@ -3,16 +3,13 @@ import textwrap
 import zlib
 from functools import lru_cache
 import sqlite3
-
+import hashlib
+from pathlib import Path
+from typing import Optional, Union
 from array import array
+from subprocess import run, CalledProcessError
 
-from coverage.python import get_python_source
-
-try:
-    from coverage.exceptions import NoSource
-except ImportError:
-    from coverage.misc import NoSource
-
+from coverage.phystokens import source_encoding
 
 CHECKUMS_ARRAY_TYPE = "i"
 
@@ -34,33 +31,30 @@ def debug_blob_to_code(blob):
     return blob.split(";\n")
 
 
-def prod_encode_lines(lines):
+def methods_to_checksums(blocks):
     checksums = []
-    for line in lines:
-        checksums.append(to_signed(zlib.adler32(line.encode("UTF-8"))))
+    for block in blocks:
+        checksums.append(to_signed(zlib.crc32(block.encode("UTF-8"))))
 
     return checksums
 
 
-def prod_list_to_blob(checksums):
+def checksums_to_blob(checksums):
     blob = array(CHECKUMS_ARRAY_TYPE, checksums)
     data = blob.tobytes()
     return sqlite3.Binary(data)
 
 
-def prod_blob_to_list(blob):
+def blob_to_checksums(blob):
     arr = array(CHECKUMS_ARRAY_TYPE)
     arr.frombytes(blob)
     return arr.tolist()
 
 
-encode_lines = prod_encode_lines
-checksums_to_blob = prod_list_to_blob
-blob_to_checksums = prod_blob_to_list
-
-
 GAP_MARKS = {i: f"{i}GAP" for i in range(-1, 64)}
-INVERTED_GAP_MARKS_CHECKSUMS = {encode_lines([f"{i}GAP"])[0]: i for i in range(-1, 64)}
+INVERTED_GAP_MARKS_CHECKSUMS = {
+    methods_to_checksums([f"{i}GAP"])[0]: i for i in range(-1, 64)
+}
 
 
 class Block:
@@ -90,8 +84,17 @@ class Block:
 
 
 @lru_cache(300)
-def string_checksum(string):
-    return str(zlib.adler32(string.encode("UTF-8")))
+def bytes_to_string_and_checksum(byte_stream):
+    byte_stream = byte_stream.replace(b"\f", b" ")
+    byte_stream = byte_stream.replace(b"\r\n", b"\n")
+    byte_string = byte_stream.decode(source_encoding(byte_stream), "replace")
+    git_header = b"blob %u\0" % len(byte_string)
+    hsh = hashlib.sha1()
+    hsh.update(git_header)
+    hsh.update(byte_stream)
+    if byte_string and byte_string[-1] != "\n":
+        byte_string += "\n"
+    return byte_string, hsh.hexdigest()
 
 
 def _next_lineno(nodes, i, end):
@@ -104,16 +107,22 @@ def _next_lineno(nodes, i, end):
 
 
 class Module:
-    def __init__(self, source_code=None, mtime=None, ext="py"):
+    def __init__(
+        self, source_code=None, mtime=None, ext="py", fs_checksum=None, filename=None
+    ):
+        self.filename = filename
         self._blocks = None
         self.counter = 0
         self.mtime = mtime
-        self.source_code = textwrap.dedent(source_code)
-        self.fs_checksum = string_checksum(self.source_code)
+        self._source_code = (
+            None if source_code is None else textwrap.dedent(source_code)
+        )
+        self.fs_checksum = (
+            fs_checksum or bytes_to_string_and_checksum(bytes(source_code, "utf-8"))[1]
+        )
         self.ext = ext
 
     def dump_and_block(self, node, end, name="unknown", into_block=False):
-
         if isinstance(node, ast.AST):
             class_name = node.__class__.__name__
             fields = []
@@ -155,7 +164,7 @@ class Module:
 
     @property
     def checksums(self):
-        return encode_lines([block.checksum for block in self.blocks])
+        return methods_to_checksums([block.checksum for block in self.blocks])
 
     @property
     def blocks(self):
@@ -172,13 +181,62 @@ class Module:
                 self._blocks = [Block(1, len(lines), self.source_code)]
         return self._blocks
 
+    @property
+    def source_code(self):
+        if self._source_code is None:
+            self._source_code = read_source_sha(self.filename)[0]
+        return self._source_code
 
-def read_file_with_checksum(absfilename):
+    @property
+    def method_checksums(self):
+        return methods_to_checksums([block.checksum for block in self.blocks])
+
+
+def read_source_sha(filename):
+    # source_bytes: Optional[bytes]
+
     try:
-        source = get_python_source(absfilename)
-    except NoSource:
+        with open(filename, "rb") as file:
+            source_bytes = file.read()
+    except FileNotFoundError:
         return None, None
-    return source, zlib.adler32(source.encode("UTF-8"))
+
+    source, checksum = bytes_to_string_and_checksum(source_bytes)
+    return source, checksum
+
+
+def get_files_shas(directory):
+    all_shas = {}
+    try:
+        result = run(
+            ["git", "ls-files", "--stage", "-m", directory],
+            capture_output=True,
+            universal_newlines=True,
+            check=True,
+        )
+    except (FileNotFoundError, CalledProcessError):
+        return all_shas
+
+    modified_files = set()
+    for line in result.stdout.splitlines():
+        _, hsh, filename_with_junk = line.split(" ")
+        _, filename = filename_with_junk.split("\t")
+        if filename in all_shas:
+            modified_files.add(filename)
+        else:
+            all_shas[filename] = hsh
+    for modified_file in modified_files:
+        del all_shas[modified_file]
+    return all_shas
+
+
+def get_source_sha(directory, filename):
+    try:
+        sha = get_files_shas(directory)[filename]
+        return (None, sha)
+    except KeyError:
+        pass
+    return read_source_sha(Path(directory) / filename)
 
 
 def match_fingerprint_source(source_code, fingerprint, ext="py"):
@@ -197,20 +255,19 @@ def create_fingerprint_source(source_code, lines, ext="py"):
     return create_fingerprint(module, lines)
 
 
-def create_fingerprint(module, lines):
+def create_fingerprint(module, covered_lines):
     blocks = module.blocks
-    result = []
+    method_reprs = []
     line_index = 0
-    sorted_lines = sorted(list(lines))
+    sorted_lines = sorted(covered_lines)
 
     for current_block in sorted(blocks, key=lambda x: x.start):
         try:
             while sorted_lines[line_index] < current_block.start:
                 line_index += 1
             if sorted_lines[line_index] <= current_block.end:
-                result.append(current_block.checksum)
+                method_reprs.append(current_block.code)
         except IndexError:
             break
 
-    result = encode_lines(result)
-    return result
+    return methods_to_checksums(method_reprs)

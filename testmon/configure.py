@@ -6,6 +6,8 @@ try:
 except ImportError:
     from coverage.pytracer import PyTracer as Tracer
 
+from dataclasses import dataclass
+
 
 def _is_dogfooding(coverage_stack):
     return coverage_stack
@@ -19,16 +21,7 @@ def _is_coverage():
     return False
 
 
-def _deactivate_on_xdist(options):
-    return False
-    return (
-        options.get("numprocesses", False)
-        or options.get("distload", False)
-        or options.get("dist", "no") != "no"
-    )
-
-
-def _get_notestmon_reasons(options, xdist):
+def _get_notestmon_reasons(options):
     if options["no-testmon"]:
         return "deactivated through --no-testmon"
 
@@ -36,18 +29,16 @@ def _get_notestmon_reasons(options, xdist):
         return "deactivated, both noselect and nocollect options used"
 
     if not any(
-        options[t]
+        options.get(t, False)
         for t in [
             "testmon",
             "testmon_noselect",
             "testmon_nocollect",
             "testmon_forceselect",
+            "tmnet",
         ]
     ):
         return "not mentioned"
-
-    if xdist:
-        return "deactivated, execution with xdist is not supported"
 
     return None
 
@@ -106,20 +97,35 @@ def _formulate_deactivation(what, reasons):
     return []
 
 
+@dataclass
+class TmConf:
+    message: str
+    collect: bool
+    select: bool
+    tmnet: bool = False
+
+    def __eq__(self, other):
+        return (
+            self.message == other.message
+            and self.collect == other.collect
+            and self.select == other.select
+            and self.tmnet == other.tmnet
+        )
+
+
 def _header_collect_select(
     options,
     debugger=False,
     coverage=False,
     dogfooding=False,
-    xdist=False,
     cov_plugin=False,
-):
-    notestmon_reasons = _get_notestmon_reasons(options, xdist=xdist)
+) -> TmConf:
+    notestmon_reasons = _get_notestmon_reasons(options)
 
     if notestmon_reasons == "not mentioned":
-        return None, False, False
+        return TmConf(None, False, False)
     if notestmon_reasons:
-        return "testmon: " + notestmon_reasons, False, False
+        return TmConf("testmon: " + notestmon_reasons, False, False)
 
     nocollect_reasons = _get_nocollect_reasons(
         options,
@@ -139,20 +145,20 @@ def _header_collect_select(
     else:
         message = ""
 
-    return (
+    return TmConf(
         f"testmon: {message}",
         not bool(nocollect_reasons),
         not bool(noselect_reasons),
+        bool(options.get("tmnet")),
     )
 
 
-def header_collect_select(config, coverage_stack, cov_plugin=None):
+def header_collect_select(config, coverage_stack, cov_plugin=None) -> TmConf:
     options = vars(config.option)
     return _header_collect_select(
         options,
         debugger=_is_debugger(),
         coverage=_is_coverage(),
         dogfooding=_is_dogfooding(coverage_stack),
-        xdist=_deactivate_on_xdist(options),
         cov_plugin=cov_plugin,
     )

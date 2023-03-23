@@ -1,22 +1,24 @@
-import xmlrpc
+import time
+import xmlrpc.client
 from collections import defaultdict
 from datetime import date, timedelta
 
 import pytest
 import pkg_resources
 
-from _pytest.config import ExitCode
+from _pytest.config import ExitCode, Config
+from _pytest.terminal import TerminalReporter
+
+from testmon.configure import TmConf
 
 from testmon.testmon_core import (
-    Testmon,
+    TestmonCollector,
     eval_environment,
     TestmonData,
     home_file,
     TestmonException,
-    get_node_class_name,
-    get_node_module_name,
-    nofili2fingerprints,
-    LIBRARIES_KEY,
+    get_test_execution_class_name,
+    get_test_execution_module_name,
     cached_relpath,
 )
 from testmon import configure
@@ -25,7 +27,9 @@ SURVEY_NOTIFICATION_INTERVAL = timedelta(days=28)
 
 
 def pytest_addoption(parser):
-    group = parser.getgroup("testmon")
+    group = parser.getgroup(
+        "automatically select tests affected by changes (pytest-testmon)"
+    )
 
     group.addoption(
         "--testmon",
@@ -40,23 +44,22 @@ def pytest_addoption(parser):
     )
 
     group.addoption(
+        "--testmon-noselect",
+        action="store_true",
+        dest="testmon_noselect",
+        help=(
+            "Reorder and prioritize the tests most likely to fail first, but don't deselect anything. "
+            "Forced if you use -m, -k, -l, -lf, test_file.py::test_name"
+        ),
+    )
+
+    group.addoption(
         "--testmon-nocollect",
         action="store_true",
         dest="testmon_nocollect",
         help=(
             "Run testmon but deactivate the collection and writing of testmon data. "
             "Forced if you run under debugger or coverage."
-        ),
-    )
-
-    group.addoption(
-        "--testmon-noselect",
-        action="store_true",
-        dest="testmon_noselect",
-        help=(
-            "Run testmon but deactivate selection, so all tests selected by other "
-            "means will be collected and executed. "
-            "Forced if you use -k, -l, -lf, test_file.py::test_name"
         ),
     )
 
@@ -94,8 +97,18 @@ def pytest_addoption(parser):
         ),
     )
 
+    group.addoption(
+        "--tmnet",
+        action="store_true",
+        dest="tmnet",
+        help=(
+            "This is used for internal beta. Please don't use. You can go to https://www.testmon.net/ to register."
+        ),
+    )
+
     parser.addini("environment_expression", "environment expression", default="")
-    parser.addini("testmon_port", "testmon port", default="")
+    parser.addini("testmon_url", "URL of the testmon.net api server.")
+    parser.addini("testmon_api_key", "testmon api key")
 
 
 def testmon_options(config):
@@ -110,27 +123,34 @@ def testmon_options(config):
     return result
 
 
-def init_testmon_data(config, read_source=True):
+def init_testmon_data(config):
     environment = config.getoption("environment_expression") or eval_environment(
         config.getini("environment_expression")
     )
-    remote_port = config.getini("testmon_port")
+    packages = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
 
-    rpc_client = None
-    if remote_port:
-        url = f"http://localhost:{remote_port}"
-        print(f"using remote server at {url}")
-        rpc_client = xmlrpc.client.ServerProxy(url, allow_none=True)
+    url = config.getini("testmon_url")
+    api_key = config.getini("testmon_api_key")
+    rpc_proxy = None
 
-    libraries = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
+    if config.testmon_config.tmnet or getattr(config, "tmnet", None):
+        rpc_proxy = getattr(config, "tmnet", None)
+
+        if not url:
+            url = "https://tmnet-4.fly.dev/"
+
+        if not rpc_proxy:
+            print(f"using remote server at {url}")
+            project_name = api_key.rsplit("_")[0]
+            project_url = url + project_name
+            rpc_proxy = xmlrpc.client.ServerProxy(project_url, allow_none=True)
+
     testmon_data = TestmonData(
-        config.rootdir.strpath,
+        database=rpc_proxy,
         environment=environment,
-        libraries=libraries,
-        rpc=rpc_client,
+        system_packages=packages,
     )
-    if read_source:
-        testmon_data.determine_stable()
+    testmon_data.determine_stable(bool(rpc_proxy))
     config.testmon_data = testmon_data
 
 
@@ -153,7 +173,7 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
     if should_collect:
         config.pluginmanager.register(
             TestmonCollect(
-                Testmon(
+                TestmonCollector(
                     config.rootdir.strpath,
                     testmon_labels=testmon_options(config),
                     cov_plugin=cov_plugin,
@@ -179,41 +199,37 @@ def pytest_configure(config):
     cov_plugin = None
     cov_plugin = config.pluginmanager.get_plugin("_cov")
 
-    message, should_collect, should_select = configure.header_collect_select(
+    tm_conf = configure.header_collect_select(
         config, coverage_stack, cov_plugin=cov_plugin
     )
-    config.testmon_config = (message, should_collect, should_select)
-    if should_select or should_collect:
-
+    config.testmon_config = tm_conf
+    if tm_conf.select or tm_conf.collect:
         try:
             init_testmon_data(config)
-            register_plugins(config, should_select, should_collect, cov_plugin)
+            register_plugins(config, tm_conf.select, tm_conf.collect, cov_plugin)
         except TestmonException as error:
             pytest.exit(str(error))
 
 
 def pytest_report_header(config):
-    message, should_collect, should_select = config.testmon_config
+    tm_conf = config.testmon_config
 
-    if should_collect or should_select:
+    if tm_conf.collect or tm_conf.select:
         unstable_files = getattr(config.testmon_data, "unstable_files", set())
-        stable_files = getattr(config.testmon_data, "stable_files", set()) - {
-            LIBRARIES_KEY
-        }
+        stable_files = getattr(config.testmon_data, "stable_files", set())
         environment = config.testmon_data.environment
-        libraries_miss = getattr(config.testmon_data, "libraries_miss", None)
 
-        message += changed_message(
+        tm_conf.message += changed_message(
             config,
             environment,
-            libraries_miss,
-            should_select,
+            config.testmon_data.system_packages_change,
+            tm_conf.select,
             stable_files,
             unstable_files,
         )
 
         show_survey_notification = True
-        last_notification_date = config.testmon_data.db._fetch_attribute(
+        last_notification_date = config.testmon_data.db.fetch_attribute(
             "last_survey_notification_date"
         )
         if last_notification_date:
@@ -221,27 +237,26 @@ def pytest_report_header(config):
             if date.today() - last_notification_date < SURVEY_NOTIFICATION_INTERVAL:
                 show_survey_notification = False
             else:
-                config.testmon_data.db._write_attribute(
+                config.testmon_data.db.write_attribute(
                     "last_survey_notification_date", date.today().isoformat()
                 )
         else:
-            config.testmon_data.db._write_attribute(
+            config.testmon_data.db.write_attribute(
                 "last_survey_notification_date", date.today().isoformat()
             )
 
         if show_survey_notification:
-            message += (
+            tm_conf.message += (
                 "\nWe'd like to hear from testmon users! "
                 "🙏🙏 go to https://testmon.org/survey to leave feedback ✅❌"
             )
-
-    return message
+    return tm_conf.message
 
 
 def changed_message(
     config,
     environment,
-    libraries_miss,
+    packages_change,
     should_select,
     stable_files,
     unstable_files,
@@ -252,12 +267,14 @@ def changed_message(
         if changed_files_msg == "" or len(changed_files_msg) > 100:
             changed_files_msg = str(len(config.testmon_data.unstable_files))
 
-        if changed_files_msg == "0" and len(stable_files) == 0:
+        if changed_files_msg == "0" and len(stable_files) == 0 and not packages_change:
             message += "new DB, "
         else:
             message += (
-                f"{'libraries upgrade, ' if libraries_miss else ''}changed files: {changed_files_msg}, "
-                f"skipping collection of {len(stable_files)} files, "
+                "The packages installed in your Python environment have been changed. "
+                "All tests have to be re-executed. "
+                if packages_change
+                else f"changed files: {changed_files_msg}, unchanged files: {len(stable_files)}, "
             )
     if config.testmon_data.environment:
         message += f"environment: {environment}"
@@ -269,12 +286,6 @@ def pytest_unconfigure(config):
         config.testmon_data.close_connection()
 
 
-def process_result(result):
-    failed = any(r.outcome == "failed" for r in result.values())
-    duration = sum(value.duration for value in result.values())
-    return failed, duration
-
-
 class TestmonCollect:
     def __init__(self, testmon, testmon_data, host="single", cov_plugin=None):
         self.testmon_data = testmon_data
@@ -282,15 +293,16 @@ class TestmonCollect:
         self._host = host
 
         self.reports = defaultdict(lambda: {})
-        self.raw_nodeids = []
+        self.raw_test_names = []
         self.cov_plugin = cov_plugin
+        self._sessionstarttime = time.time()
 
     @pytest.hookimpl(tryfirst=True, hookwrapper=True)
     def pytest_pycollect_makeitem(self, collector, name, obj):
         makeitem_result = yield
         items = makeitem_result.get_result() or []
         try:
-            self.raw_nodeids.extend(
+            self.raw_test_names.extend(
                 [item.nodeid for item in items if isinstance(item, pytest.Item)]
             )
         except TypeError:
@@ -302,7 +314,7 @@ class TestmonCollect:
         if getattr(config, "workerinput", {}).get("workerid", "gw0") != "gw0":
             should_sync = False
         if should_sync:
-            config.testmon_data.sync_db_fs_nodes(retain=set(self.raw_nodeids))
+            config.testmon_data.sync_db_fs_tests(retain=set(self.raw_test_names))
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_protocol(self, item, nextitem):
@@ -327,32 +339,31 @@ class TestmonCollect:
 
         self.reports[report.nodeid][report.when] = report
         if report.when == "teardown" and hasattr(report, "nodes_files_lines"):
-            nodes_fingerprints = nofili2fingerprints(
-                report.nodes_files_lines, self.testmon_data
-            )
-            fa_durs = {
-                nodeid: process_result(self.reports[nodeid])
-                for nodeid in nodes_fingerprints
-            }
-            self.testmon_data.db.insert_node_file_fps(nodes_fingerprints, fa_durs)
+            if report.nodes_files_lines:
+                test_executions_fingerprints = self.testmon_data.get_tests_fingerprints(
+                    report.nodes_files_lines, self.reports
+                )
+                self.testmon_data.save_test_execution_file_fps(
+                    test_executions_fingerprints
+                )
 
     def pytest_keyboard_interrupt(self, excinfo):
         if self._host == "single":
             nodes_files_lines = self.testmon.get_batch_coverage_data()
 
-            nodes_fingerprints = nofili2fingerprints(
-                nodes_files_lines, self.testmon_data
+            test_executions_fingerprints = self.testmon_data.get_tests_fingerprints(
+                nodes_files_lines, self.reports
             )
-            fa_durs = {
-                nodeid: process_result(self.reports[nodeid])
-                for nodeid in nodes_fingerprints
-            }
-            self.testmon_data.db.insert_node_file_fps(nodes_fingerprints, fa_durs)
+            self.testmon_data.save_test_execution_file_fps(test_executions_fingerprints)
             self.testmon.close()
 
     def pytest_sessionfinish(self, session):
         if self._host in ("single", "controller"):
-            self.testmon_data.db.remove_unused_file_fps()
+            self.testmon_data.db.finish_execution(
+                self.testmon_data.exec_id,
+                time.time() - self._sessionstarttime,
+                session.config.testmon_config.select,
+            )
         self.testmon.close()
 
 
@@ -360,19 +371,31 @@ def did_fail(reports):
     return reports["failed"]
 
 
-def get_failing(all_nodes):
-    failing_files, failing_nodes = set(), {}
-    for nodeid, result in all_nodes.items():
-        if did_fail(all_nodes[nodeid]):
-            failing_files.add(home_file(nodeid))
-            failing_nodes[nodeid] = result
-    return failing_files, failing_nodes
+def get_failing(all_test_executions):
+    failing_files, failing_tests = set(), {}
+    for test_name, result in all_test_executions.items():
+        if did_fail(all_test_executions[test_name]):
+            failing_files.add(home_file(test_name))
+            failing_tests[test_name] = result
+    return failing_files, failing_tests
 
 
 def sort_items_by_duration(items, avg_durations):
     items.sort(key=lambda item: avg_durations[item.nodeid])
-    items.sort(key=lambda item: avg_durations[get_node_class_name(item.nodeid)])
-    items.sort(key=lambda item: avg_durations[get_node_module_name(item.nodeid)])
+    items.sort(
+        key=lambda item: avg_durations[get_test_execution_class_name(item.nodeid)]
+    )
+    items.sort(
+        key=lambda item: avg_durations[get_test_execution_module_name(item.nodeid)]
+    )
+
+
+def format_time_saved(seconds):
+    if not seconds:
+        seconds = 0
+    if seconds >= 3600:
+        return f"{int(seconds / 3600)}h {int((seconds % 3600) / 60)}m"
+    return f"{int(seconds / 60)}m {int((seconds % 60) % 60)}s"
 
 
 class TestmonSelect:
@@ -380,18 +403,21 @@ class TestmonSelect:
         self.testmon_data = testmon_data
         self.config = config
 
-        failing_files, failing_nodes = get_failing(testmon_data.all_nodes)
+        failing_files, failing_test_names = get_failing(testmon_data.all_tests)
 
         self.deselected_files = [
             file for file in testmon_data.stable_files if file not in failing_files
         ]
-        self.deselected_nodes = [
-            node for node in testmon_data.stable_nodeids if node not in failing_nodes
+        self.deselected_tests = [
+            test_name
+            for test_name in testmon_data.stable_test_names
+            if test_name not in failing_test_names
         ]
+        self._interrupted = False
 
     def pytest_ignore_collect(self, path, config):
         strpath = cached_relpath(path.strpath, config.rootdir.strpath)
-        if strpath in self.deselected_files and self.config.testmon_config[2]:
+        if strpath in self.deselected_files and self.config.testmon_config.select:
             return True
         return None
 
@@ -400,19 +426,17 @@ class TestmonSelect:
         selected = []
         deselected = []
         for item in items:
-            if item.nodeid in self.deselected_nodes:
+            if item.nodeid in self.deselected_tests:
                 deselected.append(item)
             else:
                 selected.append(item)
 
         sort_items_by_duration(selected, self.testmon_data.avg_durations)
 
-        if self.config.testmon_config[2]:
+        if self.config.testmon_config.select:
             items[:] = selected
             session.config.hook.pytest_deselected(
-                items=(
-                    [FakeItemFromTestmon(session.config)] * len(self.deselected_nodes)
-                )
+                items=([FakeItemFromTestmon(session.config)] * len(deselected))
             )
         else:
             sort_items_by_duration(deselected, self.testmon_data.avg_durations)
@@ -420,8 +444,60 @@ class TestmonSelect:
 
     @pytest.hookimpl(trylast=True)
     def pytest_sessionfinish(self, session, exitstatus):
-        if len(self.deselected_nodes) and exitstatus == ExitCode.NO_TESTS_COLLECTED:
+        if len(self.deselected_tests) and exitstatus == ExitCode.NO_TESTS_COLLECTED:
             session.exitstatus = ExitCode.OK
+
+    @pytest.hookimpl(trylast=True)
+    def pytest_terminal_summary(self):
+        if self._interrupted:
+            return
+
+        if not self.config.option.verbose >= 2:
+            return
+
+        (
+            run_saved_time,
+            run_all_time,
+            run_saved_tests,
+            run_all_tests,
+            total_saved_time,
+            total_all_time,
+            total_saved_tests,
+            total_tests_all,
+        ) = self.testmon_data.fetch_saving_stats(self.config.testmon_config.select)
+
+        terminal_reporter = TerminalReporter(self.config)
+        potential_or_not = ""
+        if not self.config.testmon_config.select:
+            potential_or_not = "Potential t"
+        else:
+            potential_or_not = "T"
+        terminal_reporter.section(
+            f"{potential_or_not}estmon savings (deselected/no testmon)",
+            "=",
+            **{"blue": True},
+        )
+
+        try:
+            tests_all_ratio = f"{100.0*total_saved_tests/total_tests_all:.0f}"
+        except ZeroDivisionError:
+            tests_all_ratio = "0"
+        try:
+            tests_current_ratio = f"{100.0*run_saved_tests/run_all_tests:.0f}"
+        except ZeroDivisionError:
+            tests_current_ratio = "0"
+        msg = f"this run: {run_saved_tests}/{run_all_tests} ({tests_current_ratio}%) tests, "
+        msg += format_time_saved(run_saved_time) + "/" + format_time_saved(run_all_time)
+        msg += f", all runs: {total_saved_tests}/{total_tests_all} ({tests_all_ratio}%) tests, "
+        msg += (
+            format_time_saved(total_saved_time)
+            + "/"
+            + format_time_saved(total_all_time)
+        )
+        terminal_reporter.write_line(msg)
+
+    def pytest_keyboard_interrupt(self, excinfo):
+        self._interrupted = True
 
 
 class FakeItemFromTestmon:

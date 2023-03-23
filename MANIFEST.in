@@ -1,3 +1,5 @@
 include README.md
 include LICENSE
-prune tests/
+prune tests
+prune tox.ini
+prune tmserver

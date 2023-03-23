@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytest-testmon"
+authors = [
+    { name = "Tibor Arpas", email = "tibor@testmon.org" },
+]
+version = "2.0.0"
+description = "selects tests affected by changed files and methods"
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["testing", "pytest", "plugin"]
+license = { text = "AGPL" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS :: MacOS X",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Utilities",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3 :: Only",
+    "Framework :: Pytest",
+]
+dependencies = [
+    "pytest>=5,<8",
+    "coverage>=6,<8",
+]
+
+[tool.setuptools]
+packages = [
+    "testmon",
+]
+
+[tool.black]
+exclude = '''
+(
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+  )/
+  | io.intellij/
+)
+'''
+
+[project.scripts]
+tmnetc = "testmon.tmnetc:main"
+
+[project.entry-points.pytest11]
+pytest-testmon = "testmon.pytest_testmon"
