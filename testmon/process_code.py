@@ -219,8 +219,8 @@ def get_files_shas(directory):
 
     modified_files = set()
     for line in result.stdout.splitlines():
-        _, hsh, filename_with_junk = line.split(" ")
-        _, filename = filename_with_junk.split("\t")
+        _, hsh, filename_with_junk = line.split(" ", 2)
+        _, filename = filename_with_junk.split("\t", 1)
         if filename in all_shas:
             modified_files.add(filename)
         else:
