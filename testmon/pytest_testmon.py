@@ -146,6 +146,7 @@ def init_testmon_data(config):
             rpc_proxy = xmlrpc.client.ServerProxy(project_url, allow_none=True)
 
     testmon_data = TestmonData(
+        rootdir=config.rootdir.strpath,
         database=rpc_proxy,
         environment=environment,
         system_packages=packages,
@@ -479,11 +480,11 @@ class TestmonSelect:
         )
 
         try:
-            tests_all_ratio = f"{100.0*total_saved_tests/total_tests_all:.0f}"
+            tests_all_ratio = f"{100.0 * total_saved_tests / total_tests_all:.0f}"
         except ZeroDivisionError:
             tests_all_ratio = "0"
         try:
-            tests_current_ratio = f"{100.0*run_saved_tests/run_all_tests:.0f}"
+            tests_current_ratio = f"{100.0 * run_saved_tests / run_all_tests:.0f}"
         except ZeroDivisionError:
             tests_current_ratio = "0"
         msg = f"this run: {run_saved_tests}/{run_all_tests} ({tests_current_ratio}%) tests, "

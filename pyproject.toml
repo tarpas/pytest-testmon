@@ -7,7 +7,7 @@ name = "pytest-testmon"
 authors = [
     { name = "Tibor Arpas", email = "tibor@testmon.org" },
 ]
-version = "2.0.1"
+version = "2.0.2"
 description = "selects tests affected by changed files and methods"
 readme = "README.md"
 requires-python = ">=3.7"
@@ -60,8 +60,6 @@ exclude = '''
 )
 '''
 
-[project.scripts]
-tmnetc = "testmon.tmnetc:main"
 
 [project.entry-points.pytest11]
 pytest-testmon = "testmon.pytest_testmon"

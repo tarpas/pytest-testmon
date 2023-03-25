@@ -49,7 +49,7 @@ class TestmonException(Exception):
 
 
 class SourceTree:
-    def __init__(self, rootdir="", packages=None):
+    def __init__(self, rootdir, packages=None):
         self.rootdir = rootdir
         self.packages = packages
         self.cache = {}
@@ -128,13 +128,15 @@ class TestmonData:
 
     def __init__(
         self,
+        rootdir,
         database=None,
         environment=None,
         system_packages=None,
         python_version=None,
     ):
+        self.rootdir = rootdir
         self.environment = environment if environment else "default"
-        self.source_tree = SourceTree(rootdir="")
+        self.source_tree = SourceTree(rootdir=rootdir)
         if system_packages is None:
             system_packages = ", ".join(
                 sorted(str(p) for p in pkg_resources.working_set or [])
@@ -145,7 +147,7 @@ class TestmonData:
         if database:
             self.db = database
         else:
-            self.db = db.DB(get_data_file_path())
+            self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))
 
         try:
             result = self.db.initiate_execution(
@@ -156,7 +158,7 @@ class TestmonData:
                 "%s error when communication with testmon.net. (falling back to .testmondata locally)",
                 exc,
             )
-            self.db = db.DB(get_data_file_path())
+            self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))
 
         self.exec_id = result["exec_id"]
         self.all_files = set(result["filenames"])
@@ -180,7 +182,7 @@ class TestmonData:
             deps_n_outcomes = {"deps": []}
 
             for filename, covered in nodes_files_lines[context].items():
-                if os.path.exists(filename):
+                if os.path.exists(os.path.join(self.rootdir, filename)):
                     module = self.source_tree.get_file(filename)
                     fingerprint = create_fingerprint(module, covered)
                     deps_n_outcomes["deps"].append(
@@ -340,7 +342,7 @@ def cached_relpath(path, basepath):
 class TestmonCollector:
     coverage_stack = []
 
-    def __init__(self, rootdir=".", testmon_labels=None, cov_plugin=None):
+    def __init__(self, rootdir, testmon_labels=None, cov_plugin=None):
         try:
             from testmon.testmon_core import (
                 Testmon as UberTestmon,
