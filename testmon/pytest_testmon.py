@@ -4,7 +4,6 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 import pytest
-import pkg_resources
 
 from _pytest.config import ExitCode, Config
 from _pytest.terminal import TerminalReporter
@@ -127,7 +126,6 @@ def init_testmon_data(config):
     environment = config.getoption("environment_expression") or eval_environment(
         config.getini("environment_expression")
     )
-    packages = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
 
     url = config.getini("testmon_url")
     api_key = config.getini("testmon_api_key")
@@ -148,7 +146,6 @@ def init_testmon_data(config):
     testmon_data = TestmonData(
         database=rpc_proxy,
         environment=environment,
-        system_packages=packages,
     )
     testmon_data.determine_stable(bool(rpc_proxy))
     config.testmon_data = testmon_data
