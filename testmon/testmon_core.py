@@ -1,4 +1,5 @@
 import hashlib
+import importlib.metadata
 import os
 import random
 import sys
@@ -8,7 +9,6 @@ from functools import lru_cache
 from collections import defaultdict
 from xmlrpc.client import Fault
 
-import pkg_resources
 import pytest
 from coverage import Coverage, CoverageData
 
@@ -137,7 +137,7 @@ class TestmonData:
         self.source_tree = SourceTree(rootdir="")
         if system_packages is None:
             system_packages = ", ".join(
-                sorted(str(p) for p in pkg_resources.working_set or [])
+                sorted(f"{d.name} {d.version}" for d in importlib.metadata.distributions())
             )
         if not python_version:
             python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
