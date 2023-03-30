@@ -312,6 +312,7 @@ class TestmonData:
 
 
 def get_new_mtimes(filesystem, hits):
+
     try:
         for hit in hits:
             module = filesystem.get_file(hit[0])

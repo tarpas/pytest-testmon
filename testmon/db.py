@@ -8,7 +8,7 @@ from functools import lru_cache
 from testmon.process_code import blob_to_checksums, checksums_to_blob
 
 
-DATA_VERSION = 8
+DATA_VERSION = 9
 
 ChangedFileData = namedtuple(
     "ChangedFileData", "filename name method_checksums id failed"
@@ -361,13 +361,11 @@ class DB:
                 FOREIGN KEY({self._test_execution_fk_column()}) REFERENCES {self._test_execution_fk_table()}(id));
                 CREATE INDEX test_execution_fk_name ON test_execution ({self._test_execution_fk_column()}, test_name);
                                                 
-                CREATE TABLE mcall_id (id INTEGER PRIMARY KEY ASC, exec_id INTEGER);
-
-                CREATE TABLE temp_files_checksums (mcall_id INTEGER, filename TEXT, checksum TEXT);
-                CREATE INDEX temp_files_checksums_mcall ON temp_files_checksums (mcall_ID);
+                CREATE TABLE temp_files_checksums (exec_id INTEGER, filename TEXT, checksum TEXT);
+                CREATE INDEX temp_files_checksums_mcall ON temp_files_checksums (exec_id);
             
-                CREATE TABLE temp_filenames (mcall_id INTEGER, filename TEXT);
-                CREATE INDEX temp_filenames_mcall ON temp_filenames (mcall_id);
+                CREATE TABLE temp_filenames (exec_id INTEGER, filename TEXT);
+                CREATE INDEX temp_filenames_eid ON temp_filenames (exec_id);
             """
 
     def _create_file_fp_statement(self):
@@ -447,18 +445,11 @@ class DB:
 
     def fetch_unknown_files(self, files_checksums, exec_id):
         with self.con as con:
-            con.execute(
-                f"UPDATE test_execution set forced = NULL WHERE {self._test_execution_fk_column()} = ?",
-                [exec_id],
-            )
-            cursor = con.cursor()
-            cursor.execute("INSERT INTO mcall_id (exec_id) VALUES (?)", [exec_id])
-            mcall_id = cursor.lastrowid
             self.con.execute("DELETE FROM temp_files_checksums")
             con.executemany(
                 "INSERT INTO temp_files_checksums VALUES (?, ?, ?)",
                 [
-                    (mcall_id, file, checksum)
+                    (exec_id, file, checksum)
                     for file, checksum in files_checksums.items()
                 ],
             )
@@ -469,34 +460,38 @@ class DB:
                     f.filename
                 FROM test_execution te, test_execution_file_fp te_ffp, file_fp f
                 LEFT OUTER JOIN temp_files_checksums tfc
-                ON f.filename = tfc.filename and f.checksum = tfc.checksum AND tfc.mcall_id = ?
+                ON f.filename = tfc.filename and f.checksum = tfc.checksum AND tfc.exec_id = ?
                 WHERE
                     te.{self._test_execution_fk_column()} = ? AND
                     te.id = te_ffp.test_execution_id AND
                     te_ffp.fingerprint_id = f.id AND
-                    (f.checksum IS NULL OR tfc.checksum IS NULL OR f.checksum <> tfc.checksum)
+                    (f.checksum IS NULL OR tfc.checksum IS NULL)
                 """,
-                [mcall_id, exec_id],
+                [exec_id, exec_id],
             ):
                 result.append(row["filename"])
 
             return result
 
+    def delete_filenames(self, con):
+        con.execute("DELETE FROM temp_filenames")
+
     def determine_tests(self, exec_id, files_mhashes):
         with self.con as con:
-            cursor = con.cursor()
-            cursor.execute("INSERT INTO mcall_id (exec_id) VALUES (?)", [exec_id])
-            mcall_id = cursor.lastrowid
-            con.execute("DELETE FROM temp_filenames")
+            con.execute(
+                f"UPDATE test_execution set forced = NULL WHERE {self._test_execution_fk_column()} = ?",
+                [exec_id],
+            )
+            self.delete_filenames(con)
             con.executemany(
                 "INSERT INTO temp_filenames VALUES (?, ?)",
-                list(
+                [
                     (
-                        mcall_id,
+                        exec_id,
                         k,
                     )
                     for k in files_mhashes
-                ),
+                ],
             )
 
             results = []
@@ -510,13 +505,13 @@ class DB:
                     te.duration
                 FROM test_execution te, test_execution_file_fp te_ffp, file_fp f, temp_filenames tf
                 WHERE
-                    tf.mcall_id = ? AND
+                    tf.exec_id = ? AND
                     te.{self._test_execution_fk_column()} = ? AND
                     te.id = te_ffp.test_execution_id AND
                     te_ffp.fingerprint_id = f.id AND
                     tf.filename = f.filename
                 """,
-                [mcall_id, exec_id],
+                [exec_id, exec_id],
             ):
                 results.append(
                     [

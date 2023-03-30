@@ -205,6 +205,7 @@ def pytest_configure(config):
     )
     config.testmon_config = tm_conf
     if tm_conf.select or tm_conf.collect:
+
         try:
             init_testmon_data(config)
             register_plugins(config, tm_conf.select, tm_conf.collect, cov_plugin)
