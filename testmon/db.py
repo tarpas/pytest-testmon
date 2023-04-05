@@ -360,10 +360,10 @@ class DB:
                 forced BIT,
                 FOREIGN KEY({self._test_execution_fk_column()}) REFERENCES {self._test_execution_fk_table()}(id));
                 CREATE INDEX test_execution_fk_name ON test_execution ({self._test_execution_fk_column()}, test_name);
-                                                
+
                 CREATE TABLE temp_files_checksums (exec_id INTEGER, filename TEXT, checksum TEXT);
                 CREATE INDEX temp_files_checksums_mcall ON temp_files_checksums (exec_id);
-            
+
                 CREATE TABLE temp_filenames (exec_id INTEGER, filename TEXT);
                 CREATE INDEX temp_filenames_eid ON temp_filenames (exec_id);
             """
@@ -387,7 +387,7 @@ class DB:
             CREATE TABLE test_execution_file_fp (
                 test_execution_id INTEGER,
                 fingerprint_id INTEGER,
-                FOREIGN KEY(test_execution_id) REFERENCES test_execution(id),                
+                FOREIGN KEY(test_execution_id) REFERENCES test_execution(id),
                 FOREIGN KEY(fingerprint_id) REFERENCES file_fp(id)
             );
             CREATE INDEX test_execution_file_fp_both ON test_execution_file_fp (test_execution_id, fingerprint_id);
@@ -456,7 +456,7 @@ class DB:
             result = []
             for row in self.con.execute(
                 f"""
-                SELECT DISTINCT 
+                SELECT DISTINCT
                     f.filename
                 FROM test_execution te, test_execution_file_fp te_ffp, file_fp f
                 LEFT OUTER JOIN temp_files_checksums tfc
@@ -658,6 +658,7 @@ class DB:
         environment_name,
         system_packages,
         python_version,
+        execution_metadata,
     ):
         exec_id, packages_changed = self.fetch_or_create_environment(
             environment_name, system_packages, python_version

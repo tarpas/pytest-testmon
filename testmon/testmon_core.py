@@ -6,13 +6,17 @@ import sysconfig
 import textwrap
 from functools import lru_cache
 from collections import defaultdict
-from xmlrpc.client import Fault
+from xmlrpc.client import Fault, ProtocolError
+from subprocess import check_output, CalledProcessError
+from socket import gaierror
 
 import pkg_resources
 import pytest
 from coverage import Coverage, CoverageData
 
 from testmon import db
+from testmon import VERSION as TM_CLIENT_VERSION
+
 from testmon.common import get_logger
 
 from testmon.process_code import (
@@ -150,16 +154,32 @@ class TestmonData:
             self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))
 
         try:
+            git_head_sha = None
+            try:
+                git_head_sha = (
+                    check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()
+                )
+            except CalledProcessError:
+                pass
             result = self.db.initiate_execution(
-                self.environment, system_packages, python_version
+                self.environment,
+                system_packages,
+                python_version,
+                {
+                    "tm_client_version": TM_CLIENT_VERSION,
+                    "git_head_sha": git_head_sha,
+                    "ci": os.environ.get("CI"),
+                },
             )
-        except (ConnectionRefusedError, Fault) as exc:
+        except (ConnectionRefusedError, Fault, ProtocolError, gaierror) as exc:
             logger.error(
                 "%s error when communication with testmon.net. (falling back to .testmondata locally)",
                 exc,
             )
             self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))
-
+            result = self.db.initiate_execution(
+                self.environment, system_packages, python_version, {}
+            )
         self.exec_id = result["exec_id"]
         self.all_files = set(result["filenames"])
 

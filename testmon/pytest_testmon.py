@@ -1,5 +1,7 @@
 import time
 import xmlrpc.client
+import os
+
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -22,8 +24,11 @@ from testmon.testmon_core import (
     cached_relpath,
 )
 from testmon import configure
+from testmon.common import get_logger
 
 SURVEY_NOTIFICATION_INTERVAL = timedelta(days=28)
+
+logger = get_logger(__name__)
 
 
 def pytest_addoption(parser):
@@ -108,7 +113,7 @@ def pytest_addoption(parser):
 
     parser.addini("environment_expression", "environment expression", default="")
     parser.addini("testmon_url", "URL of the testmon.net api server.")
-    parser.addini("testmon_api_key", "testmon api key")
+    parser.addini("tmnet_api_key", "testmon api key")
 
 
 def testmon_options(config):
@@ -130,20 +135,33 @@ def init_testmon_data(config):
     packages = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
 
     url = config.getini("testmon_url")
-    api_key = config.getini("testmon_api_key")
     rpc_proxy = None
 
     if config.testmon_config.tmnet or getattr(config, "tmnet", None):
         rpc_proxy = getattr(config, "tmnet", None)
 
         if not url:
-            url = "https://tmnet-4.fly.dev/"
-
+            url = "https://api1.testmon.net/"
         if not rpc_proxy:
-            print(f"using remote server at {url}")
-            project_name = api_key.rsplit("_")[0]
-            project_url = url + project_name
-            rpc_proxy = xmlrpc.client.ServerProxy(project_url, allow_none=True)
+            tmnet_api_key = config.getini("tmnet_api_key")
+            if "TMNET_DEV_API_KEY" in os.environ:
+                if tmnet_api_key:
+                    logger.warning(
+                        "Duplicate TMNET_DEV_API_KEY (environment and ini file). \
+                         Using TMNET_DEV_API_KEY from %s",
+                        config.inipath,
+                    )
+                else:
+                    tmnet_api_key = os.getenv("TMNET_DEV_API_KEY")
+            elif tmnet_api_key is None:
+                logger.warning(
+                    "TMNET_DEV_API_KEY not set.",
+                )
+            rpc_proxy = xmlrpc.client.ServerProxy(
+                url,
+                allow_none=True,
+                headers=[("x-api-key", tmnet_api_key)],
+            )
 
     testmon_data = TestmonData(
         rootdir=config.rootdir.strpath,
