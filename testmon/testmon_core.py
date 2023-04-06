@@ -159,7 +159,7 @@ class TestmonData:
                 git_head_sha = (
                     check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()
                 )
-            except CalledProcessError:
+            except (CalledProcessError, FileNotFoundError):
                 pass
             result = self.db.initiate_execution(
                 self.environment,
