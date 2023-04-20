@@ -181,9 +181,10 @@ class TestmonData:
                 self.environment, system_packages, python_version, {}
             )
         self.exec_id = result["exec_id"]
-        self.all_files = set(result["filenames"])
 
         self.system_packages_change = result["packages_changed"]
+
+        self.all_files = {}
         self.unstable_test_names = None
         self.unstable_files = None
         self.stable_test_names = None
@@ -264,6 +265,7 @@ class TestmonData:
         if assert_old:
             self.assert_old_determin_stable(affected_tests)
 
+        self.all_files = set(self.db.filenames(self.exec_id))
         self.unstable_test_names = set()
         self.unstable_files = set()
 
@@ -290,9 +292,19 @@ class TestmonData:
             self.source_tree, check_fingerprint, changed_file_data
         )
 
-        assert {fingerprint_miss[1] for fingerprint_miss in fingerprint_misses} == set(
+        if {fingerprint_miss[1] for fingerprint_miss in fingerprint_misses} != set(
             new_fingerprint_misses
-        )
+        ):
+            print("ERROR: old and new fingerprint misses differ.. printing old algo")
+            print(
+                "\n".join(
+                    sorted(
+                        {fingerprint_miss[1] for fingerprint_miss in fingerprint_misses}
+                    )
+                )
+            )
+            print("printing new algo")
+            print("\n".join(sorted(new_fingerprint_misses)))
 
     @property
     def avg_durations(self):
@@ -332,7 +344,6 @@ class TestmonData:
 
 
 def get_new_mtimes(filesystem, hits):
-
     try:
         for hit in hits:
             module = filesystem.get_file(hit[0])

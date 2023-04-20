@@ -15,18 +15,6 @@ ChangedFileData = namedtuple(
 )
 
 
-class CachedProperty:
-    def __init__(self, func):
-        self.__doc__ = getattr(func, "__doc__")
-        self.func = func
-
-    def __get__(self, obj, cls):
-        if obj is None:
-            return self
-        value = obj.__dict__[self.func.__name__] = self.func(obj)
-        return value
-
-
 class TestmonDbException(Exception):
     pass
 
@@ -445,7 +433,9 @@ class DB:
 
     def fetch_unknown_files(self, files_checksums, exec_id):
         with self.con as con:
-            self.con.execute("DELETE FROM temp_files_checksums")
+            con.execute(
+                "DELETE FROM temp_files_checksums WHERE exec_id = ?", (exec_id,)
+            )
             con.executemany(
                 "INSERT INTO temp_files_checksums VALUES (?, ?, ?)",
                 [
@@ -453,25 +443,27 @@ class DB:
                     for file, checksum in files_checksums.items()
                 ],
             )
-            result = []
-            for row in self.con.execute(
-                f"""
+            return self._fetch_unknown_files_from_one_v(con, exec_id, exec_id)
+
+    def _fetch_unknown_files_from_one_v(self, con, exec_id, files_shas_id):
+        result = []
+        for row in con.execute(
+            f"""
                 SELECT DISTINCT
                     f.filename
                 FROM test_execution te, test_execution_file_fp te_ffp, file_fp f
                 LEFT OUTER JOIN temp_files_checksums tfc
-                ON f.filename = tfc.filename and f.checksum = tfc.checksum AND tfc.exec_id = ?
+                ON f.filename = tfc.filename and f.checksum = tfc.checksum AND tfc.exec_id = :files_shas_id
                 WHERE
-                    te.{self._test_execution_fk_column()} = ? AND
+                    te.{self._test_execution_fk_column()} = :exec_id AND
                     te.id = te_ffp.test_execution_id AND
                     te_ffp.fingerprint_id = f.id AND
                     (f.checksum IS NULL OR tfc.checksum IS NULL)
                 """,
-                [exec_id, exec_id],
-            ):
-                result.append(row["filename"])
-
-            return result
+            {"files_shas_id": files_shas_id, "exec_id": exec_id},
+        ):
+            result.append(row["filename"])
+        return result
 
     def delete_filenames(self, con):
         con.execute("DELETE FROM temp_filenames")
@@ -590,7 +582,6 @@ class DB:
 
         return [row[0] for row in cursor]
 
-    @lru_cache(128)
     def filenames_fingerprints(self, exec_id):
         cursor = self.con.execute(
             f"""
@@ -665,6 +656,5 @@ class DB:
         )
         return {
             "exec_id": exec_id,
-            "filenames": self.filenames(exec_id),
             "packages_changed": packages_changed,
         }

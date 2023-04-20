@@ -123,7 +123,6 @@ class Module:
         self.ext = ext
 
     def dump_and_block(self, node, end, name="unknown", into_block=False):
-
         if isinstance(node, ast.AST):
             class_name = node.__class__.__name__
             fields = []

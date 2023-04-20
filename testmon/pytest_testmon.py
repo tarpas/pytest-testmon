@@ -128,11 +128,15 @@ def testmon_options(config):
     return result
 
 
+def get_system_packages():
+    return ", ".join(sorted(str(p) for p in pkg_resources.working_set))
+
+
 def init_testmon_data(config):
     environment = config.getoption("environment_expression") or eval_environment(
         config.getini("environment_expression")
     )
-    packages = ", ".join(sorted(str(p) for p in pkg_resources.working_set))
+    packages = get_system_packages()
 
     url = config.getini("testmon_url")
     rpc_proxy = None
@@ -144,18 +148,18 @@ def init_testmon_data(config):
             url = "https://api1.testmon.net/"
         if not rpc_proxy:
             tmnet_api_key = config.getini("tmnet_api_key")
-            if "TMNET_DEV_API_KEY" in os.environ:
+            if "TMNET_API_KEY" in os.environ:
                 if tmnet_api_key:
                     logger.warning(
-                        "Duplicate TMNET_DEV_API_KEY (environment and ini file). \
-                         Using TMNET_DEV_API_KEY from %s",
+                        "Duplicate TMNET_API_KEY (environment and ini file). \
+                         Using TMNET_API_KEY from %s",
                         config.inipath,
                     )
                 else:
-                    tmnet_api_key = os.getenv("TMNET_DEV_API_KEY")
+                    tmnet_api_key = os.getenv("TMNET_API_KEY")
             elif tmnet_api_key is None:
                 logger.warning(
-                    "TMNET_DEV_API_KEY not set.",
+                    "TMNET_API_KEY not set.",
                 )
             rpc_proxy = xmlrpc.client.ServerProxy(
                 url,
@@ -223,7 +227,6 @@ def pytest_configure(config):
     )
     config.testmon_config = tm_conf
     if tm_conf.select or tm_conf.collect:
-
         try:
             init_testmon_data(config)
             register_plugins(config, tm_conf.select, tm_conf.collect, cov_plugin)
