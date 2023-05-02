@@ -656,5 +656,6 @@ class DB:
         )
         return {
             "exec_id": exec_id,
+            "filenames": self.all_filenames(),
             "packages_changed": packages_changed,
         }

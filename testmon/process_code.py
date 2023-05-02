@@ -205,7 +205,7 @@ def read_source_sha(filename):
     return source, checksum
 
 
-def get_files_shas(directory):
+def noncached_get_files_shas(directory):
     all_shas = {}
     try:
         result = run(
@@ -228,6 +228,11 @@ def get_files_shas(directory):
     for modified_file in modified_files:
         del all_shas[modified_file]
     return all_shas
+
+
+@lru_cache()
+def get_files_shas(directory):
+    return noncached_get_files_shas(directory)
 
 
 def get_source_sha(directory, filename):

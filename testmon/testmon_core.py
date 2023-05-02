@@ -7,7 +7,6 @@ import textwrap
 from functools import lru_cache
 from collections import defaultdict
 from xmlrpc.client import Fault, ProtocolError
-from subprocess import check_output, CalledProcessError
 from socket import gaierror
 
 import pkg_resources
@@ -17,7 +16,7 @@ from coverage import Coverage, CoverageData
 from testmon import db
 from testmon import VERSION as TM_CLIENT_VERSION
 
-from testmon.common import get_logger
+from testmon.common import get_logger, git_current_head
 
 from testmon.process_code import (
     match_fingerprint,
@@ -60,9 +59,7 @@ class SourceTree:
 
     def get_file(self, filename):
         if filename not in self.cache:
-            code, checksum = get_source_sha(
-                directory=".", filename=os.path.join(self.rootdir, filename)
-            )
+            code, checksum = get_source_sha(directory=self.rootdir, filename=filename)
             if checksum:
                 fs_mtime = os.path.getmtime(os.path.join(self.rootdir, filename))
                 self.cache[filename] = Module(
@@ -154,20 +151,13 @@ class TestmonData:
             self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))
 
         try:
-            git_head_sha = None
-            try:
-                git_head_sha = (
-                    check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()
-                )
-            except (CalledProcessError, FileNotFoundError):
-                pass
             result = self.db.initiate_execution(
                 self.environment,
                 system_packages,
                 python_version,
                 {
                     "tm_client_version": TM_CLIENT_VERSION,
-                    "git_head_sha": git_head_sha,
+                    "git_head_sha": git_current_head(),
                     "ci": os.environ.get("CI"),
                 },
             )
@@ -183,6 +173,7 @@ class TestmonData:
         self.exec_id = result["exec_id"]
 
         self.system_packages_change = result["packages_changed"]
+        self.files_of_interest = result["filenames"]
 
         self.all_files = {}
         self.unstable_test_names = None
@@ -247,7 +238,7 @@ class TestmonData:
 
     def determine_stable(self, assert_old=True):
         files_checksums = {}
-        for filename in self.all_files:
+        for filename in self.files_of_interest:
             module = self.source_tree.get_file(filename)
             if module:
                 files_checksums[filename] = module.fs_checksum
