@@ -353,11 +353,11 @@ class DB:
                 FOREIGN KEY({self._test_execution_fk_column()}) REFERENCES {self._test_execution_fk_table()}(id));
                 CREATE INDEX test_execution_fk_name ON test_execution ({self._test_execution_fk_column()}, test_name);
 
-                CREATE TABLE temp_files_fshas (exec_id INTEGER, filename TEXT, fsha TEXT);
-                CREATE INDEX temp_files_fshas_mcall ON temp_files_fshas (exec_id, filename, fsha);
+                CREATE TABLE changed_files_fshas (exec_id INTEGER, filename TEXT, fsha TEXT);
+                CREATE INDEX changed_files_fshas_mcall ON changed_files_fshas (exec_id, filename, fsha);
 
-                CREATE TABLE temp_filenames (exec_id INTEGER, filename TEXT, mhashes BLOB);
-                CREATE INDEX temp_filenames_eid ON temp_filenames (exec_id);
+                CREATE TABLE changed_files_mhashes (exec_id INTEGER, filename TEXT, mhashes BLOB);
+                CREATE INDEX changed_files_mhashes_eid ON changed_files_mhashes (exec_id);
             """
 
     def _create_file_fp_statement(self):
@@ -445,9 +445,9 @@ class DB:
 
     def fetch_unknown_files(self, files_fshas, exec_id):
         with self.con as con:
-            con.execute("DELETE FROM temp_files_fshas WHERE exec_id = ?", (exec_id,))
+            con.execute("DELETE FROM changed_files_fshas WHERE exec_id = ?", (exec_id,))
             con.executemany(
-                "INSERT INTO temp_files_fshas VALUES (?, ?, ?)",
+                "INSERT INTO changed_files_fshas VALUES (?, ?, ?)",
                 [(exec_id, file, fsha) for file, fsha in files_fshas.items()],
             )
             return self._fetch_unknown_files_from_one_v(con, exec_id, exec_id)
@@ -459,13 +459,13 @@ class DB:
                 SELECT DISTINCT
                     f.filename
                 FROM test_execution te, test_execution_file_fp te_ffp, file_fp f
-                LEFT OUTER JOIN temp_files_fshas tfc
-                ON f.filename = tfc.filename and f.fsha = tfc.fsha AND tfc.exec_id = :files_shas_id
+                LEFT OUTER JOIN changed_files_fshas chff
+                ON f.filename = chff.filename and f.fsha = chff.fsha AND chff.exec_id = :files_shas_id
                 WHERE
                     te.{self._test_execution_fk_column()} = :exec_id AND
                     te.id = te_ffp.test_execution_id AND
                     te_ffp.fingerprint_id = f.id AND
-                    (f.fsha IS NULL OR tfc.fsha IS NULL)
+                    (f.fsha IS NULL OR chff.fsha IS NULL)
                 """,
             {"files_shas_id": files_shas_id, "exec_id": exec_id},
         ):
@@ -473,7 +473,7 @@ class DB:
         return result
 
     def delete_filenames(self, con):
-        con.execute("DELETE FROM temp_filenames")
+        con.execute("DELETE FROM changed_files_mhashes")
 
     def determine_tests(self, exec_id, files_mhashes):
         with self.con as con:
@@ -483,7 +483,7 @@ class DB:
             )
             self.delete_filenames(con)
             con.executemany(
-                "INSERT INTO temp_filenames VALUES (?, ?, ?)",
+                "INSERT INTO changed_files_mhashes VALUES (?, ?, ?)",
                 [
                     (exec_id, file, checksums_to_blob(mhashes) if mhashes else None)
                     for file, mhashes in files_mhashes.items()
@@ -499,13 +499,13 @@ class DB:
                     f.method_checksums,
                     te.failed,
                     te.duration
-                FROM test_execution te, test_execution_file_fp te_ffp, file_fp f, temp_filenames tf
+                FROM test_execution te, test_execution_file_fp te_ffp, file_fp f, changed_files_mhashes chfm
                 WHERE
-                    tf.exec_id = ? AND
+                    chfm.exec_id = ? AND
                     te.{self._test_execution_fk_column()} = ? AND
                     te.id = te_ffp.test_execution_id AND
                     te_ffp.fingerprint_id = f.id AND
-                    tf.filename = f.filename
+                    chfm.filename = f.filename
                 """,
                 [exec_id, exec_id],
             ):
