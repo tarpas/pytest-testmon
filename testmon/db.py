@@ -8,7 +8,7 @@ from functools import lru_cache
 from testmon.process_code import blob_to_checksums, checksums_to_blob
 
 
-DATA_VERSION = 9
+DATA_VERSION = 11
 
 ChangedFileData = namedtuple(
     "ChangedFileData", "filename name method_checksums id failed"
@@ -278,8 +278,13 @@ class DB:
             )
             self.fetch_or_create_file_fp.cache_clear()
             cursor.execute(
-                "DELETE FROM file_fp where id not in (select fingerprint_id from test_execution_file_fp)"
+                "DELETE FROM file_fp WHERE "
+                "    id NOT IN (select fingerprint_id from test_execution_file_fp)"
             )
+            self.refresh_suite_files_checksums(con, exec_id)
+
+    def refresh_suite_files_checksums(self, con, exec_id):
+        pass
 
     def _fetch_data_version(self):
         con = self.con
@@ -350,7 +355,7 @@ class DB:
                 CREATE INDEX test_execution_fk_name ON test_execution ({self._test_execution_fk_column()}, test_name);
 
                 CREATE TABLE temp_files_checksums (exec_id INTEGER, filename TEXT, checksum TEXT);
-                CREATE INDEX temp_files_checksums_mcall ON temp_files_checksums (exec_id);
+                CREATE INDEX temp_files_checksums_mcall ON temp_files_checksums (exec_id, filename, checksum);
 
                 CREATE TABLE temp_filenames (exec_id INTEGER, filename TEXT);
                 CREATE INDEX temp_filenames_eid ON temp_filenames (exec_id);
@@ -365,7 +370,7 @@ class DB:
                 method_checksums BLOB,
                 mtime FLOAT,
                 checksum TEXT,
-                UNIQUE (filename, method_checksums)
+                UNIQUE (filename, checksum,method_checksums)
             );"""
 
     def _create_test_execution_ffp_statement(
@@ -379,6 +384,14 @@ class DB:
                 FOREIGN KEY(fingerprint_id) REFERENCES file_fp(id)
             );
             CREATE INDEX test_execution_file_fp_both ON test_execution_file_fp (test_execution_id, fingerprint_id);
+            -- the following table stores the same data coarsely, but is used for faster queries
+            CREATE TABLE suite_execution_file_checksum (
+                suite_execution_id INTEGER,
+                filename TEXT,
+                fsha text,
+                FOREIGN KEY(suite_execution_id) REFERENCES suite_execution(id)
+                );
+                CREATE UNIQUE INDEX sefch_suite_id_filename_sha ON suite_execution_file_checksum(suite_execution_id, filename, fsha);
             """
 
     def init_tables(self):

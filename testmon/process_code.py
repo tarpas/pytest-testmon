@@ -108,9 +108,16 @@ def _next_lineno(nodes, i, end):
 
 class Module:
     def __init__(
-        self, source_code=None, mtime=None, ext="py", fs_checksum=None, filename=None
+        self,
+        source_code=None,
+        mtime=None,
+        ext="py",
+        fs_checksum=None,
+        filename=None,
+        rootdir=None,
     ):
         self.filename = filename
+        self.rootdir = rootdir
         self._blocks = None
         self.counter = 0
         self.mtime = mtime
@@ -184,7 +191,7 @@ class Module:
     @property
     def source_code(self):
         if self._source_code is None:
-            self._source_code = read_source_sha(self.filename)[0]
+            self._source_code = read_source_sha(Path(self.rootdir) / self.filename)[0]
         return self._source_code
 
     @property

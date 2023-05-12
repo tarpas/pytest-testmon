@@ -68,6 +68,7 @@ class SourceTree:
                     ext=filename.rsplit(".", 1)[1],
                     fs_checksum=checksum,
                     filename=filename,
+                    rootdir=self.rootdir,
                 )
             else:
                 self.cache[filename] = None
