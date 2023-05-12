@@ -9,14 +9,17 @@ from collections import defaultdict
 from xmlrpc.client import Fault, ProtocolError
 from socket import gaierror
 
-import pkg_resources
 import pytest
 from coverage import Coverage, CoverageData
 
 from testmon import db
 from testmon import VERSION as TM_CLIENT_VERSION
-
-from testmon.common import get_logger, git_current_head
+from testmon.common import (
+    get_logger,
+    get_system_packages,
+    drop_patch_version,
+    git_current_head,
+)
 
 from testmon.process_code import (
     match_fingerprint,
@@ -59,14 +62,14 @@ class SourceTree:
 
     def get_file(self, filename):
         if filename not in self.cache:
-            code, checksum = get_source_sha(directory=self.rootdir, filename=filename)
-            if checksum:
+            code, fsha = get_source_sha(directory=self.rootdir, filename=filename)
+            if fsha:
                 fs_mtime = os.path.getmtime(os.path.join(self.rootdir, filename))
                 self.cache[filename] = Module(
                     source_code=code,
                     mtime=fs_mtime,
                     ext=filename.rsplit(".", 1)[1],
-                    fs_checksum=checksum,
+                    fs_fsha=fsha,
                     filename=filename,
                     rootdir=self.rootdir,
                 )
@@ -86,11 +89,11 @@ def check_mtime(file_system, record):
     return record["mtime"] == fs_mtime
 
 
-def check_checksum(file_system, record):
+def check_fsha(file_system, record):
     cache_module = file_system.get_file(record["filename"])
-    fs_checksum = cache_module.fs_checksum if cache_module else None
+    fs_fsha = cache_module.fs_fsha if cache_module else None
 
-    return record["checksum"] == fs_checksum
+    return record["fsha"] == fs_fsha
 
 
 def check_fingerprint(disk, record):
@@ -140,9 +143,8 @@ class TestmonData:
         self.environment = environment if environment else "default"
         self.source_tree = SourceTree(rootdir=rootdir)
         if system_packages is None:
-            system_packages = ", ".join(
-                sorted(str(p) for p in pkg_resources.working_set or [])
-            )
+            system_packages = get_system_packages()
+        system_packages = drop_patch_version(system_packages)
         if not python_version:
             python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
@@ -164,7 +166,10 @@ class TestmonData:
             )
         except (ConnectionRefusedError, Fault, ProtocolError, gaierror) as exc:
             logger.error(
-                "%s error when communication with testmon.net. (falling back to .testmondata locally)",
+                (
+                    "%s error when communication with testmon.net. (falling back to"
+                    " .testmondata locally)"
+                ),
                 exc,
             )
             self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))
@@ -202,7 +207,7 @@ class TestmonData:
                         {
                             "filename": filename,
                             "mtime": module.mtime,
-                            "checksum": module.fs_checksum,
+                            "fsha": module.fs_fsha,
                             "method_checksums": fingerprint,
                         }
                     )
@@ -223,7 +228,7 @@ class TestmonData:
                             "filename": home_file(test_name),
                             "method_checksums": methods_to_checksums(["0match"]),
                             "mtime": None,
-                            "checksum": None,
+                            "fsha": None,
                         },
                     )
                 }
@@ -238,15 +243,13 @@ class TestmonData:
             database.delete_test_executions(to_delete, self.exec_id)
 
     def determine_stable(self, assert_old=True):
-        files_checksums = {}
+        files_fshas = {}
         for filename in self.files_of_interest:
             module = self.source_tree.get_file(filename)
             if module:
-                files_checksums[filename] = module.fs_checksum
+                files_fshas[filename] = module.fs_fsha
 
-        new_changed_file_data = self.db.fetch_unknown_files(
-            files_checksums, self.exec_id
-        )
+        new_changed_file_data = self.db.fetch_unknown_files(files_fshas, self.exec_id)
 
         files_mhashes = collect_mhashes(self.source_tree, new_changed_file_data)
 
@@ -271,12 +274,12 @@ class TestmonData:
     def assert_old_determin_stable(self, new_fingerprint_misses):
         filenames_fingerprints = self.db.filenames_fingerprints(self.exec_id)
 
-        _, checksum_misses = split_filter(
-            self.source_tree, check_checksum, filenames_fingerprints
+        _, fsha_misses = split_filter(
+            self.source_tree, check_fsha, filenames_fingerprints
         )
 
         changed_file_data = self.db.fetch_changed_file_data(
-            [checksum_miss["fingerprint_id"] for checksum_miss in (checksum_misses)],
+            [fsha_miss["fingerprint_id"] for fsha_miss in (fsha_misses)],
             self.exec_id,
         )
 
@@ -340,12 +343,12 @@ def get_new_mtimes(filesystem, hits):
         for hit in hits:
             module = filesystem.get_file(hit[0])
             if module:
-                yield module.mtime, module.fs_checksum, hit[3]
+                yield module.mtime, module.fs_fsha, hit[3]
     except KeyError:
         for hit in hits:
             module = filesystem.get_file(hit["filename"])
             if module:
-                yield module.mtime, module.fs_checksum, hit["fingerprint_id"]
+                yield module.mtime, module.fs_fsha, hit["fingerprint_id"]
 
 
 def get_test_execution_class_name(node_id):
@@ -465,8 +468,11 @@ class TestmonCollector:
     def get_batch_coverage_data(self):
         if self.check_stack != TestmonCollector.coverage_stack:
             pytest.exit(
-                f"Exiting pytest!!!! This test corrupts Testmon.coverage_stack: "
-                f"{self._test_name} {self.check_stack}, {TestmonCollector.coverage_stack}",
+                (
+                    "Exiting pytest!!!! This test corrupts Testmon.coverage_stack:"
+                    f" {self._test_name} {self.check_stack},"
+                    f" {TestmonCollector.coverage_stack}"
+                ),
                 returncode=3,
             )
 

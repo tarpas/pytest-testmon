@@ -1,5 +1,24 @@
 import logging
 import os
+import re
+
+try:
+    import importlib.metadata
+
+    def get_system_packages_raw():
+        return (
+            f"{pkg.name} {pkg.version}" for pkg in importlib.metadata.distributions()
+        )
+
+except ImportError:
+    import pkg_resources
+
+    def get_system_packages_raw():
+        return (
+            f"{pkg.project_name} {pkg.version}" for pkg in pkg_resources.working_set
+        )
+
+
 from pathlib import Path
 
 
@@ -13,6 +32,18 @@ def get_logger(name):
 
 
 logger = get_logger(__name__)
+
+
+def get_system_packages():
+    return ", ".join(sorted(set(get_system_packages_raw())))
+
+
+def drop_patch_version(system_packages):
+    return re.sub(
+        r"\b([\w_-]+\s\d+\.\d+)\.\w+\b",
+        r"\1",
+        system_packages,
+    )
 
 
 def git_path(start_path=None):

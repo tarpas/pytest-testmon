@@ -6,7 +6,6 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 import pytest
-import pkg_resources
 
 from _pytest.config import ExitCode, Config
 from _pytest.terminal import TerminalReporter
@@ -24,7 +23,7 @@ from testmon.testmon_core import (
     cached_relpath,
 )
 from testmon import configure
-from testmon.common import get_logger
+from testmon.common import get_logger, get_system_packages
 
 SURVEY_NOTIFICATION_INTERVAL = timedelta(days=28)
 
@@ -128,15 +127,11 @@ def testmon_options(config):
     return result
 
 
-def get_system_packages():
-    return ", ".join(sorted(str(p) for p in pkg_resources.working_set))
-
-
 def init_testmon_data(config):
     environment = config.getoption("environment_expression") or eval_environment(
         config.getini("environment_expression")
     )
-    packages = get_system_packages()
+    system_packages = get_system_packages()
 
     url = config.getini("testmon_url")
     rpc_proxy = None
@@ -171,7 +166,7 @@ def init_testmon_data(config):
         rootdir=config.rootdir.strpath,
         database=rpc_proxy,
         environment=environment,
-        system_packages=packages,
+        system_packages=system_packages,
     )
     testmon_data.determine_stable(bool(rpc_proxy))
     config.testmon_data = testmon_data

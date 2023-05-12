@@ -8,7 +8,7 @@ from functools import lru_cache
 from testmon.process_code import blob_to_checksums, checksums_to_blob
 
 
-DATA_VERSION = 11
+DATA_VERSION = 12
 
 ChangedFileData = namedtuple(
     "ChangedFileData", "filename name method_checksums id failed"
@@ -84,7 +84,7 @@ class DB:
     def update_mtimes(self, new_mtimes):
         with self.con as con:
             con.executemany(
-                "UPDATE file_fp SET mtime=?, checksum=? WHERE id = ?", new_mtimes
+                "UPDATE file_fp SET mtime=?, fsha=? WHERE id = ?", new_mtimes
             )
 
     def finish_execution(self, exec_id, duration=None, select=True):
@@ -178,16 +178,16 @@ class DB:
         )
 
     @lru_cache(1000)
-    def fetch_or_create_file_fp(self, filename, checksum, method_checksums):
+    def fetch_or_create_file_fp(self, filename, fsha, method_checksums):
         cursor = self.con.cursor()
         try:
             cursor.execute(
                 """
                 INSERT INTO file_fp
-                (filename, method_checksums, checksum)
+                (filename, method_checksums, fsha)
                 VALUES (?, ?, ?)
                 """,
-                (filename, method_checksums, checksum),
+                (filename, method_checksums, fsha),
             )
 
             fingerprint_id = cursor.lastrowid
@@ -251,27 +251,26 @@ class DB:
 
             test_execution_file_fps = []
             for test_name, deps_n_outcomes in tests_deps_n_outcomes.items():
-                failed = deps_n_outcomes.get("failed", None)
-                duration = deps_n_outcomes.get("duration", None)
-                forced = deps_n_outcomes.get("forced", None)
                 te_id = self._insert_test_execution(
                     con,
                     exec_id,
                     test_name,
-                    duration,
-                    failed,
-                    forced,
+                    deps_n_outcomes.get("duration", None),
+                    deps_n_outcomes.get("failed", None),
+                    deps_n_outcomes.get("forced", None),
                 )
 
                 fingerprints = deps_n_outcomes["deps"]
+                files_fshas = set()
                 for record in fingerprints:
                     fingerprint_id = self.fetch_or_create_file_fp(
                         record["filename"],
-                        record["checksum"],
+                        record["fsha"],
                         checksums_to_blob(record["method_checksums"]),
                     )
 
                     test_execution_file_fps.append((te_id, fingerprint_id))
+                    files_fshas.add((record["filename"], record["fsha"]))
             cursor.executemany(
                 "INSERT INTO test_execution_file_fp VALUES (?, ?)",
                 test_execution_file_fps,
@@ -281,9 +280,9 @@ class DB:
                 "DELETE FROM file_fp WHERE "
                 "    id NOT IN (select fingerprint_id from test_execution_file_fp)"
             )
-            self.refresh_suite_files_checksums(con, exec_id)
+            self.insert_into_suite_files_fshas(con, exec_id, files_fshas)
 
-    def refresh_suite_files_checksums(self, con, exec_id):
+    def insert_into_suite_files_fshas(self, con, exec_id, files_fshas):
         pass
 
     def _fetch_data_version(self):
@@ -354,10 +353,10 @@ class DB:
                 FOREIGN KEY({self._test_execution_fk_column()}) REFERENCES {self._test_execution_fk_table()}(id));
                 CREATE INDEX test_execution_fk_name ON test_execution ({self._test_execution_fk_column()}, test_name);
 
-                CREATE TABLE temp_files_checksums (exec_id INTEGER, filename TEXT, checksum TEXT);
-                CREATE INDEX temp_files_checksums_mcall ON temp_files_checksums (exec_id, filename, checksum);
+                CREATE TABLE temp_files_fshas (exec_id INTEGER, filename TEXT, fsha TEXT);
+                CREATE INDEX temp_files_fshas_mcall ON temp_files_fshas (exec_id, filename, fsha);
 
-                CREATE TABLE temp_filenames (exec_id INTEGER, filename TEXT);
+                CREATE TABLE temp_filenames (exec_id INTEGER, filename TEXT, mhashes BLOB);
                 CREATE INDEX temp_filenames_eid ON temp_filenames (exec_id);
             """
 
@@ -369,8 +368,8 @@ class DB:
                 filename TEXT,
                 method_checksums BLOB,
                 mtime FLOAT,
-                checksum TEXT,
-                UNIQUE (filename, checksum,method_checksums)
+                fsha TEXT,
+                UNIQUE (filename, fsha, method_checksums)
             );"""
 
     def _create_test_execution_ffp_statement(
@@ -385,13 +384,13 @@ class DB:
             );
             CREATE INDEX test_execution_file_fp_both ON test_execution_file_fp (test_execution_id, fingerprint_id);
             -- the following table stores the same data coarsely, but is used for faster queries
-            CREATE TABLE suite_execution_file_checksum (
+            CREATE TABLE suite_execution_file_fsha (
                 suite_execution_id INTEGER,
                 filename TEXT,
                 fsha text,
                 FOREIGN KEY(suite_execution_id) REFERENCES suite_execution(id)
                 );
-                CREATE UNIQUE INDEX sefch_suite_id_filename_sha ON suite_execution_file_checksum(suite_execution_id, filename, fsha);
+                CREATE UNIQUE INDEX sefch_suite_id_filename_sha ON suite_execution_file_fsha(suite_execution_id, filename, fsha);
             """
 
     def init_tables(self):
@@ -444,17 +443,12 @@ class DB:
 
         return result
 
-    def fetch_unknown_files(self, files_checksums, exec_id):
+    def fetch_unknown_files(self, files_fshas, exec_id):
         with self.con as con:
-            con.execute(
-                "DELETE FROM temp_files_checksums WHERE exec_id = ?", (exec_id,)
-            )
+            con.execute("DELETE FROM temp_files_fshas WHERE exec_id = ?", (exec_id,))
             con.executemany(
-                "INSERT INTO temp_files_checksums VALUES (?, ?, ?)",
-                [
-                    (exec_id, file, checksum)
-                    for file, checksum in files_checksums.items()
-                ],
+                "INSERT INTO temp_files_fshas VALUES (?, ?, ?)",
+                [(exec_id, file, fsha) for file, fsha in files_fshas.items()],
             )
             return self._fetch_unknown_files_from_one_v(con, exec_id, exec_id)
 
@@ -465,13 +459,13 @@ class DB:
                 SELECT DISTINCT
                     f.filename
                 FROM test_execution te, test_execution_file_fp te_ffp, file_fp f
-                LEFT OUTER JOIN temp_files_checksums tfc
-                ON f.filename = tfc.filename and f.checksum = tfc.checksum AND tfc.exec_id = :files_shas_id
+                LEFT OUTER JOIN temp_files_fshas tfc
+                ON f.filename = tfc.filename and f.fsha = tfc.fsha AND tfc.exec_id = :files_shas_id
                 WHERE
                     te.{self._test_execution_fk_column()} = :exec_id AND
                     te.id = te_ffp.test_execution_id AND
                     te_ffp.fingerprint_id = f.id AND
-                    (f.checksum IS NULL OR tfc.checksum IS NULL)
+                    (f.fsha IS NULL OR tfc.fsha IS NULL)
                 """,
             {"files_shas_id": files_shas_id, "exec_id": exec_id},
         ):
@@ -489,13 +483,10 @@ class DB:
             )
             self.delete_filenames(con)
             con.executemany(
-                "INSERT INTO temp_filenames VALUES (?, ?)",
+                "INSERT INTO temp_filenames VALUES (?, ?, ?)",
                 [
-                    (
-                        exec_id,
-                        k,
-                    )
-                    for k in files_mhashes
+                    (exec_id, file, checksums_to_blob(mhashes) if mhashes else None)
+                    for file, mhashes in files_mhashes.items()
                 ],
             )
 
@@ -601,7 +592,7 @@ class DB:
             SELECT DISTINCT
                 f.filename,
                 f.mtime,
-                f.checksum,
+                f.fsha,
                 f.id as fingerprint_id,
                 sum(failed)
             FROM
@@ -611,7 +602,7 @@ class DB:
                 te_ffp.fingerprint_id = f.id AND
                 {self._test_execution_fk_column()} = ?
             GROUP BY
-                f.filename, f.mtime, f.checksum, f.id
+                f.filename, f.mtime, f.fsha, f.id
             """,
             (exec_id,),
         )

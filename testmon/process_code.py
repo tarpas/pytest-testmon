@@ -84,7 +84,7 @@ class Block:
 
 
 @lru_cache(300)
-def bytes_to_string_and_checksum(byte_stream):
+def bytes_to_string_and_fsha(byte_stream):
     byte_stream = byte_stream.replace(b"\f", b" ")
     byte_stream = byte_stream.replace(b"\r\n", b"\n")
     byte_string = byte_stream.decode(source_encoding(byte_stream), "replace")
@@ -112,7 +112,7 @@ class Module:
         source_code=None,
         mtime=None,
         ext="py",
-        fs_checksum=None,
+        fs_fsha=None,
         filename=None,
         rootdir=None,
     ):
@@ -124,8 +124,8 @@ class Module:
         self._source_code = (
             None if source_code is None else textwrap.dedent(source_code)
         )
-        self.fs_checksum = (
-            fs_checksum or bytes_to_string_and_checksum(bytes(source_code, "utf-8"))[1]
+        self.fs_fsha = (
+            fs_fsha or bytes_to_string_and_fsha(bytes(source_code, "utf-8"))[1]
         )
         self.ext = ext
 
@@ -208,8 +208,8 @@ def read_source_sha(filename):
     except FileNotFoundError:
         return None, None
 
-    source, checksum = bytes_to_string_and_checksum(source_bytes)
-    return source, checksum
+    source, fsha = bytes_to_string_and_fsha(source_bytes)
+    return source, fsha
 
 
 def noncached_get_files_shas(directory):
