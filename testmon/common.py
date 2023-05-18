@@ -7,7 +7,8 @@ try:
 
     def get_system_packages_raw():
         return (
-            f"{pkg.name} {pkg.version}" for pkg in importlib.metadata.distributions()
+            f"{pkg.metadata['Name']} {pkg.version}"
+            for pkg in importlib.metadata.distributions()
         )
 
 except ImportError:
