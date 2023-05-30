@@ -7,7 +7,7 @@ try:
 
     def get_system_packages_raw():
         return (
-            f"{pkg.metadata['Name']} {pkg.version}"
+            (pkg.metadata["Name"], pkg.version)
             for pkg in importlib.metadata.distributions()
         )
 
@@ -15,9 +15,7 @@ except ImportError:
     import pkg_resources
 
     def get_system_packages_raw():
-        return (
-            f"{pkg.project_name} {pkg.version}" for pkg in pkg_resources.working_set
-        )
+        return ((pkg.project_name, pkg.version) for pkg in pkg_resources.working_set)
 
 
 from pathlib import Path
@@ -35,8 +33,16 @@ def get_logger(name):
 logger = get_logger(__name__)
 
 
-def get_system_packages():
-    return ", ".join(sorted(set(get_system_packages_raw())))
+def get_system_packages(ignore=None):
+    return ", ".join(
+        sorted(
+            {
+                f"{package} {version}"
+                for (package, version) in get_system_packages_raw()
+                if not ignore or not package in ignore
+            }
+        )
+    )
 
 
 def drop_patch_version(system_packages):

@@ -111,6 +111,7 @@ def pytest_addoption(parser):
     )
 
     parser.addini("environment_expression", "environment expression", default="")
+    parser.addini("ignore_dependencies", "ignore dependencies", default=[])
     parser.addini("testmon_url", "URL of the testmon.net api server.")
     parser.addini("tmnet_api_key", "testmon api key")
 
@@ -131,7 +132,11 @@ def init_testmon_data(config):
     environment = config.getoption("environment_expression") or eval_environment(
         config.getini("environment_expression")
     )
-    system_packages = get_system_packages()
+    ignore_dependencies_str = config.getini("ignore_dependencies")
+    ignore_dependencies = (
+        ignore_dependencies_str.split("\n") if ignore_dependencies_str else None
+    )
+    system_packages = get_system_packages(ignore=ignore_dependencies)
 
     url = config.getini("testmon_url")
     rpc_proxy = None
