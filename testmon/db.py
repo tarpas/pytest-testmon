@@ -91,14 +91,14 @@ class DB:
         self.update_saving_stats(exec_id, select)
         self.fetch_or_create_file_fp.cache_clear()
         with self.con as con:
-            con.execute(
-                """
-                DELETE FROM file_fp
+            self.vacuum_file_fp(con)
+
+    def vacuum_file_fp(self, con):
+        con.execute(
+            """ DELETE FROM file_fp
                 WHERE id NOT IN (
-                    SELECT DISTINCT fingerprint_id FROM test_execution_file_fp
-                )
-                """
-            )
+                    SELECT DISTINCT fingerprint_id FROM test_execution_file_fp) """
+        )
 
     def fetch_current_run_stats(self, exec_id):
         with self.con as con:
@@ -276,10 +276,6 @@ class DB:
                 test_execution_file_fps,
             )
             self.fetch_or_create_file_fp.cache_clear()
-            cursor.execute(
-                "DELETE FROM file_fp WHERE "
-                "    id NOT IN (select fingerprint_id from test_execution_file_fp)"
-            )
             self.insert_into_suite_files_fshas(con, exec_id, files_fshas)
 
     def insert_into_suite_files_fshas(self, con, exec_id, files_fshas):
