@@ -271,12 +271,13 @@ class DB:
 
                     test_execution_file_fps.append((te_id, fingerprint_id))
                     files_fshas.add((record["filename"], record["fsha"]))
-            cursor.executemany(
-                "INSERT INTO test_execution_file_fp VALUES (?, ?)",
-                test_execution_file_fps,
-            )
-            self.fetch_or_create_file_fp.cache_clear()
-            self.insert_into_suite_files_fshas(con, exec_id, files_fshas)
+            if test_execution_file_fps:
+                cursor.executemany(
+                    "INSERT INTO test_execution_file_fp VALUES (?, ?)",
+                    test_execution_file_fps,
+                )
+                self.fetch_or_create_file_fp.cache_clear()
+                self.insert_into_suite_files_fshas(con, exec_id, files_fshas)
 
     def insert_into_suite_files_fshas(self, con, exec_id, files_fshas):
         pass
