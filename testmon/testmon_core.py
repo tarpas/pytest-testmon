@@ -186,6 +186,7 @@ class TestmonData:
         self.unstable_files = None
         self.stable_test_names = None
         self.stable_files = None
+        self.failing_tests = None
 
     def close_connection(self):
         pass
@@ -213,7 +214,9 @@ class TestmonData:
                     )
 
             deps_n_outcomes.update(process_result(reports[context]))
-            deps_n_outcomes["forced"] = context in self.stable_test_names
+            deps_n_outcomes["forced"] = context in self.stable_test_names and (
+                context not in self.failing_tests
+            )
             test_executions_fingerprints[context] = deps_n_outcomes
         return test_executions_fingerprints
 
@@ -253,9 +256,8 @@ class TestmonData:
 
         files_mhashes = collect_mhashes(self.source_tree, new_changed_file_data)
 
-        affected_tests = self.db.determine_tests(self.exec_id, files_mhashes)[
-            "affected"
-        ]
+        tests = self.db.determine_tests(self.exec_id, files_mhashes)
+        affected_tests, self.failing_tests = tests["affected"], tests["failing"]
 
         if assert_old:
             self.assert_old_determin_stable(affected_tests)

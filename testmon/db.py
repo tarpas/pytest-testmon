@@ -519,7 +519,22 @@ class DB:
                 if not check_fingerprint_db(files_mhashes, result):
                     new_method_misses.append(result[1])
 
-            return {"affected": new_method_misses}
+            failing_tests = [
+                row["test_name"]
+                for row in self.con.execute(
+                    f"""
+                    SELECT
+                        te.test_name
+                    FROM test_execution te
+                    WHERE
+                        te.{self._test_execution_fk_column()} = ? AND
+                        te.failed = 1
+                    """,
+                    [exec_id],
+                )
+            ]
+
+            return {"affected": new_method_misses, "failing": failing_tests}
 
     def delete_test_executions(self, test_names, exec_id):
         self.con.executemany(
