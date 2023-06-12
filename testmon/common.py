@@ -26,7 +26,7 @@ def dummy():
 
 
 def get_logger(name):
-    logging.basicConfig(format="%(levelname)s: %(message)s.", level=logging.WARNING)
+    logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
     return logging.getLogger(name)
 
 
