@@ -1,0 +1,14 @@
+inputSet:
+  name: GitHub
+  identifier: GitHub
+  orgIdentifier: CIIT
+  projectIdentifier: pytestTestmon
+  pipeline:
+    identifier: test
+    properties:
+      ci:
+        codebase:
+          build:
+            type: PR
+            spec:
+              number: <+trigger.prNumber>

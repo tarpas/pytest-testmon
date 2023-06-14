@@ -1,17 +1,17 @@
 import ast
 import hashlib
-import textwrap
 import os
+import textwrap
 import zlib
 
-from coverage.python import get_python_source
 from coverage.misc import NoSource
+from coverage.python import get_python_source
 
 
 def encode_lines(lines):
     checksums = []
     for line in lines:
-        checksums.append(zlib.adler32(line.encode("UTF-8")) & 0xffffffff)
+        checksums.append(zlib.adler32(line.encode("UTF-8")) & 0xFFFFFFFF)
 
     return checksums
 
@@ -36,7 +36,7 @@ def is_blank_line(line):
     return stripped_line == '' or stripped_line[0] == '#'
 
 
-class Module(object):
+class Module:
     def __init__(
         self,
         source_code=None,
@@ -45,7 +45,6 @@ class Module(object):
         mtime=None,
         checksum=None,
     ):
-
         if source_code is None:
             absfilename = os.path.join(rootdir, file_name)
             mtime = os.path.getmtime(absfilename)
@@ -169,13 +168,9 @@ def create_fingerprints(lines, special_blocks, coverage):
         if (
             line_idx in special_blocks
             and line_idx not in coverage
-            and not covered_unused_statement(
-                line_idx + 1, special_blocks[line_idx], coverage
-            )
+            and not covered_unused_statement(line_idx + 1, special_blocks[line_idx], coverage)
         ):
-            fingerprints, line_idx = gap_marks_until(
-                lines, line_idx - 1, special_blocks[line_idx]
-            )
+            fingerprints, line_idx = gap_marks_until(lines, line_idx - 1, special_blocks[line_idx])
             result.extend(fingerprints)
         else:
             result.append(line)
@@ -187,15 +182,9 @@ def file_has_lines(full_lines, fingerprints):
     fingerprint_idx = 0
 
     while file_idx < len(full_lines) and fingerprint_idx < len(fingerprints):
-
-        searching_indent = INVERTED_GAP_MARKS_CHECKSUMS.get(
-            fingerprints[fingerprint_idx]
-        )
+        searching_indent = INVERTED_GAP_MARKS_CHECKSUMS.get(fingerprints[fingerprint_idx])
         if searching_indent is not None:
-            while (
-                file_idx < len(full_lines)
-                and get_indent_level(full_lines[file_idx]) > searching_indent
-            ):
+            while file_idx < len(full_lines) and get_indent_level(full_lines[file_idx]) > searching_indent:
                 file_idx += 1
         else:
             if encode_lines([full_lines[file_idx]])[0] != fingerprints[fingerprint_idx]:
@@ -204,7 +193,4 @@ def file_has_lines(full_lines, fingerprints):
 
         fingerprint_idx += 1
 
-    if file_idx >= len(full_lines) and fingerprint_idx >= len(fingerprints):
-        return True
-    else:
-        return False
+    return file_idx >= len(full_lines) and fingerprint_idx >= len(fingerprints)

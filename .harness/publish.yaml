@@ -1,0 +1,19 @@
+pipeline:
+  name: publish
+  identifier: publish
+  projectIdentifier: pytestTestmon
+  orgIdentifier: CIIT
+  tags: {}
+  properties:
+    ci:
+      codebase:
+        connectorRef: account.svc_harness_git1
+        repoName: pytest-testmon
+        build: <+input>
+  stages:
+    - stage:
+        name: Publish
+        identifier: Publish
+        template:
+          templateRef: account.setup_py_artifactory
+          versionLabel: 0.1.0

@@ -55,7 +55,8 @@ def _uses_testmon(envconfig):
 
 
 def touch_stampfile(venv):
-    open(venv.path.join(".testmon_installed"), "a").close()
+    with open(venv.path.join(".testmon_installed"), "a"):
+        pass
 
 
 def installed_testmon(venv):
@@ -72,9 +73,7 @@ def tox_runenvreport(venv, action):
         action.setactivity("testmon", "setting TESTMON_DATAFILE=%s" % datafile)
         venv.envconfig.setenv["TESTMON_DATAFILE"] = datafile
 
-    if _uses_testmon(venv.envconfig) and "pytest-testmon" not in (
-        x.name for x in venv.envconfig.deps
-    ):
+    if _uses_testmon(venv.envconfig) and "pytest-testmon" not in (x.name for x in venv.envconfig.deps):
         if not installed_testmon(venv):
             action.setactivity("testmon", "installing pytest-testmon")
             # Uses _install for handling configured indexservers.

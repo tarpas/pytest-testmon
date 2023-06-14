@@ -1,23 +1,18 @@
-from array import array
 import hashlib
 import json
 import os
 import sqlite3
 import sys
+from array import array
 
 from coverage import Coverage
 from coverage.tracer import CTracer
 
-from testmon.process_code import (
-    read_file_with_checksum,
-    file_has_lines,
-    create_fingerprints,
-    encode_lines,
-)
 from testmon.process_code import Module
-
-if sys.version_info.major < 3:
-    range = xrange
+from testmon.process_code import create_fingerprints
+from testmon.process_code import encode_lines
+from testmon.process_code import file_has_lines
+from testmon.process_code import read_file_with_checksum
 
 CHECKUMS_ARRAY_TYPE = "I"  # from zlib.adler32
 DB_FILENAME = ".testmondata"
@@ -59,19 +54,16 @@ def is_python_file(file_path):
 
 
 def get_measured_relfiles(rootdir, cov, test_file):
-    files = {
-        test_file: set()
-    }
+    files = {test_file: set()}
     c = cov.config
     for filename in cov.get_data().measured_files():
         if not is_python_file(filename):
             continue
         relfilename = os.path.relpath(filename, rootdir)
         files[relfilename] = cov.get_data().lines(filename)
-        assert files[relfilename] is not None, (
-            "{} is in measured_files but wasn't measured! cov.config: ".format(filename) +
-            "{config_files}, {_omit}, {_include}, {source}".format(**c)
-        )
+        assert files[relfilename] is not None, "{} is in measured_files but wasn't measured! cov.config: ".format(
+            filename
+        ) + "{config_files}, {_omit}, {_include}, {source}".format(**c)
     return files
 
 
@@ -91,8 +83,7 @@ def eval_environment(environment, **kwargs):
         return repr(e)
 
 
-class cached_property(object):
-
+class cached_property:
     def __init__(self, func):
         self.__doc__ = getattr(func, "__doc__")
         self.func = func
@@ -109,7 +100,6 @@ class TestmonException(Exception):
 
 
 class SourceTree:
-
     def __init__(self, rootdir=""):
         self.rootdir = rootdir
         self.cache = {}
@@ -118,9 +108,7 @@ class SourceTree:
         if filename in self.cache:
             return self.cache[filename]
 
-        code, checksum = read_file_with_checksum(
-            os.path.join(self.rootdir, filename)
-        )
+        code, checksum = read_file_with_checksum(os.path.join(self.rootdir, filename))
         if not checksum:  # Missing, or not code
             self.cache[filename] = None
             return None
@@ -136,11 +124,10 @@ class SourceTree:
         return self.cache[filename]
 
 
-class TestmonData(object):
+class TestmonData:
     DATA_VERSION = 6
 
     def __init__(self, rootdir="", environment=None):
-
         self.environment = environment if environment else "default"
         self.rootdir = rootdir
         self.unstable_files = None
@@ -150,9 +137,7 @@ class TestmonData(object):
         self.init_connection()
 
     def init_connection(self):
-        self.datafile = os.environ.get(
-            "TESTMON_DATAFILE", os.path.join(self.rootdir, DB_FILENAME)
-        )
+        self.datafile = os.environ.get("TESTMON_DATAFILE", os.path.join(self.rootdir, DB_FILENAME))
 
         new_db = not os.path.exists(self.datafile)
 
@@ -174,9 +159,7 @@ class TestmonData(object):
             self.connection.close()
 
     def init_tables(self):
-        self.connection.execute(
-            "CREATE TABLE metadata (dataid TEXT PRIMARY KEY, data TEXT)"
-        )
+        self.connection.execute("CREATE TABLE metadata (dataid TEXT PRIMARY KEY, data TEXT)")
 
         self.connection.execute(
             """
@@ -225,15 +208,11 @@ class TestmonData(object):
             """
         )
 
-        self._write_attribute(
-            "__data_version", str(self.DATA_VERSION), environment="default"
-        )
+        self._write_attribute("__data_version", str(self.DATA_VERSION), environment="default")
         self.connection.commit()
 
     def _check_data_version(self):
-        stored_data_version = self._fetch_attribute(
-            "__data_version", default=None, environment="default"
-        )
+        stored_data_version = self._fetch_attribute("__data_version", default=None, environment="default")
 
         if stored_data_version is None or int(stored_data_version) == self.DATA_VERSION:
             return
@@ -314,7 +293,8 @@ class TestmonData(object):
         result_row = self.connection.execute(
             """
             SELECT result FROM node WHERE name = ?
-            """, (nodeid,)
+            """,
+            (nodeid,),
         ).fetchone()
         return json.loads(result_row[0]) if result_row else {}
 
@@ -328,23 +308,15 @@ class TestmonData(object):
             if not module:
                 continue
             coverage_set = set(covered)  # To speed `in` lookups
-            result[filename] = encode_lines(
-                create_fingerprints(
-                    module.lines, module.special_blocks, coverage_set
-                )
-            )
+            result[filename] = encode_lines(create_fingerprints(module.lines, module.special_blocks, coverage_set))
         return result
 
     def node_data_from_cov(self, cov, nodeid):
-        return self.make_nodedata(
-            get_measured_relfiles(self.rootdir, cov, home_file(nodeid))
-        )
+        return self.make_nodedata(get_measured_relfiles(self.rootdir, cov, home_file(nodeid)))
 
     @staticmethod
     def did_fail(reports):
-        return any(
-            [True for report in reports.values() if report.get("outcome") == u"failed"]
-        )
+        return any(True for report in reports.values() if report.get("outcome") == u"failed")
 
     def write_node_data(self, nodeid, nodedata, result={}, fake=False):
         with self.connection as con:
@@ -401,10 +373,7 @@ class TestmonData(object):
                     continue
                 self.write_node_data(
                     nodeid,
-                    self.make_nodedata(
-                        {home_file(nodeid): None},
-                        encode_lines(["0match"])
-                    ),
+                    self.make_nodedata({home_file(nodeid): None}, encode_lines(["0match"])),
                     fake=True,
                 )
 
@@ -415,10 +384,7 @@ class TestmonData(object):
                 WHERE environment = ?
                   AND name = ?
                 """,
-                [
-                    (self.environment, nodeid)
-                    for nodeid in self.all_nodes - collected
-                ],
+                [(self.environment, nodeid) for nodeid in self.all_nodes - collected],
             )
 
     def remove_unused_fingerprints(self):
@@ -435,9 +401,7 @@ class TestmonData(object):
     def update_mtimes(self, new_mtimes):
         """Takes list of tuples of the form `mtime, checksum, fingerprint_id` to update"""
         with self.connection as con:
-            con.executemany(
-                "UPDATE fingerprint SET mtime=?, checksum=? WHERE id = ?", new_mtimes
-            )
+            con.executemany("UPDATE fingerprint SET mtime=?, checksum=? WHERE id = ?", new_mtimes)
 
     def get_new_mtimes(self, hits):
         """
@@ -484,12 +448,7 @@ class TestmonData(object):
                 return
 
             for row in current_page:
-                yield (
-                    row["file_name"],
-                    row["name"],
-                    blob_to_checksums(row["fingerprint"]),
-                    row["fingerprint_id"]
-                )
+                yield (row["file_name"], row["name"], blob_to_checksums(row["fingerprint"]), row["fingerprint_id"])
                 last_nfp_rowid = row["ROWID"]
 
     def check_mtime(self, file_name, mtime):
@@ -514,7 +473,6 @@ class TestmonData(object):
         return module and file_has_lines(module.full_lines, fingerprint)
 
     def determine_stable(self):
-
         missed_checksum_fingerprint_ids = set()
         hit_checksum_fingerprints = []
         for fingerprint in self.filenames_fingerprints:
@@ -540,14 +498,12 @@ class TestmonData(object):
 
         # Loop through files by affected node
         for file_name, nodeid, fingerprint, fingerprint_id in self.get_changed_file_data(
-                missed_checksum_fingerprint_ids
+            missed_checksum_fingerprint_ids
         ):
             # If the fingerprint is hit, update the mtime
             # otherwise add the node for the missed fingerprint to the unstable set
             if self.check_fingerprint(file_name, fingerprint):
-                hit_fingerprint_nodes.append(
-                    {"file_name": file_name, "fingerprint_id": fingerprint_id}
-                )
+                hit_fingerprint_nodes.append({"file_name": file_name, "fingerprint_id": fingerprint_id})
             else:
                 self.unstable_nodeids.add(nodeid)
                 self.unstable_files.add(home_file(nodeid))
@@ -559,7 +515,7 @@ class TestmonData(object):
         self.stable_files = self.all_files - self.unstable_files
 
 
-class Testmon(object):
+class Testmon:
     coverage_stack = []
 
     def __init__(self, rootdir="", testmon_labels=None, cov_plugin=None):
@@ -576,20 +532,13 @@ class Testmon(object):
             "omit": _get_python_lib_paths(),
         }
 
-
-
-        self.cov = Coverage(
-            data_file=getattr(self, "sub_cov_file", None), config_file=False, **params
-        )
+        self.cov = Coverage(data_file=getattr(self, "sub_cov_file", None), config_file=False, **params)
         self.cov._warn_no_data = False
 
-
     def start(self):
-
         Testmon.coverage_stack.append(self.cov)
         self.cov.erase()
         self.cov.start()
-
 
     def stop(self):
         self.cov.stop()
@@ -609,7 +558,6 @@ class Testmon(object):
 
 
 class TestmonConfig:
-
     def _is_debugger(self):
         return sys.gettrace() and not isinstance(sys.gettrace(), CTracer)
 
@@ -617,9 +565,7 @@ class TestmonConfig:
         return isinstance(sys.gettrace(), CTracer)
 
     def _is_xdist(self, options):
-        return (
-            "dist" in options and options["dist"] != "no"
-        ) or "slaveinput" in options
+        return ("dist" in options and options["dist"] != "no") or "slaveinput" in options
 
     def _get_notestmon_reasons(self, options, xdist):
         if options["no-testmon"]:
@@ -645,16 +591,15 @@ class TestmonConfig:
         return None
 
     def _get_nocollect_reasons(
-            self,
-            options,
-            debugger=False,
-            coverage=False,
-            dogfooding=False,
-            cov_plugin=False,
+        self,
+        options,
+        debugger=False,
+        coverage=False,
+        dogfooding=False,
+        cov_plugin=False,
     ):
         if options["testmon_nocollect"]:
             return [None]
-
 
         if coverage and not dogfooding:
             return ["it's not compatible with coverage.py"]

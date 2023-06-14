@@ -36,7 +36,6 @@ nosetests.xml
 .pydevproject
 
 # Any hidden files
-.*
 /htmlcov/
 /tags
 /test

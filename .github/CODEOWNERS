@@ -1,0 +1,21 @@
+# This file defines which domain owns what parts of this repository.
+# This repository is a central place for defining Jenkins Jobs and Jarvis Suites to orchestrate
+# build and test workflows for pull requests and pipelines.  As such, it is expected
+# that this repository will have many owners and some shared areas (reusable macros, etc.)
+#
+# The syntax is the same as defined in
+# https://help.github.com/articles/about-codeowners/
+#
+# Important Rules:
+# 1. The last matching pattern in this file takes precedence
+#
+# 2. Only domains (github team) own code, not individuals
+#    see list at https://github.com/orgs/datarobot/teams
+#
+# Please see DataRobot repo ./tools/code_owners.py tool to find which particular file
+# or directory is owned by what domain.
+#
+# Default owners for everything in the repo.
+# Unless a later match takes precedence, these groups will be requested for
+# review when someone opens a pull request.
+/                                           @datarobot/continuous-integration

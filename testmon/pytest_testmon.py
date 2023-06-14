@@ -2,17 +2,15 @@ import os
 from collections import defaultdict
 
 import pytest
-from _pytest.python import Function
 from _pytest import runner
+from _pytest.python import Function
 
-from testmon.testmon_core import (
-    eval_environment,
-    home_file,
-    Testmon,
-    TestmonData,
-    TestmonConfig,
-    TestmonException,
-)
+from testmon.testmon_core import Testmon
+from testmon.testmon_core import TestmonConfig
+from testmon.testmon_core import TestmonData
+from testmon.testmon_core import TestmonException
+from testmon.testmon_core import eval_environment
+from testmon.testmon_core import home_file
 
 
 def serialize_report(rep):
@@ -139,9 +137,7 @@ def pytest_configure(config):
             init_testmon_data(config)
 
             if should_select:
-                config.pluginmanager.register(
-                    TestmonSelect(config, config.testmon_data), "TestmonSelect"
-                )
+                config.pluginmanager.register(TestmonSelect(config, config.testmon_data), "TestmonSelect")
 
             if should_collect:
                 config.pluginmanager.register(
@@ -174,17 +170,17 @@ def pytest_report_header(config):
     elif len(changed_files) > 100 and config.getoption("verbose") < 1:
         changed_files = len(config.testmon_data.unstable_files)
     else:
-        changed_files = "{} files\n{}\n".format(
-            len(config.testmon_data.unstable_files),
-            changed_files
-        )
+        changed_files = "{} files\n{}\n".format(len(config.testmon_data.unstable_files), changed_files)
     new_db = "new DB, " if changed_files == 0 and len(config.testmon_data.stable_files) == 0 else ""
-    return "{message}{environment}{new_db}skipping collection of {stable_files} files, changed files: {changed_files}".format(
-        message=message,
-        environment=environment,
-        new_db=new_db,
-        stable_files=len(config.testmon_data.stable_files),
-        changed_files=changed_files,
+    return (
+        "{message}{environment}{new_db}skipping collection "
+        "of {stable_files} files, changed files: {changed_files}".format(
+            message=message,
+            environment=environment,
+            new_db=new_db,
+            stable_files=len(config.testmon_data.stable_files),
+            changed_files=changed_files,
+        )
     )
 
 
@@ -200,9 +196,7 @@ def sort_items_by_duration(items, testmon_data):
         if item.nodeid in testmon_data.all_nodes:
             report = testmon_data.get_report(item.nodeid)
             if report:
-                item.duration = sum(
-                    [report["duration"] for report in report.values()]
-                )
+                item.duration = sum(report["duration"] for report in report.values())
         item.module_name = item.location[0]
         item_hierarchy = item.location[2].split(".")
         item.node_name = item_hierarchy[-1]
@@ -214,14 +208,14 @@ def sort_items_by_duration(items, testmon_data):
         durations[item.module_name]["duration"] += item.duration
 
     for key, stats in durations.items():
-        durations[key]["avg_duration"] = stats["duration"] / stats["node_count"]
+        stats["avg_duration"] = stats["duration"] / stats["node_count"]
 
     items.sort(key=lambda item: item.duration)
     items.sort(key=lambda item: durations[item.class_name]["avg_duration"])
     items.sort(key=lambda item: durations[item.module_name]["avg_duration"])
 
 
-class TestmonCollect(object):
+class TestmonCollect:
     def __init__(self, testmon, testmon_data):
         self.testmon_data = testmon_data
         self.testmon = testmon
@@ -234,9 +228,7 @@ class TestmonCollect(object):
         makeitem_result = yield
         items = makeitem_result.get_result() or []
         try:
-            self.raw_nodeids.extend(
-                [item.nodeid for item in items if isinstance(item, pytest.Item)]
-            )
+            self.raw_nodeids.extend([item.nodeid for item in items if isinstance(item, pytest.Item)])
         except TypeError:
             pass
 
@@ -263,9 +255,7 @@ class TestmonCollect(object):
             yield
 
     def pytest_runtest_logreport(self, report):
-        assert report.when not in self.reports, "{} {} {}".format(
-            report.nodeid, report.when, self.reports
-        )
+        assert report.when not in self.reports, "{} {} {}".format(report.nodeid, report.when, self.reports)
         self.reports[report.nodeid][report.when] = serialize_report(report)
 
     def pytest_sessionfinish(self, session):
@@ -301,10 +291,9 @@ class TestmonSelect:
     def pytest_ignore_collect(self, path, config):
         strpath = os.path.relpath(path.strpath, config.rootdir.strpath)
         self.original_files.add(strpath)
-        if strpath in self.deselected_files:
-            return True
+        return strpath in self.deselected_files or None
 
-    @pytest.mark.trylast
+    @pytest.hookimpl(trylast=True)
     def pytest_collection_modifyitems(self, session, config, items):
         selected = []
         for item in items:
@@ -326,11 +315,9 @@ class TestmonSelect:
         yield
         if session.config.option.collectonly:
             return
-        self.add_failing_reports_from_db(
-            self.deselected_nodes.intersection(self.failing_nodes)
-        )
+        self.add_failing_reports_from_db(self.deselected_nodes.intersection(self.failing_nodes))
 
 
-class FakeItemFromTestmon(object):
+class FakeItemFromTestmon:
     def __init__(self, config):
         self.config = config

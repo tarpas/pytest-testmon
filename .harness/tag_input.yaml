@@ -1,0 +1,14 @@
+inputSet:
+  name: tag
+  identifier: tag
+  orgIdentifier: CIIT
+  projectIdentifier: pytestTestmon
+  pipeline:
+    identifier: publish
+    properties:
+      ci:
+        codebase:
+          build:
+            type: tag
+            spec:
+              tag: <+trigger.tag>

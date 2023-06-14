@@ -1,0 +1,19 @@
+pipeline:
+  name: test
+  identifier: test
+  projectIdentifier: pytestTestmon
+  orgIdentifier: CIIT
+  tags: {}
+  properties:
+    ci:
+      codebase:
+        connectorRef: account.svc_harness_git1
+        repoName: pytest-testmon
+        build: <+input>
+  stages:
+    - stage:
+        name: Test - Tox 3
+        identifier: test_tox
+        template:
+          templateRef: account.tox_3_test
+          versionLabel: 0.1.0
