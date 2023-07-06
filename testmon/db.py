@@ -21,7 +21,7 @@ class TestmonDbException(Exception):
 
 def connect(datafile, readonly=False):
     connection = sqlite3.connect(
-        f"file:{datafile}{'?mode=ro' if readonly else ''}", uri=True
+        f"file:{datafile}{'?mode=ro' if readonly else ''}", uri=True, timeout=5000
     )
 
     connection.execute("PRAGMA journal_mode = WAL")
