@@ -64,15 +64,18 @@ class SourceTree:
         if filename not in self.cache:
             code, fsha = get_source_sha(directory=self.rootdir, filename=filename)
             if fsha:
-                fs_mtime = os.path.getmtime(os.path.join(self.rootdir, filename))
-                self.cache[filename] = Module(
-                    source_code=code,
-                    mtime=fs_mtime,
-                    ext=filename.rsplit(".", 1)[1],
-                    fs_fsha=fsha,
-                    filename=filename,
-                    rootdir=self.rootdir,
-                )
+                try:
+                    fs_mtime = os.path.getmtime(os.path.join(self.rootdir, filename))
+                    self.cache[filename] = Module(
+                        source_code=code,
+                        mtime=fs_mtime,
+                        ext=filename.rsplit(".", 1)[1],
+                        fs_fsha=fsha,
+                        filename=filename,
+                        rootdir=self.rootdir,
+                    )
+                except FileNotFoundError:
+                    self.cache[filename] = None
             else:
                 self.cache[filename] = None
         return self.cache[filename]
