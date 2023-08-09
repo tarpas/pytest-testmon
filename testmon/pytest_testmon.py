@@ -68,6 +68,17 @@ def pytest_addoption(parser):
     )
 
     group.addoption(
+        "--testmon-connect-timeout",
+        action="store",
+        type=int,
+        default=60,
+        dest="testmon_connect_timeout",
+        help=(
+            "Set the timeout for opening a connection to the sqlite database."
+        ),
+    )
+
+    group.addoption(
         "--testmon-forceselect",
         action="store_true",
         dest="testmon_forceselect",
@@ -133,7 +144,7 @@ def testmon_options(config):
     return result
 
 
-def init_testmon_data(config):
+def init_testmon_data(config, connect_timeout):
     environment = config.getoption("environment_expression") or eval_environment(
         config.getini("environment_expression")
     )
@@ -175,6 +186,7 @@ def init_testmon_data(config):
         database=rpc_proxy,
         environment=environment,
         system_packages=system_packages,
+        connect_timeout=connect_timeout,
     )
     testmon_data.determine_stable(bool(rpc_proxy))
     config.testmon_data = testmon_data
@@ -231,7 +243,7 @@ def pytest_configure(config):
     config.testmon_config = tm_conf
     if tm_conf.select or tm_conf.collect:
         try:
-            init_testmon_data(config)
+            init_testmon_data(config, connect_timeout=tm_conf.connect_timeout)
             register_plugins(config, tm_conf.select, tm_conf.collect, cov_plugin)
         except TestmonException as error:
             pytest.exit(str(error))

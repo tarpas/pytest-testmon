@@ -1,5 +1,6 @@
 import sys
 import re
+from typing import Optional
 
 try:
     from coverage.tracer import CTracer as Tracer
@@ -103,6 +104,7 @@ class TmConf:
     collect: bool
     select: bool
     tmnet: bool = False
+    connect_timeout: Optional[int] = None
 
     def __eq__(self, other):
         return (
@@ -110,6 +112,7 @@ class TmConf:
             and self.collect == other.collect
             and self.select == other.select
             and self.tmnet == other.tmnet
+            and self.connect_timeout == other.connect_timeout
         )
 
 
@@ -150,6 +153,7 @@ def _header_collect_select(
         not bool(nocollect_reasons),
         not bool(noselect_reasons),
         bool(options.get("tmnet")),
+        int(options.get("testmon_connect_timeout")),
     )
 
 

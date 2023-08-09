@@ -19,9 +19,9 @@ class TestmonDbException(Exception):
     pass
 
 
-def connect(datafile, readonly=False):
+def connect(datafile, connect_timeout, readonly=False):
     connection = sqlite3.connect(
-        f"file:{datafile}{'?mode=ro' if readonly else ''}", uri=True, timeout=60
+        f"file:{datafile}{'?mode=ro' if readonly else ''}", uri=True, timeout=connect_timeout
     )
 
     connection.execute("PRAGMA journal_mode = WAL")
@@ -44,10 +44,11 @@ def check_fingerprint_db(files_methods_checksums, record):
 
 
 class DB:
-    def __init__(self, datafile):
+    def __init__(self, datafile, connect_timeout):
         new_db = not os.path.exists(datafile)
+        self.connect_timeout = connect_timeout
 
-        connection = connect(datafile)
+        connection = connect(datafile, self.connect_timeout)
         self.con = connection
         old_format = self._check_data_version(datafile)
 
@@ -65,7 +66,7 @@ class DB:
 
         self.con.close()
         os.remove(datafile)
-        self.con = connect(datafile)
+        self.con = connect(datafile, self.connect_timeout)
         return True
 
     def __enter__(self):

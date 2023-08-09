@@ -31,6 +31,7 @@ from testmon.process_code import (
 
 
 TEST_BATCH_SIZE = 250
+DEFAULT_DATABASE_CONNECT_TIMEOUT = 60
 
 CHECKUMS_ARRAY_TYPE = "I"
 DB_FILENAME = ".testmondata"
@@ -141,6 +142,7 @@ class TestmonData:
         environment=None,
         system_packages=None,
         python_version=None,
+        connect_timeout=None,
     ):
         self.rootdir = rootdir
         self.environment = environment if environment else "default"
@@ -150,11 +152,12 @@ class TestmonData:
         system_packages = drop_patch_version(system_packages)
         if not python_version:
             python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        connect_timeout = int(connect_timeout) if connect_timeout else DEFAULT_DATABASE_CONNECT_TIMEOUT
 
         if database:
             self.db = database
         else:
-            self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))
+            self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()), connect_timeout=connect_timeout)
 
         try:
             result = self.db.initiate_execution(
@@ -175,7 +178,7 @@ class TestmonData:
                 ),
                 exc,
             )
-            self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))
+            self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()), connect_timeout=connect_timeout)
             result = self.db.initiate_execution(
                 self.environment, system_packages, python_version, {}
             )
