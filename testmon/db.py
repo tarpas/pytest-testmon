@@ -8,7 +8,7 @@ from functools import lru_cache
 from testmon.process_code import blob_to_checksums, checksums_to_blob
 
 
-DATA_VERSION = 12
+DATA_VERSION = 13
 
 ChangedFileData = namedtuple(
     "ChangedFileData", "filename name method_checksums id failed"
@@ -53,6 +53,8 @@ class DB:
 
         if new_db or old_format:
             self.init_tables()
+
+        self.con.executescript(self._local_temp_tables_statement())
 
     def version_compatibility(self):
         return DATA_VERSION
@@ -349,13 +351,19 @@ class DB:
                 forced BIT,
                 FOREIGN KEY({self._test_execution_fk_column()}) REFERENCES {self._test_execution_fk_table()}(id));
                 CREATE INDEX test_execution_fk_name ON test_execution ({self._test_execution_fk_column()}, test_name);
+            """
 
-                CREATE TABLE changed_files_fshas (exec_id INTEGER, filename TEXT, fsha TEXT);
+    def _create_temp_tables_statement(self):
+        return ""
+
+    def _local_temp_tables_statement(self):
+        return """
+                CREATE TEMPORARY TABLE changed_files_fshas (exec_id INTEGER, filename TEXT, fsha TEXT);
                 CREATE INDEX changed_files_fshas_mcall ON changed_files_fshas (exec_id, filename, fsha);
 
-                CREATE TABLE changed_files_mhashes (exec_id INTEGER, filename TEXT, mhashes BLOB);
+                CREATE TEMPORARY TABLE changed_files_mhashes (exec_id INTEGER, filename TEXT, mhashes BLOB);
                 CREATE INDEX changed_files_mhashes_eid ON changed_files_mhashes (exec_id);
-            """
+        """
 
     def _create_file_fp_statement(self):
         return """
@@ -397,6 +405,7 @@ class DB:
             self._create_metadata_statement()
             + self._create_environment_statement()
             + self._create_test_execution_statement()
+            + self._create_temp_tables_statement()
             + self._create_file_fp_statement()
             + self._create_test_execution_ffp_statement()
         )
