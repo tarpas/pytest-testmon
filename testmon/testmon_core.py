@@ -141,6 +141,7 @@ class TestmonData:
         environment=None,
         system_packages=None,
         python_version=None,
+        readonly=False,
     ):
         self.rootdir = rootdir
         self.environment = environment if environment else "default"
@@ -154,7 +155,9 @@ class TestmonData:
         if database:
             self.db = database
         else:
-            self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))
+            self.db = db.DB(
+                os.path.join(self.rootdir, get_data_file_path()), readonly=readonly
+            )
 
         try:
             result = self.db.initiate_execution(

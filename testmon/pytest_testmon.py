@@ -175,6 +175,7 @@ def init_testmon_data(config):
         database=rpc_proxy,
         environment=environment,
         system_packages=system_packages,
+        readonly=parallelism_status(config) == "worker",
     )
     testmon_data.determine_stable(bool(rpc_proxy))
     config.testmon_data = testmon_data

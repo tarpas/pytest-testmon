@@ -44,10 +44,11 @@ def check_fingerprint_db(files_methods_checksums, record):
 
 
 class DB:
-    def __init__(self, datafile):
+    def __init__(self, datafile, readonly=False):
+        self._readonly = readonly
         new_db = not os.path.exists(datafile)
 
-        connection = connect(datafile)
+        connection = connect(datafile, readonly)
         self.con = connection
         old_format = self._check_data_version(datafile)
 
@@ -483,10 +484,11 @@ class DB:
 
     def determine_tests(self, exec_id, files_mhashes):
         with self.con as con:
-            con.execute(
-                f"UPDATE test_execution set forced = NULL WHERE {self._test_execution_fk_column()} = ?",
-                [exec_id],
-            )
+            if not self._readonly:
+                con.execute(
+                    f"UPDATE test_execution set forced = NULL WHERE {self._test_execution_fk_column()} = ?",
+                    [exec_id],
+                )
             self.delete_filenames(con)
             con.executemany(
                 "INSERT INTO changed_files_mhashes VALUES (?, ?, ?)",
@@ -634,40 +636,52 @@ class DB:
         self, environment_name, system_packages, python_version
     ):
         with self.con as con:
-            try:
-                cursor = con.cursor()
-                cursor.execute(
-                    """
-                    INSERT INTO environment VALUES (?, ?, ?, ?)
-                    """,
-                    (
-                        None,
-                        environment_name,
-                        system_packages,
-                        python_version,
-                    ),
-                )
-                environment_id = cursor.lastrowid
-                count = cursor.execute(
-                    """
-                    SELECT count(*) as count FROM environment WHERE environment_name = ?
-                    """,
-                    (environment_name,),
-                ).fetchone()
-                packages_changed = count["count"] > 1
-            except sqlite3.IntegrityError:
-                environment = con.execute(
-                    """
-                    SELECT
-                    id as id, environment_name as name, system_packages as packages
-                    FROM environment
-                    WHERE environment_name = ?
-                    """,
-                    (environment_name,),
-                ).fetchone()
+            cursor = con.cursor()
+            environment = cursor.execute(
+                """
+                SELECT
+                id, environment_name, system_packages, python_version
+                FROM environment
+                WHERE environment_name = ?
+                """,
+                (environment_name,),
+            ).fetchone()
+
+            if environment:
                 environment_id = environment["id"]
+                packages_changed = (
+                    environment["system_packages"] != system_packages
+                    or environment["python_version"] != python_version
+                )
+            else:
                 packages_changed = False
-        return environment_id, packages_changed
+            if not environment or packages_changed:
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO environment (environment_name, system_packages, python_version)
+                        VALUES (?, ?, ?)
+                        """,
+                        (
+                            environment_name,
+                            system_packages,
+                            python_version,
+                        ),
+                    )
+                    environment_id = cursor.lastrowid
+                except sqlite3.IntegrityError:
+                    environment = con.execute(
+                        """
+                        SELECT
+                        id as id, environment_name as name, system_packages as packages
+                        FROM environment
+                        WHERE environment_name = ?
+                        """,
+                        (environment_name,),
+                    ).fetchone()
+                    environment_id = environment["id"]
+
+            return environment_id, packages_changed
 
     def initiate_execution(
         self,
