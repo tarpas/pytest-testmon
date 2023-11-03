@@ -25,9 +25,6 @@ def _get_notestmon_reasons(options):
     if options["no-testmon"]:
         return "deactivated through --no-testmon"
 
-    if options["testmon_noselect"] and options["testmon_nocollect"]:
-        return "deactivated, both noselect and nocollect options used"
-
     if not any(
         options.get(t, False)
         for t in [
