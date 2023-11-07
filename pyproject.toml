@@ -11,7 +11,7 @@ dynamic =  ["version"]
 
 description = "selects tests affected by changed files and methods"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 keywords = ["testing", "pytest", "plugin"]
 license = { text = "MIT" }
 classifiers = [
@@ -24,12 +24,6 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Utilities",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3 :: Only",
     "Framework :: Pytest",
 ]
 dependencies = [

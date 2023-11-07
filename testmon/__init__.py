@@ -1,2 +1,2 @@
 """PYTEST_DONT_REWRITE"""
-VERSION = "2.1.0.dev2"
+VERSION = "2.1.0"
