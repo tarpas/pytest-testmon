@@ -37,7 +37,7 @@ packages = [
 ]
 
 [tool.setuptools.dynamic]
-version = {attr = "testmon.VERSION"}
+version = {attr = "testmon.TESTMON_VERSION"}
 
 [tool.black]
 exclude = '''

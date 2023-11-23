@@ -175,14 +175,13 @@ def init_testmon_data(config):
         database=rpc_proxy,
         environment=environment,
         system_packages=system_packages,
-        readonly=parallelism_status(config) == "worker"
-        and config.workerinput["workerid"] != "gw0",
+        readonly=get_running_as(config) == "worker",
     )
     testmon_data.determine_stable(bool(rpc_proxy))
     config.testmon_data = testmon_data
 
 
-def parallelism_status(config):
+def get_running_as(config):
     if hasattr(config, "workerinput"):
         return "worker"
 
@@ -207,10 +206,12 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
                     cov_plugin=cov_plugin,
                 ),
                 config.testmon_data,
-                host=parallelism_status(config),
+                running_as=get_running_as(config),
             ),
             "TestmonCollect",
         )
+        if config.pluginmanager.hasplugin("xdist"):
+            config.pluginmanager.register(TestmonXdistSync())
 
 
 def pytest_configure(config):
@@ -315,10 +316,10 @@ def pytest_unconfigure(config):
 
 
 class TestmonCollect:
-    def __init__(self, testmon, testmon_data, host="single", cov_plugin=None):
+    def __init__(self, testmon, testmon_data, running_as="single", cov_plugin=None):
         self.testmon_data = testmon_data
         self.testmon = testmon
-        self._host = host
+        self._running_as = running_as
 
         self.reports = defaultdict(lambda: {})
         self.raw_test_names = []
@@ -338,9 +339,10 @@ class TestmonCollect:
 
     @pytest.hookimpl(tryfirst=True)
     def pytest_collection_modifyitems(self, session, config, items):
-        should_sync = not session.testsfailed
-        if getattr(config, "workerinput", {}).get("workerid", "gw0") != "gw0":
-            should_sync = False
+        should_sync = not session.testsfailed and self._running_as in (
+            "single",
+            "controller",
+        )
         if should_sync:
             config.testmon_data.sync_db_fs_tests(retain=set(self.raw_test_names))
 
@@ -362,7 +364,7 @@ class TestmonCollect:
 
     @pytest.hookimpl
     def pytest_runtest_logreport(self, report):
-        if self._host == "worker":
+        if self._running_as == "worker":
             return
 
         self.reports[report.nodeid][report.when] = report
@@ -376,7 +378,7 @@ class TestmonCollect:
                 )
 
     def pytest_keyboard_interrupt(self, excinfo):
-        if self._host == "single":
+        if self._running_as == "single":
             nodes_files_lines = self.testmon.get_batch_coverage_data()
 
             test_executions_fingerprints = self.testmon_data.get_tests_fingerprints(
@@ -386,13 +388,26 @@ class TestmonCollect:
             self.testmon.close()
 
     def pytest_sessionfinish(self, session):
-        if self._host in ("single", "controller"):
+        if self._running_as in ("single", "controller"):
             self.testmon_data.db.finish_execution(
                 self.testmon_data.exec_id,
                 time.time() - self._sessionstarttime,
                 session.config.testmon_config.select,
             )
         self.testmon.close()
+
+
+class TestmonXdistSync:
+    def __init__(self):
+        self.await_nodes = 0
+
+    def pytest_testnodeready(self, node):
+        self.await_nodes += 1
+
+    def pytest_xdist_node_collection_finished(self, node, ids):
+        self.await_nodes += -1
+        if self.await_nodes == 0:
+            node.config.testmon_data.sync_db_fs_tests(retain=set(ids))
 
 
 def did_fail(reports):

@@ -13,7 +13,7 @@ import pytest
 from coverage import Coverage, CoverageData
 
 from testmon import db
-from testmon import VERSION as TM_CLIENT_VERSION
+from testmon import TESTMON_VERSION as TM_CLIENT_VERSION
 from testmon.common import (
     get_logger,
     get_system_packages,
