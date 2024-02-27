@@ -26,28 +26,28 @@ def dummy():
 
 
 def get_logger(name):
-    # Create a formatter and set it on a new handler
     formatter = logging.Formatter("%(levelname)s: %(message)s")
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
 
-    # Configure the logger
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    logger.addHandler(handler)
-    return logger
+    tm_logger = logging.getLogger(name)
+    tm_logger.setLevel(logging.INFO)
+    tm_logger.addHandler(handler)
+    return tm_logger
 
 
 logger = get_logger(__name__)
 
 
 def get_system_packages(ignore=None):
+    if not ignore:
+        ignore = set(("pytest-testmon", "pytest-testmon"))
     return ", ".join(
         sorted(
             {
                 f"{package} {version}"
                 for (package, version) in get_system_packages_raw()
-                if not ignore or not package in ignore
+                if not package in ignore
             }
         )
     )

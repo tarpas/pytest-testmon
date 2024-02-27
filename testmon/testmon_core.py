@@ -194,6 +194,10 @@ class TestmonData:
         self.stable_files = None
         self.failing_tests = None
 
+    @property
+    def new_db(self):
+        return self.db.file_created
+
     def close_connection(self):
         pass
 

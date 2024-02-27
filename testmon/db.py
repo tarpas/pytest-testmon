@@ -20,10 +20,12 @@ class TestmonDbException(Exception):
 
 
 def connect(datafile, readonly=False):
-    connection = sqlite3.connect(
+    return sqlite3.connect(
         f"file:{datafile}{'?mode=ro' if readonly else ''}", uri=True, timeout=60
     )
 
+
+def connection_options(connection):
     connection.execute("PRAGMA journal_mode = WAL")
     connection.execute("PRAGMA synchronous = OFF")
     connection.execute("PRAGMA foreign_keys = TRUE ")
@@ -32,44 +34,48 @@ def connect(datafile, readonly=False):
     return connection
 
 
-def check_fingerprint_db(files_methods_checksums, record):
-    file = record[0]
-    fingerprint = record[2]
-
-    if file in files_methods_checksums and files_methods_checksums[file]:
-        if set(fingerprint) - set(files_methods_checksums[file]):
+def check_fingerprint_db(files_methods_checksums, file_name, fingerprint):
+    if file_name in files_methods_checksums and files_methods_checksums[file_name]:
+        if set(fingerprint) - set(files_methods_checksums[file_name]):
             return False
         return True
     return False
 
 
+def check_data_version(connection, datafile, data_version):
+    stored_data_version = connection.execute("PRAGMA user_version").fetchone()[0]
+
+    if int(stored_data_version) == data_version:
+        return connection, False
+
+    connection.close()
+    os.remove(datafile)
+    connection = connect(datafile)
+    connection = connection_options(connection)
+    return connection, True
+
+
 class DB:
     def __init__(self, datafile, readonly=False):
         self._readonly = readonly
-        new_db = not os.path.exists(datafile)
+        file_exists = os.path.exists(datafile)
 
         connection = connect(datafile, readonly)
-        self.con = connection
-        old_format = self._check_data_version(datafile)
+        connection, old_format = check_data_version(
+            connection, datafile, self.version_compatibility()
+        )
+        self.con = connection_options(connection)
 
-        if new_db or old_format:
+        if (not file_exists) or old_format:
             self.init_tables()
+            self.file_created = True
+        else:
+            self.file_created = False
 
         self.con.executescript(self._local_temp_tables_statement())
 
     def version_compatibility(self):
         return DATA_VERSION
-
-    def _check_data_version(self, datafile):
-        stored_data_version = self._fetch_data_version()
-
-        if int(stored_data_version) == self.version_compatibility():
-            return False
-
-        self.con.close()
-        os.remove(datafile)
-        self.con = connect(datafile)
-        return True
 
     def __enter__(self):
         self.con = self.con.__enter__()
@@ -284,11 +290,6 @@ class DB:
 
     def insert_into_suite_files_fshas(self, con, exec_id, files_fshas):
         pass
-
-    def _fetch_data_version(self):
-        con = self.con
-
-        return con.execute("PRAGMA user_version").fetchone()[0]
 
     def write_attribute(self, attribute, data, exec_id=None):
         dataid = f"{exec_id}:{attribute}"
@@ -525,10 +526,10 @@ class DB:
                     ]
                 )
 
-            new_method_misses = []
+            method_misses = []
             for result in results:
-                if not check_fingerprint_db(files_mhashes, result):
-                    new_method_misses.append(result[1])
+                if not check_fingerprint_db(files_mhashes, result[0], result[2]):
+                    method_misses.append(result[1])
 
             failing_tests = [
                 row["test_name"]
@@ -545,7 +546,7 @@ class DB:
                 )
             ]
 
-            return {"affected": new_method_misses, "failing": failing_tests}
+            return {"affected": method_misses, "failing": failing_tests}
 
     def delete_test_executions(self, test_names, exec_id):
         self.con.executemany(

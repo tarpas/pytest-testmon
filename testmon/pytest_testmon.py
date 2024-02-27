@@ -296,7 +296,7 @@ def changed_message(
         if changed_files_msg == "" or len(changed_files_msg) > 100:
             changed_files_msg = str(len(config.testmon_data.unstable_files))
 
-        if changed_files_msg == "0" and len(stable_files) == 0 and not packages_change:
+        if config.testmon_data.new_db:
             message += "new DB, "
         else:
             message += (
