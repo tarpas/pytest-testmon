@@ -26,8 +26,16 @@ def dummy():
 
 
 def get_logger(name):
-    logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
-    return logging.getLogger(name)
+    # Create a formatter and set it on a new handler
+    formatter = logging.Formatter("%(levelname)s: %(message)s")
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+
+    # Configure the logger
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    return logger
 
 
 logger = get_logger(__name__)
