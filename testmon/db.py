@@ -636,6 +636,7 @@ class DB:
         self, environment_name, system_packages, python_version
     ):
         with self.con as con:
+            con.execute("BEGIN IMMEDIATE TRANSACTION")
             cursor = con.cursor()
             environment = cursor.execute(
                 """
