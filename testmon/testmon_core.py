@@ -145,7 +145,7 @@ class TestmonData:
     ):
         self.rootdir = rootdir
         self.environment = environment if environment else "default"
-        self.source_tree = SourceTree(rootdir=rootdir)
+        self.source_tree = SourceTree(rootdir=self.rootdir)
         if system_packages is None:
             system_packages = get_system_packages()
         system_packages = drop_patch_version(system_packages)
