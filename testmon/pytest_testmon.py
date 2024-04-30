@@ -277,7 +277,7 @@ def pytest_report_header(config):
         if show_survey_notification:
             tm_conf.message += (
                 "\nWe'd like to hear from testmon users! "
-                "🙏🙏 go to https://testmon.org/survey to leave feedback ✅❌"
+                "Please go to https://testmon.org/survey to leave feedback."
             )
     return tm_conf.message
 
