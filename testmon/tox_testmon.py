@@ -1,5 +1,3 @@
-import os
-
 from pathlib import Path
 import pluggy
 
@@ -21,7 +19,7 @@ def touch_stampfile(venv):
 
 
 def installed_testmon(venv):
-    return os.path.exists(venv.path.join(".testmon_installed"))
+    return Path(venv.path.join(".testmon_installed")).exists()
 
 
 @hookimpl
