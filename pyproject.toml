@@ -31,6 +31,7 @@ dependencies = [
     "coverage>=6,<8",
 ]
 
+# specify testmon and tmserver as packages of this project
 [tool.setuptools]
 packages = [
     "testmon",

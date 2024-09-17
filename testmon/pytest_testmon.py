@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+"""
+Main module of testmon pytest plugin.
+"""
 import time
 import xmlrpc.client
 import os
@@ -217,7 +221,7 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
 def pytest_configure(config):
     coverage_stack = None
     try:
-        from tmnet.testmon_core import (
+        from tmnet.testmon_core import (  # pylint: disable=import-outside-toplevel
             Testmon as UberTestmon,
         )
 
@@ -233,6 +237,7 @@ def pytest_configure(config):
     )
     config.testmon_config = tm_conf
     if tm_conf.select or tm_conf.collect:
+
         try:
             init_testmon_data(config)
             register_plugins(config, tm_conf.select, tm_conf.collect, cov_plugin)
@@ -327,18 +332,22 @@ class TestmonCollect:
         self._sessionstarttime = time.time()
 
     @pytest.hookimpl(tryfirst=True, hookwrapper=True)
-    def pytest_pycollect_makeitem(self, collector, name, obj):
+    def pytest_pycollect_makeitem(
+        self, collector, name, obj
+    ):  # pylint: disable=unused-argument
         makeitem_result = yield
         items = makeitem_result.get_result() or []
         try:
             self.raw_test_names.extend(
                 [item.nodeid for item in items if isinstance(item, pytest.Item)]
             )
-        except TypeError:
+        except TypeError:  # 'Class' object is not iterable
             pass
 
     @pytest.hookimpl(tryfirst=True)
-    def pytest_collection_modifyitems(self, session, config, items):
+    def pytest_collection_modifyitems(
+        self, session, config, items
+    ):  # pylint: disable=unused-argument
         should_sync = not session.testsfailed and self._running_as in (
             "single",
             "controller",
@@ -347,14 +356,16 @@ class TestmonCollect:
             config.testmon_data.sync_db_fs_tests(retain=set(self.raw_test_names))
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_protocol(self, item, nextitem):
+    def pytest_runtest_protocol(
+        self, item, nextitem
+    ):  # pylint: disable=unused-argument
         self.testmon.start_testmon(item.nodeid, nextitem.nodeid if nextitem else None)
         result = yield
         if result.excinfo and issubclass(result.excinfo[0], BaseException):
             self.testmon.discard_current()
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_makereport(self, item, call):
+    def pytest_runtest_makereport(self, item, call):  # pylint: disable=unused-argument
         result = yield
 
         if call.when == "teardown":
@@ -377,7 +388,7 @@ class TestmonCollect:
                     test_executions_fingerprints
                 )
 
-    def pytest_keyboard_interrupt(self, excinfo):
+    def pytest_keyboard_interrupt(self, excinfo):  # pylint: disable=unused-argument
         if self._running_as == "single":
             nodes_files_lines = self.testmon.get_batch_coverage_data()
 
@@ -387,7 +398,7 @@ class TestmonCollect:
             self.testmon_data.save_test_execution_file_fps(test_executions_fingerprints)
             self.testmon.close()
 
-    def pytest_sessionfinish(self, session):
+    def pytest_sessionfinish(self, session):  # pylint: disable=unused-argument
         if self._running_as in ("single", "controller"):
             self.testmon_data.db.finish_execution(
                 self.testmon_data.exec_id,
@@ -401,10 +412,12 @@ class TestmonXdistSync:
     def __init__(self):
         self.await_nodes = 0
 
-    def pytest_testnodeready(self, node):
+    def pytest_testnodeready(self, node):  # pylint: disable=unused-argument
         self.await_nodes += 1
 
-    def pytest_xdist_node_collection_finished(self, node, ids):
+    def pytest_xdist_node_collection_finished(
+        self, node, ids
+    ):  # pylint: disable=invalid-name
         self.await_nodes += -1
         if self.await_nodes == 0:
             node.config.testmon_data.sync_db_fs_tests(retain=set(ids))
@@ -465,7 +478,9 @@ class TestmonSelect:
         return None
 
     @pytest.hookimpl(trylast=True)
-    def pytest_collection_modifyitems(self, session, config, items):
+    def pytest_collection_modifyitems(
+        self, session, config, items
+    ):  # pylint: disable=unused-argument
         selected = []
         deselected = []
         for item in items:
@@ -539,10 +554,10 @@ class TestmonSelect:
         )
         terminal_reporter.write_line(msg)
 
-    def pytest_keyboard_interrupt(self, excinfo):
+    def pytest_keyboard_interrupt(self, excinfo):  # pylint: disable=unused-argument
         self._interrupted = True
 
 
-class FakeItemFromTestmon:
+class FakeItemFromTestmon:  # pylint: disable=too-few-public-methods
     def __init__(self, config):
         self.config = config

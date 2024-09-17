@@ -59,6 +59,7 @@ INVERTED_GAP_MARKS_CHECKSUMS = {
 
 class Block:
     def __init__(self, start, end, code=0, name=""):
+        # assert start <= end
         self.start = start
         self.end = end
         self.name = name
@@ -85,6 +86,7 @@ class Block:
 
 @lru_cache(300)
 def bytes_to_string_and_fsha(byte_stream):
+    # Replace \f because of http://bugs.python.org/issue19035
     byte_stream = byte_stream.replace(b"\f", b" ")
     byte_stream = byte_stream.replace(b"\r\n", b"\n")
     byte_string = byte_stream.decode(source_encoding(byte_stream), "replace")
@@ -107,7 +109,7 @@ def _next_lineno(nodes, i, end):
 
 
 class Module:
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         source_code=None,
         mtime=None,
@@ -130,6 +132,16 @@ class Module:
         self.ext = ext
 
     def dump_and_block(self, node, end, name="unknown", into_block=False):
+        """Frame of this method is taken from ast.dump
+        Objective is to return a representation of python source code where
+        all of the bodies of functions are replaced with 'transformed_into_block'
+        string. The rest of the syntax tree is represented in the same way as
+        in ast.dump(tree, annotate_fields=False). Of course the bodies of functions
+        are not completely thrown away, they are transformed into Block() objects
+        and appended to self.blocks. More can be probably understood from
+        (at the time rather messy) test_process_code.py examples.
+        """
+
         if isinstance(node, ast.AST):
             class_name = node.__class__.__name__
             fields = []
@@ -183,6 +195,8 @@ class Module:
                     tree = ast.parse(self.source_code, filename="<unknown>")
                     self.dump_and_block(tree, len(lines), name="<module>")
                 except SyntaxError:
+                    # We can continue without blocks because no tests depending on this file will ever get executed,
+                    # so no node depending on this checksum and mtime will ever be written to db.
                     pass
             else:
                 self._blocks = [Block(1, len(lines), self.source_code)]

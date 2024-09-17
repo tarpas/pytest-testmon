@@ -55,6 +55,17 @@ class TestmonException(Exception):
 
 
 class SourceTree:
+    """
+    - reads files from file_system and caches them in memory
+      (if the file was once read, let's use the on memory
+      copy for further operations. Also caches the mtime.)
+    - store rootdir and convert between relative and absolute paths
+    - implement the check if the file is changed based on mtime, fsha.
+    - implement the ckeck if the node is stable based on fingerprint
+    - mockability (unit tests without filesystem, check if the file is changed
+      based on mtime, fsha)
+    """
+
     def __init__(self, rootdir, packages=None):
         self.rootdir = rootdir
         self.packages = packages
@@ -99,7 +110,7 @@ def check_fsha(file_system, record):
     return record["fsha"] == fs_fsha
 
 
-def check_fingerprint(disk, record):
+def check_fingerprint(disk, record):  # filename name method_fshas id failed
     file = record[0]
     fingerprint = record[2]
 
@@ -131,10 +142,10 @@ def collect_mhashes(source_tree, new_changed_file_data):
     return files_mhashes
 
 
-class TestmonData:
+class TestmonData:  # pylint: disable=too-many-instance-attributes
     __test__ = False
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         rootdir,
         database=None,
@@ -153,11 +164,11 @@ class TestmonData:
             python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
         if database:
-            self.db = database
+            self.db = database  # pylint: disable=invalid-name
         else:
             self.db = db.DB(
                 os.path.join(self.rootdir, get_data_file_path()), readonly=readonly
-            )
+            )  # pylint: disable=invalid-name
 
         try:
             result = self.db.initiate_execution(
@@ -178,7 +189,9 @@ class TestmonData:
                 ),
                 exc,
             )
-            self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))
+            self.db = db.DB(
+                os.path.join(self.rootdir, get_data_file_path())
+            )  # pylint: disable=invalid-name
             result = self.db.initiate_execution(
                 self.environment, system_packages, python_version, {}
             )
@@ -200,6 +213,8 @@ class TestmonData:
 
     def close_connection(self):
         pass
+        # TODO this is why there are "too many open files" on MacOS.
+        # we need the leave the connection open for tests
 
     @property
     def all_tests(self):
@@ -262,8 +277,11 @@ class TestmonData:
             if module:
                 files_fshas[filename] = module.fs_fsha
 
+        # Compare the fshas from disk to the fshas in the database and get files
+        # where the fsha is not in database.
         new_changed_file_data = self.db.fetch_unknown_files(files_fshas, self.exec_id)
 
+        # Get the mhashes for the files from above
         files_mhashes = collect_mhashes(self.source_tree, new_changed_file_data)
 
         tests = self.db.determine_tests(self.exec_id, files_mhashes)
@@ -288,12 +306,23 @@ class TestmonData:
 
         _, fsha_misses = split_filter(
             self.source_tree, check_fsha, filenames_fingerprints
-        )
+        )  # check 2. fsha vs filesystem
+
+        # with the list of fingerprint_ids go to the database
+        # and fetch all the data needed for next step
 
         changed_file_data = self.db.fetch_changed_file_data(
             [fsha_miss["fingerprint_id"] for fsha_miss in (fsha_misses)],
             self.exec_id,
         )
+
+        # changed_file_data:
+        # [(filename, test_name, method_fshas, fingerprint_id, failed )]
+        # All the test_names in this list have a dependency on one
+        # or more changed files. And we also have the fingerprints
+        # of data content which they depend on. So it’s possible to
+        # filter out the node_ids where the content of the changed file
+        # still matches the fingerprint
 
         _, fingerprint_misses = split_filter(
             self.source_tree, check_fingerprint, changed_file_data
@@ -320,7 +349,7 @@ class TestmonData:
         for (
             test_execution_id,
             report,
-        ) in self.all_tests.items():
+        ) in self.all_tests.items():  # pylint: disable=no-member
             if report:
                 class_name = get_test_execution_class_name(test_execution_id)
                 module_name = get_test_execution_module_name(test_execution_id)
@@ -351,6 +380,7 @@ class TestmonData:
 
 
 def get_new_mtimes(filesystem, hits):
+    """hits: [(filename, _, _, fingerprint_id)]"""
     try:
         for hit in hits:
             module = filesystem.get_file(hit[0])
@@ -383,7 +413,7 @@ class TestmonCollector:
 
     def __init__(self, rootdir, testmon_labels=None, cov_plugin=None):
         try:
-            from testmon.testmon_core import (
+            from testmon.testmon_core import (  # pylint: disable=import-outside-toplevel
                 Testmon as UberTestmon,
             )
 
@@ -449,6 +479,7 @@ class TestmonCollector:
                 params["include"] = list(
                     set(cov.config.run_include + params["include"])
                 )
+            # params["omit"] = cov.config.run_omit
             if cov.config.branch:
                 raise TestmonException(
                     "testmon doesn't support simultaneous run with pytest-cov when "
@@ -573,7 +604,7 @@ def eval_environment(environment, **kwargs):
 
     try:
         return str(eval(environment, eval_globals))
-    except Exception as error:
+    except Exception as error:  # pylint: disable=broad-except
         return repr(error)
 
 

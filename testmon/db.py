@@ -34,7 +34,9 @@ def connection_options(connection):
     return connection
 
 
-def check_fingerprint_db(files_methods_checksums, file_name, fingerprint):
+def check_fingerprint_db(
+    files_methods_checksums, file_name, fingerprint
+):  # filename name method_checksums id failed
     if file_name in files_methods_checksums and files_methods_checksums[file_name]:
         if set(fingerprint) - set(files_methods_checksums[file_name]):
             return False
@@ -55,7 +57,7 @@ def check_data_version(connection, datafile, data_version):
     return connection, True
 
 
-class DB:
+class DB:  # pylint: disable=too-many-public-methods
     def __init__(self, datafile, readonly=False):
         self._readonly = readonly
         file_exists = os.path.exists(datafile)
@@ -96,7 +98,9 @@ class DB:
                 "UPDATE file_fp SET mtime=?, fsha=? WHERE id = ?", new_mtimes
             )
 
-    def finish_execution(self, exec_id, duration=None, select=True):
+    def finish_execution(
+        self, exec_id, duration=None, select=True
+    ):  # pylint: disable=unused-argument
         self.update_saving_stats(exec_id, select)
         self.fetch_or_create_file_fp.cache_clear()
         with self.con as con:
@@ -187,7 +191,9 @@ class DB:
         )
 
     @lru_cache(1000)
-    def fetch_or_create_file_fp(self, filename, fsha, method_checksums):
+    def fetch_or_create_file_fp(
+        self, filename, fsha, method_checksums
+    ):  # pylint: disable=R0801
         cursor = self.con.cursor()
         try:
             cursor.execute(
@@ -200,7 +206,7 @@ class DB:
             )
 
             fingerprint_id = cursor.lastrowid
-        except sqlite3.IntegrityError:
+        except sqlite3.IntegrityError:  # rather fetching existing fingerprint
             fingerprint_id, *_ = cursor.execute(
                 """
                 SELECT
@@ -215,7 +221,7 @@ class DB:
 
         return fingerprint_id
 
-    def _insert_test_execution(
+    def _insert_test_execution(  # pylint: disable=too-many-arguments
         self,
         con,
         exec_id,
@@ -306,7 +312,7 @@ class DB:
         )
         result = cursor.fetchone()
         if result:
-            return json.loads(result[0])
+            return json.loads(result[0])  # zlib.decompress(result[0]).decode('utf-8)'))
         return default
 
     def increment_attributes(self, attributes_to_increment, exec_id=None):
@@ -342,7 +348,7 @@ class DB:
                 UNIQUE (environment_name, system_packages, python_version)
             );"""
 
-    def _create_test_execution_statement(self):
+    def _create_test_execution_statement(self):  # pylint: disable=invalid-name
         return f"""
                 CREATE TABLE test_execution (
                 id INTEGER PRIMARY KEY ASC,
@@ -379,7 +385,7 @@ class DB:
                 UNIQUE (filename, fsha, method_checksums)
             );"""
 
-    def _create_test_execution_ffp_statement(
+    def _create_test_execution_ffp_statement(  # pylint: disable=invalid-name
         self,
     ):
         return """
@@ -451,7 +457,9 @@ class DB:
 
         return result
 
-    def fetch_unknown_files(self, files_fshas, exec_id):
+    def fetch_unknown_files(
+        self, files_fshas, exec_id
+    ):  # exec_id is environment_id in this module
         with self.con as con:
             con.execute("DELETE FROM changed_files_fshas WHERE exec_id = ?", (exec_id,))
             con.executemany(
@@ -598,6 +606,7 @@ class DB:
 
         return [row[0] for row in cursor]
 
+    # TODO unify with filenames? Restrict not to go into ancient history, but not miss combinations?
     def all_filenames(self):
         cursor = self.con.execute(
             """
@@ -685,13 +694,13 @@ class DB:
 
             return environment_id, packages_changed
 
-    def initiate_execution(
+    def initiate_execution(  # pylint: disable= R0913 W0613
         self,
         environment_name,
         system_packages,
         python_version,
-        execution_metadata,
-    ):
+        execution_metadata,  # pylint: disable=unused-argument
+    ):  # exec_id  # changed_file_data  # future_string2
         exec_id, packages_changed = self.fetch_or_create_environment(
             environment_name, system_packages, python_version
         )

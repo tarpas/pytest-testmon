@@ -2,7 +2,7 @@ import sys
 import re
 
 try:
-    from coverage.tracer import CTracer as Tracer
+    from coverage.tracer import CTracer as Tracer  # pylint: disable=no-name-in-module
 except ImportError:
     from coverage.pytracer import PyTracer as Tracer
 
@@ -87,9 +87,11 @@ def _get_noselect_reasons(options):
 def _formulate_deactivation(what, reasons):
     if reasons:
         return [
-            f"{what} automatically deactivated because {reasons[0]}, "
-            if reasons[0]
-            else what + " deactivated, "
+            (
+                f"{what} automatically deactivated because {reasons[0]}, "
+                if reasons[0]
+                else what + " deactivated, "
+            )
         ]
     return []
 

@@ -3,6 +3,7 @@ import os
 import re
 
 try:
+    # Python >= 3.8
     import importlib.metadata
 
     def get_system_packages_raw():
@@ -12,10 +13,14 @@ try:
         )
 
 except ImportError:
+    # Python < 3.7
     import pkg_resources
 
     def get_system_packages_raw():
-        return ((pkg.project_name, pkg.version) for pkg in pkg_resources.working_set)
+        return (
+            (pkg.project_name, pkg.version)
+            for pkg in pkg_resources.working_set  # pylint: disable=not-an-iterable
+        )
 
 
 from pathlib import Path
@@ -30,6 +35,7 @@ def get_logger(name):
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
 
+    # Configure the logger
     tm_logger = logging.getLogger(name)
     tm_logger.setLevel(logging.INFO)
     tm_logger.addHandler(handler)
@@ -55,16 +61,19 @@ def get_system_packages(ignore=None):
 
 def drop_patch_version(system_packages):
     return re.sub(
-        r"\b([\w_-]+\s\d+\.\d+)\.\w+\b",
+        r"\b([\w_-]+\s\d+\.\d+)\.\w+\b",  # extract (Package M.N).P / drop .patch
         r"\1",
         system_packages,
     )
 
 
-def git_path(start_path=None):
+#
+# .git utilities
+#
+def git_path(start_path=None):  # parent dirs only
     start_path = Path(start_path or os.getcwd()).resolve()
     current_path = start_path
-    while current_path != current_path.parent:
+    while current_path != current_path.parent:  # '/'.parent == '/'
         path = current_path / ".git"
         if path.exists() and path.is_dir():
             return str(path)
@@ -81,7 +90,7 @@ def git_current_branch(path=None):
         with open(git_head_file, "r", encoding="utf8") as head_file:
             head_content = head_file.read().strip()
         if head_content.startswith("ref:"):
-            return head_content.split("/")[-1]
+            return head_content.split("/")[-1]  # e.g. ref: refs/heads/master
     except FileNotFoundError:
         pass
     return None
