@@ -137,7 +137,7 @@ def testmon_options(config):
     return result
 
 
-def init_testmon_data(config):
+def init_testmon_data(config: Config):
     environment = config.getoption("environment_expression") or eval_environment(
         config.getini("environment_expression")
     )
@@ -235,7 +235,7 @@ def pytest_configure(config):
     tm_conf = configure.header_collect_select(
         config, coverage_stack, cov_plugin=cov_plugin
     )
-    config.testmon_config = tm_conf
+    config.testmon_config: TmConf = tm_conf
     if tm_conf.select or tm_conf.collect:
 
         try:
@@ -322,8 +322,8 @@ def pytest_unconfigure(config):
 
 class TestmonCollect:
     def __init__(self, testmon, testmon_data, running_as="single", cov_plugin=None):
-        self.testmon_data = testmon_data
-        self.testmon = testmon
+        self.testmon_data: TestmonData = testmon_data
+        self.testmon: TestmonCollector = testmon
         self._running_as = running_as
 
         self.reports = defaultdict(lambda: {})
@@ -436,7 +436,7 @@ def get_failing(all_test_executions):
     return failing_files, failing_tests
 
 
-def sort_items_by_duration(items, avg_durations):
+def sort_items_by_duration(items, avg_durations) -> None:
     items.sort(key=lambda item: avg_durations[item.nodeid])
     items.sort(
         key=lambda item: avg_durations[get_test_execution_class_name(item.nodeid)]
@@ -456,7 +456,7 @@ def format_time_saved(seconds):
 
 class TestmonSelect:
     def __init__(self, config, testmon_data):
-        self.testmon_data = testmon_data
+        self.testmon_data: TestmonData = testmon_data
         self.config = config
 
         failing_files, failing_test_names = get_failing(testmon_data.all_tests)

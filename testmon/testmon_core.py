@@ -69,7 +69,7 @@ class SourceTree:
     def __init__(self, rootdir, packages=None):
         self.rootdir = rootdir
         self.packages = packages
-        self.cache = {}
+        self.cache: dict = {}
 
     def get_file(self, filename):
         if filename not in self.cache:
@@ -92,7 +92,7 @@ class SourceTree:
         return self.cache[filename]
 
 
-def check_mtime(file_system, record):
+def check_mtime(file_system: SourceTree, record):
     absfilename = os.path.join(file_system.rootdir, record["filename"])
 
     cache_module = file_system.cache.get(record["filename"], None)
@@ -110,7 +110,9 @@ def check_fsha(file_system, record):
     return record["fsha"] == fs_fsha
 
 
-def check_fingerprint(disk, record):  # filename name method_fshas id failed
+def check_fingerprint(
+    disk, record: db.ChangedFileData
+):  # filename name method_fshas id failed
     file = record[0]
     fingerprint = record[2]
 
@@ -118,7 +120,7 @@ def check_fingerprint(disk, record):  # filename name method_fshas id failed
     return module and match_fingerprint(module, fingerprint)
 
 
-def split_filter(disk, function, records):
+def split_filter(disk, function, records: [T]) -> ([T], [T]):
     first = []
     second = []
     for record in records:
@@ -220,10 +222,10 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
     def all_tests(self):
         return self.db.all_test_executions(self.exec_id)
 
-    def get_tests_fingerprints(self, nodes_files_lines, reports):
+    def get_tests_fingerprints(self, nodes_files_lines, reports) -> TestExecutions:
         test_executions_fingerprints = {}
         for context in nodes_files_lines:
-            deps_n_outcomes = {"deps": []}
+            deps_n_outcomes: DepsNOutcomes = {"deps": []}
 
             for filename, covered in nodes_files_lines[context].items():
                 if os.path.exists(os.path.join(self.rootdir, filename)):
@@ -343,7 +345,7 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
             print("\n".join(sorted(new_fingerprint_misses)))
 
     @property
-    def avg_durations(self):
+    def avg_durations(self) -> dict:
         stats = defaultdict(lambda: {"test_execution": 0, "sum_duration": 0})
 
         for (
@@ -409,7 +411,7 @@ def cached_relpath(path, basepath):
 
 
 class TestmonCollector:
-    coverage_stack = []
+    coverage_stack: [Coverage] = []
 
     def __init__(self, rootdir, testmon_labels=None, cov_plugin=None):
         try:
@@ -417,16 +419,16 @@ class TestmonCollector:
                 Testmon as UberTestmon,
             )
 
-            TestmonCollector.coverage_stack = UberTestmon.coverage_stack
+            TestmonCollector.coverage_stack: [Coverage] = UberTestmon.coverage_stack
         except ImportError:
             pass
         if testmon_labels is None:
             testmon_labels = {"singleprocess"}
         self.rootdir = rootdir
         self.testmon_labels = testmon_labels
-        self.cov = None
+        self.cov: Coverage = None
         self.sub_cov_file = None
-        self.cov_plugin = cov_plugin
+        self.cov_plugin: CovPlugin = cov_plugin
         self._test_name = None
         self._next_test_name = None
         self.batched_test_names = set()
@@ -550,7 +552,7 @@ class TestmonCollector:
         return nodes_files_lines
 
     def get_nodes_files_lines(self, dont_include):
-        cov_data = self.cov.get_data()
+        cov_data: CoverageData = self.cov.get_data()
         files = cov_data.measured_files()
         nodes_files_lines = {}
         files_lines = {}

@@ -31,7 +31,7 @@ def debug_blob_to_code(blob):
     return blob.split(";\n")
 
 
-def methods_to_checksums(blocks):
+def methods_to_checksums(blocks) -> [int]:
     checksums = []
     for block in blocks:
         checksums.append(to_signed(zlib.crc32(block.encode("UTF-8"))))
@@ -39,7 +39,7 @@ def methods_to_checksums(blocks):
     return checksums
 
 
-def checksums_to_blob(checksums):
+def checksums_to_blob(checksums: [int]) -> sqlite3.Binary:
     blob = array(CHECKUMS_ARRAY_TYPE, checksums)
     data = blob.tobytes()
     return sqlite3.Binary(data)
@@ -85,7 +85,7 @@ class Block:
 
 
 @lru_cache(300)
-def bytes_to_string_and_fsha(byte_stream):
+def bytes_to_string_and_fsha(byte_stream: bytes) -> Union[str, bytes]:
     # Replace \f because of http://bugs.python.org/issue19035
     byte_stream = byte_stream.replace(b"\f", b" ")
     byte_stream = byte_stream.replace(b"\r\n", b"\n")
@@ -213,8 +213,8 @@ class Module:
         return methods_to_checksums([block.checksum for block in self.blocks])
 
 
-def read_source_sha(filename):
-    # source_bytes: Optional[bytes]
+def read_source_sha(filename: str):
+    source_bytes: Optional[bytes]
 
     try:
         with open(filename, "rb") as file:
@@ -256,7 +256,7 @@ def get_files_shas(directory):
     return noncached_get_files_shas(directory)
 
 
-def get_source_sha(directory, filename):
+def get_source_sha(directory: "str", filename: "str"):
     try:
         sha = get_files_shas(directory)[filename]
         return (None, sha)
@@ -270,7 +270,7 @@ def match_fingerprint_source(source_code, fingerprint, ext="py"):
     return match_fingerprint(module, fingerprint)
 
 
-def match_fingerprint(module, fingerprint):
+def match_fingerprint(module: Module, fingerprint):
     if set(fingerprint) - set(module.checksums):
         return False
     return True
@@ -281,8 +281,8 @@ def create_fingerprint_source(source_code, lines, ext="py"):
     return create_fingerprint(module, lines)
 
 
-def create_fingerprint(module, covered_lines):
-    blocks = module.blocks
+def create_fingerprint(module, covered_lines) -> [int]:
+    blocks: [Block] = module.blocks
     method_reprs = []
     line_index = 0
     sorted_lines = sorted(covered_lines)

@@ -35,7 +35,7 @@ def connection_options(connection):
 
 
 def check_fingerprint_db(
-    files_methods_checksums, file_name, fingerprint
+    files_methods_checksums, file_name, fingerprint: ChangedFileData
 ):  # filename name method_checksums id failed
     if file_name in files_methods_checksums and files_methods_checksums[file_name]:
         if set(fingerprint) - set(files_methods_checksums[file_name]):
@@ -86,10 +86,10 @@ class DB:  # pylint: disable=too-many-public-methods
     def __exit__(self, *args, **kwargs):
         self.con.__exit__(*args, **kwargs)
 
-    def _test_execution_fk_column(self):
+    def _test_execution_fk_column(self) -> str:
         return "environment_id"
 
-    def _test_execution_fk_table(self):
+    def _test_execution_fk_table(self) -> str:
         return "environment"
 
     def update_mtimes(self, new_mtimes):
@@ -224,12 +224,12 @@ class DB:  # pylint: disable=too-many-public-methods
     def _insert_test_execution(  # pylint: disable=too-many-arguments
         self,
         con,
-        exec_id,
-        test_name,
-        duration,
-        failed,
-        forced,
-    ):
+        exec_id: int,
+        test_name: "str",
+        duration: "float",
+        failed: "bool",
+        forced: bool,
+    ) -> int:
         cursor = con.cursor()
         cursor.execute(
             f"""
@@ -247,7 +247,7 @@ class DB:  # pylint: disable=too-many-public-methods
         )
         return cursor.lastrowid
 
-    def insert_test_file_fps(self, tests_deps_n_outcomes, exec_id=None):
+    def insert_test_file_fps(self, tests_deps_n_outcomes: TestExecutions, exec_id=None):
         assert exec_id
         with self.con as con:
             cursor = con.cursor()
@@ -335,10 +335,10 @@ class DB:  # pylint: disable=too-many-public-methods
                     ],
                 )
 
-    def _create_metadata_statement(self):
+    def _create_metadata_statement(self) -> str:
         return """CREATE TABLE metadata (dataid TEXT PRIMARY KEY, data TEXT);"""
 
-    def _create_environment_statement(self):
+    def _create_environment_statement(self) -> str:
         return """
                 CREATE TABLE environment (
                 id INTEGER PRIMARY KEY ASC,
@@ -348,7 +348,7 @@ class DB:  # pylint: disable=too-many-public-methods
                 UNIQUE (environment_name, system_packages, python_version)
             );"""
 
-    def _create_test_execution_statement(self):  # pylint: disable=invalid-name
+    def _create_test_execution_statement(self) -> str:  # pylint: disable=invalid-name
         return f"""
                 CREATE TABLE test_execution (
                 id INTEGER PRIMARY KEY ASC,
@@ -361,10 +361,10 @@ class DB:  # pylint: disable=too-many-public-methods
                 CREATE INDEX test_execution_fk_name ON test_execution ({self._test_execution_fk_column()}, test_name);
             """
 
-    def _create_temp_tables_statement(self):
+    def _create_temp_tables_statement(self) -> str:
         return ""
 
-    def _local_temp_tables_statement(self):
+    def _local_temp_tables_statement(self) -> str:
         return """
                 CREATE TEMPORARY TABLE changed_files_fshas (exec_id INTEGER, filename TEXT, fsha TEXT);
                 CREATE INDEX changed_files_fshas_mcall ON changed_files_fshas (exec_id, filename, fsha);
@@ -373,7 +373,7 @@ class DB:  # pylint: disable=too-many-public-methods
                 CREATE INDEX changed_files_mhashes_eid ON changed_files_mhashes (exec_id);
         """
 
-    def _create_file_fp_statement(self):
+    def _create_file_fp_statement(self) -> str:
         return """
             CREATE TABLE file_fp
             (
@@ -387,7 +387,7 @@ class DB:  # pylint: disable=too-many-public-methods
 
     def _create_test_execution_ffp_statement(  # pylint: disable=invalid-name
         self,
-    ):
+    ) -> str:
         return """
             CREATE TABLE test_execution_file_fp (
                 test_execution_id INTEGER,
@@ -420,7 +420,7 @@ class DB:  # pylint: disable=too-many-public-methods
 
         connection.execute(f"PRAGMA user_version = {self.version_compatibility()}")
 
-    def fetch_changed_file_data(self, changed_fingerprints, exec_id):
+    def fetch_changed_file_data(self, changed_fingerprints, exec_id) -> []:
         in_clause_questionsmarks = ", ".join("?" * len(changed_fingerprints))
         result = []
         for row in self.con.execute(
@@ -459,7 +459,7 @@ class DB:  # pylint: disable=too-many-public-methods
 
     def fetch_unknown_files(
         self, files_fshas, exec_id
-    ):  # exec_id is environment_id in this module
+    ) -> []:  # exec_id is environment_id in this module
         with self.con as con:
             con.execute("DELETE FROM changed_files_fshas WHERE exec_id = ?", (exec_id,))
             con.executemany(
@@ -696,11 +696,11 @@ class DB:  # pylint: disable=too-many-public-methods
 
     def initiate_execution(  # pylint: disable= R0913 W0613
         self,
-        environment_name,
-        system_packages,
-        python_version,
-        execution_metadata,  # pylint: disable=unused-argument
-    ):  # exec_id  # changed_file_data  # future_string2
+        environment_name: str,
+        system_packages: str,
+        python_version: str,
+        execution_metadata: dict,  # pylint: disable=unused-argument
+    ) -> [int, list]:  # exec_id  # changed_file_data  # future_string2
         exec_id, packages_changed = self.fetch_or_create_environment(
             environment_name, system_packages, python_version
         )
