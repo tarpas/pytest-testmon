@@ -7,6 +7,8 @@ from functools import lru_cache
 
 from testmon.process_code import blob_to_checksums, checksums_to_blob
 
+from testmon.common import TestExecutions
+
 
 DATA_VERSION = 13
 

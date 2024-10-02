@@ -9,6 +9,10 @@ from collections import defaultdict
 from xmlrpc.client import Fault, ProtocolError
 from socket import gaierror
 
+from typing import TypeVar
+
+from pytest_cov.plugin import CovPlugin
+
 import pytest
 from coverage import Coverage, CoverageData
 
@@ -29,6 +33,9 @@ from testmon.process_code import (
     Module,
 )
 
+from testmon.common import DepsNOutcomes, TestExecutions
+
+T = TypeVar("T")
 
 TEST_BATCH_SIZE = 250
 
