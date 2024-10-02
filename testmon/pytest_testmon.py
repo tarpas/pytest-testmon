@@ -9,6 +9,7 @@ import os
 from collections import defaultdict
 from datetime import date, timedelta
 
+from pathlib import Path
 import pytest
 
 from _pytest.config import ExitCode, Config
@@ -471,8 +472,8 @@ class TestmonSelect:
         ]
         self._interrupted = False
 
-    def pytest_ignore_collect(self, path, config):
-        strpath = cached_relpath(path.strpath, config.rootdir.strpath)
+    def pytest_ignore_collect(self, collection_path: Path, path, config):
+        strpath = cached_relpath(str(collection_path), config.rootdir.strpath)
         if strpath in self.deselected_files and self.config.testmon_config.select:
             return True
         return None
