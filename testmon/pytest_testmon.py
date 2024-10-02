@@ -472,7 +472,7 @@ class TestmonSelect:
         ]
         self._interrupted = False
 
-    def pytest_ignore_collect(self, collection_path: Path, path, config):
+    def pytest_ignore_collect(self, collection_path: Path, config):
         strpath = cached_relpath(str(collection_path), config.rootdir.strpath)
         if strpath in self.deselected_files and self.config.testmon_config.select:
             return True
