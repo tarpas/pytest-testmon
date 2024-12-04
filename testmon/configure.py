@@ -72,8 +72,8 @@ def _get_noselect_reasons(options):
     if options["keyword"]:
         return ["-k was used"]
 
-    if options["markexpr"]:
-        return ["-m was used"]
+    # if options["markexpr"]:
+    #     return ["-m was used"]
 
     if options["lf"]:
         return ["--lf was used"]
