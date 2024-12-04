@@ -489,11 +489,11 @@ class TestmonCollector:
                     set(cov.config.run_include + params["include"])
                 )
             # params["omit"] = cov.config.run_omit
-            if cov.config.branch:
-                raise TestmonException(
-                    "testmon doesn't support simultaneous run with pytest-cov when "
-                    "branch coverage is on. Please disable branch coverage."
-                )
+            # if cov.config.branch:
+            #     raise TestmonException(
+            #         "testmon doesn't support simultaneous run with pytest-cov when "
+            #         "branch coverage is on. Please disable branch coverage."
+            #     )
 
         self.cov = Coverage(data_file=self.sub_cov_file, config_file=False, **params)
         self.cov._warn_no_data = False
