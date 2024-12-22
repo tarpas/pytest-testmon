@@ -11,7 +11,10 @@ from socket import gaierror
 
 from typing import TypeVar
 
-from pytest_cov.plugin import CovPlugin
+try:
+    from pytest_cov.plugin import CovPlugin
+except ImportError:
+    pass
 
 import pytest
 from coverage import Coverage, CoverageData
@@ -420,7 +423,9 @@ def cached_relpath(path, basepath):
 class TestmonCollector:
     coverage_stack: [Coverage] = []
 
-    def __init__(self, rootdir, testmon_labels=None, cov_plugin=None):
+    def __init__(
+        self, rootdir, testmon_labels=None, cov_plugin=None
+    ):  # TODO remove cov_plugin
         try:
             from testmon.testmon_core import (  # pylint: disable=import-outside-toplevel
                 Testmon as UberTestmon,

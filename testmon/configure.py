@@ -87,11 +87,9 @@ def _get_noselect_reasons(options):
 def _formulate_deactivation(what, reasons):
     if reasons:
         return [
-            (
-                f"{what} automatically deactivated because {reasons[0]}, "
-                if reasons[0]
-                else what + " deactivated, "
-            )
+            f"{what} automatically deactivated because {reasons[0]}, "
+            if reasons[0]
+            else what + " deactivated, "
         ]
     return []
 

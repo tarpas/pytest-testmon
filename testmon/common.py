@@ -31,12 +31,8 @@ from typing import TypedDict, List, Dict
 class FileFp(TypedDict):
     filename: str
     method_checksums: List[int] = None
-    mtime: float = (
-        None  # optimization helper, not really a part of the data structure fundamentally
-    )
-    fsha: int = (
-        None  # optimization helper, not really a part of the data structure fundamentally
-    )
+    mtime: float = None  # optimization helper, not really a part of the data structure fundamentally
+    fsha: int = None  # optimization helper, not really a part of the data structure fundamentally
     fingerprint_id: int = None  # optimization helper,
 
 
