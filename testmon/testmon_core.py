@@ -1,15 +1,12 @@
 import hashlib
 import os
-import random
 import sys
 import sysconfig
-import textwrap
-from functools import lru_cache
 from collections import defaultdict
-from xmlrpc.client import Fault, ProtocolError
+from functools import lru_cache
 from socket import gaierror
-
 from typing import TypeVar
+from xmlrpc.client import Fault, ProtocolError
 
 try:
     from pytest_cov.plugin import CovPlugin
@@ -21,12 +18,7 @@ from coverage import Coverage, CoverageData
 
 from testmon import db
 from testmon import TESTMON_VERSION as TM_CLIENT_VERSION
-from testmon.common import (
-    get_logger,
-    get_system_packages,
-    drop_patch_version,
-    git_current_head,
-)
+from testmon.common import get_logger, git_current_head
 
 from testmon.process_code import (
     match_fingerprint,
@@ -169,11 +161,6 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         self.rootdir = rootdir
         self.environment = environment if environment else "default"
         self.source_tree = SourceTree(rootdir=self.rootdir)
-        if system_packages is None:
-            system_packages = get_system_packages()
-        system_packages = drop_patch_version(system_packages)
-        if not python_version:
-            python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
         if database:
             self.db = database  # pylint: disable=invalid-name

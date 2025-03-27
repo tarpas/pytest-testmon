@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import sys
 
 try:
     # Python >= 3.8
@@ -58,36 +59,44 @@ def dummy():
     pass
 
 
-def get_logger(name):
-    formatter = logging.Formatter("%(levelname)s: %(message)s")
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
+logging.basicConfig(
+    level=logging.getLevelName(logging.INFO),
+    format='%(asctime)s - [%(levelname)s] - [%(threadName)s] - (%(filename)s).%(funcName)s(%(lineno)d) - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
 
-    # Configure the logger
-    tm_logger = logging.getLogger(name)
-    tm_logger.setLevel(logging.INFO)
-    tm_logger.addHandler(handler)
-    return tm_logger
+
+def get_logger(name):
+    return logging.getLogger(name)
 
 
 logger = get_logger(__name__)
 
 
-def get_system_packages(ignore=None):
-    if not ignore:
-        ignore = set(("pytest-testmon", "pytest-testmon"))
-    return ", ".join(
-        sorted(
-            {
-                f"{package} {version}"
-                for (package, version) in get_system_packages_raw()
-                if not package in ignore
-            }
-        )
-    )
+def get_system_packages(track_sys_packages, ignore):
+    if track_sys_packages:
+        return __drop_patch_version(", ".join(
+            sorted(
+                {
+                    f"{package} {version}"
+                    for (package, version) in get_system_packages_raw()
+                    if not package in (ignore or {"pytest-testmon", "pytest-testmon"})
+                }
+            )
+        ))
+    else:
+        return "default_syc_packages"
 
 
-def drop_patch_version(system_packages):
+
+def get_python_version(track_python_version):
+    if track_python_version:
+        return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    else:
+        return "default_python_version"
+
+
+def __drop_patch_version(system_packages):
     return re.sub(
         r"\b([\w_-]+\s\d+\.\d+)\.\w+\b",  # extract (Package M.N).P / drop .patch
         r"\1",

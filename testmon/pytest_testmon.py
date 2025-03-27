@@ -28,7 +28,7 @@ from testmon.testmon_core import (
     cached_relpath,
 )
 from testmon import configure
-from testmon.common import get_logger, get_system_packages
+from testmon.common import get_logger, get_system_packages, get_python_version
 
 SURVEY_NOTIFICATION_INTERVAL = timedelta(days=28)
 
@@ -115,6 +115,33 @@ def pytest_addoption(parser):
         ),
     )
 
+    group.addoption(
+        "--track-sys-packages",
+        action="store_true",
+        dest="track-sys-packages",
+        help=(
+            "Turn on tracking sys packages changes."
+        ),
+    )
+
+    group.addoption(
+        "--track-python-version",
+        action="store_true",
+        dest="track-python-version",
+        help=(
+            "Turn on tracking python version changes."
+        ),
+    )
+
+    group.addoption(
+        "--select-failed",
+        action="store_true",
+        dest="select-failed",
+        help=(
+            "Turn on failed tests (from previous run) selection."
+        ),
+    )
+
     parser.addini("environment_expression", "environment expression", default="")
     parser.addini(
         "testmon_ignore_dependencies",
@@ -144,7 +171,9 @@ def init_testmon_data(config: Config):
     )
     ignore_dependencies = config.getini("testmon_ignore_dependencies")
 
-    system_packages = get_system_packages(ignore=ignore_dependencies)
+    options = vars(config.option)
+    system_packages = get_system_packages(options["track-sys-packages"], ignore=ignore_dependencies)
+    python_version = get_python_version(options["track-python-version"])
 
     url = config.getini("tmnet_url")
     rpc_proxy = None
@@ -179,6 +208,7 @@ def init_testmon_data(config: Config):
         rootdir=config.rootdir.strpath,
         database=rpc_proxy,
         environment=environment,
+        python_version=python_version,
         system_packages=system_packages,
         readonly=get_running_as(config) == "worker",
     )
@@ -459,16 +489,23 @@ class TestmonSelect:
         self.testmon_data: TestmonData = testmon_data
         self.config = config
 
-        failing_files, failing_test_names = get_failing(testmon_data.all_tests)
+        options = vars(config.option)
 
-        self.deselected_files = [
-            file for file in testmon_data.stable_files if file not in failing_files
-        ]
-        self.deselected_tests = [
-            test_name
-            for test_name in testmon_data.stable_test_names
-            if test_name not in failing_test_names
-        ]
+        if options["select-failed"]:
+            failing_files, failing_test_names = get_failing(testmon_data.all_tests)
+
+            self.deselected_files = [
+                file for file in testmon_data.stable_files if file not in failing_files
+            ]
+            self.deselected_tests = [
+                test_name
+                for test_name in testmon_data.stable_test_names
+                if test_name not in failing_test_names
+            ]
+        else:
+            self.deselected_files = testmon_data.stable_files
+            self.deselected_tests = testmon_data.stable_test_names
+
         self._interrupted = False
 
     def pytest_ignore_collect(self, collection_path: Path, config):
