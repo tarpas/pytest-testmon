@@ -62,3 +62,4 @@ exclude = '''
 
 [project.entry-points.pytest11]
 pytest-testmon = "testmon.pytest_testmon"
+testmon = "testmon.pytest_testmon"
