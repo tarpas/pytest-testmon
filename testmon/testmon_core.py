@@ -4,6 +4,7 @@ import random
 import sys
 import sysconfig
 import textwrap
+import ast
 from functools import lru_cache
 from collections import defaultdict
 from xmlrpc.client import Fault, ProtocolError
@@ -38,6 +39,8 @@ from testmon.process_code import (
 
 from testmon.common import DepsNOutcomes, TestExecutions
 
+from typing import Optional
+
 T = TypeVar("T")
 
 TEST_BATCH_SIZE = 250
@@ -58,6 +61,50 @@ def home_file(test_execution_name):
 
 def is_python_file(file_path):
     return file_path[-3:] == ".py"
+
+
+# helpers for import dependency tracking
+def parse_imported_modules(source_path: str) -> set:
+    """
+    Return a set of module names imported by a Python file.
+
+    Only `import` and `from` statements are considered.
+    """
+    imported: set = set()
+    try:
+        with open(source_path, "r", encoding="utf8") as f:
+            contents = f.read()
+    except (OSError, IOError):
+        return imported
+    try:
+        tree = ast.parse(contents, filename=source_path)
+    except SyntaxError:
+        # If the file contains syntax errors we can't parse it, so return an empty set.
+        return imported
+    for node in ast.walk(tree):
+        # Handle `import x` statements
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                name = alias.name
+                if name:
+                    imported.add(name)
+        # Handle `from x import y` statements
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                imported.add(node.module)
+    return imported
+
+def resolve_module_to_file(module_name: str, rootdir: str) -> Optional[str]:
+    """
+    Attempt to resolve a dotted module name to a Python file within rootdir.
+    """
+    # convert module name to potential file system paths
+    relative_module_path = module_name.replace(".", os.sep)
+    for candidate in [f"{relative_module_path}.py", os.path.join(relative_module_path, "__init__.py")]:
+        absolute_path = os.path.join(rootdir, candidate)
+        if os.path.exists(absolute_path):
+            return candidate
+    return None
 
 
 class TestmonException(Exception):
@@ -236,6 +283,7 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         test_executions_fingerprints = {}
         for context in nodes_files_lines:
             deps_n_outcomes: DepsNOutcomes = {"deps": []}
+            processed_filenames: set[str] = set()
 
             for filename, covered in nodes_files_lines[context].items():
                 if os.path.exists(os.path.join(self.rootdir, filename)):
@@ -249,7 +297,31 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
                             "method_checksums": fingerprint,
                         }
                     )
+                    processed_filenames.add(filename)
 
+            # include modules imported by the test as dependencies
+            test_file = home_file(context)
+            test_abs = os.path.join(self.rootdir, test_file)
+            if os.path.exists(test_abs):
+                for mod_name in parse_imported_modules(test_abs):
+                    mod_rel = resolve_module_to_file(mod_name, self.rootdir)
+                    if not mod_rel or mod_rel in processed_filenames:
+                        continue
+                    module = self.source_tree.get_file(mod_rel)
+                    if not module:
+                        continue
+                    deps_n_outcomes["deps"].append(
+                        {
+                            "filename": mod_rel,
+                            "mtime": module.mtime,
+                            "fsha": module.fs_fsha,
+                            # Use the full method_checksums for the module as fingerprint
+                            "method_checksums": module.method_checksums,
+                        }
+                    )
+                    processed_filenames.add(mod_rel)
+
+            # Copy over execution result fields and forced flag
             deps_n_outcomes.update(process_result(reports[context]))
             deps_n_outcomes["forced"] = context in self.stable_test_names and (
                 context not in self.failing_tests
