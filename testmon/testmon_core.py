@@ -212,10 +212,12 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         system_packages=None,
         python_version=None,
         readonly=False,
+        include_imports=False,
     ):
         self.rootdir = rootdir
         self.environment = environment if environment else "default"
         self.source_tree = SourceTree(rootdir=self.rootdir)
+        self.include_imports = include_imports
         if system_packages is None:
             system_packages = get_system_packages()
         system_packages = drop_patch_version(system_packages)
@@ -300,26 +302,27 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
                     processed_filenames.add(filename)
 
             # include modules imported by the test as dependencies
-            test_file = home_file(context)
-            test_abs = os.path.join(self.rootdir, test_file)
-            if os.path.exists(test_abs):
-                for mod_name in parse_imported_modules(test_abs):
-                    mod_rel = resolve_module_to_file(mod_name, self.rootdir)
-                    if not mod_rel or mod_rel in processed_filenames:
-                        continue
-                    module = self.source_tree.get_file(mod_rel)
-                    if not module:
-                        continue
-                    deps_n_outcomes["deps"].append(
-                        {
-                            "filename": mod_rel,
-                            "mtime": module.mtime,
-                            "fsha": module.fs_fsha,
-                            # Use the full method_checksums for the module as fingerprint
-                            "method_checksums": module.method_checksums,
-                        }
-                    )
-                    processed_filenames.add(mod_rel)
+            if self.include_imports:
+                test_file = home_file(context)
+                test_abs = os.path.join(self.rootdir, test_file)
+                if os.path.exists(test_abs):
+                    for mod_name in parse_imported_modules(test_abs):
+                        mod_rel = resolve_module_to_file(mod_name, self.rootdir)
+                        if not mod_rel or mod_rel in processed_filenames:
+                            continue
+                        module = self.source_tree.get_file(mod_rel)
+                        if not module:
+                            continue
+                        deps_n_outcomes["deps"].append(
+                            {
+                                "filename": mod_rel,
+                                "mtime": module.mtime,
+                                "fsha": module.fs_fsha,
+                                # Use the full method_checksums for the module as fingerprint
+                                "method_checksums": module.method_checksums,
+                            }
+                        )
+                        processed_filenames.add(mod_rel)
 
             # Copy over execution result fields and forced flag
             deps_n_outcomes.update(process_result(reports[context]))

@@ -83,6 +83,15 @@ def pytest_addoption(parser):
     )
 
     group.addoption(
+        "--testmon-include-imports",
+        action="store_true",
+        dest="testmon_include_imports",
+        help=(
+            "Include imported files as dependencies of tests."
+        ),
+    )
+
+    group.addoption(
         "--no-testmon",
         action="store_true",
         dest="no-testmon",
@@ -181,6 +190,7 @@ def init_testmon_data(config: Config):
         environment=environment,
         system_packages=system_packages,
         readonly=get_running_as(config) == "worker",
+        include_imports=config.testmon_config.include_imports
     )
     testmon_data.determine_stable(bool(rpc_proxy))
     config.testmon_data = testmon_data
