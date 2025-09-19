@@ -83,11 +83,16 @@ def pytest_addoption(parser):
     )
 
     group.addoption(
-        "--testmon-include-imports",
-        action="store_true",
-        dest="testmon_include_imports",
+        "--testmon-imports-recursion-depth",
+        action="store",
+        dest="testmon_imports_recursion_depth",
+        default=-1,
+        type=int,
         help=(
-            "Include imported files as dependencies of tests."
+            "Recursively include imported files as dependencies of "
+            "tests up to this depth. Defaults to -1, which disables "
+            "this feature. A depth of 0 will include just the "
+            "modules directly imported by the test"
         ),
     )
 
@@ -190,7 +195,7 @@ def init_testmon_data(config: Config):
         environment=environment,
         system_packages=system_packages,
         readonly=get_running_as(config) == "worker",
-        include_imports=config.testmon_config.include_imports
+        import_depth=config.testmon_config.import_depth
     )
     testmon_data.determine_stable(bool(rpc_proxy))
     config.testmon_data = testmon_data

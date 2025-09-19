@@ -64,20 +64,23 @@ def is_python_file(file_path):
 
 
 # helpers for import dependency tracking
-def parse_imported_modules(source_path: str) -> set:
+def parse_imported_modules(rootdir: str, source_path: str, level: int = 0, imported: dict = dict()) -> dict:
     """
     Return a set of module names imported by a Python file.
 
     Only `import` and `from` statements are considered.
     """
-    imported: set = set()
+    fullpath = os.path.join(rootdir, source_path)
+    if not os.path.exists(fullpath):
+        return imported
     try:
-        with open(source_path, "r", encoding="utf8") as f:
+        with open(fullpath, "r", encoding="utf8") as f:
             contents = f.read()
     except (OSError, IOError):
         return imported
+    nextlevel = level - 1
     try:
-        tree = ast.parse(contents, filename=source_path)
+        tree = ast.parse(contents, filename=fullpath)
     except SyntaxError:
         # If the file contains syntax errors we can't parse it, so return an empty set.
         return imported
@@ -86,12 +89,27 @@ def parse_imported_modules(source_path: str) -> set:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 name = alias.name
-                if name:
-                    imported.add(name)
+                if not name or name in imported:
+                    continue
+                relpath = resolve_module_to_file(name, rootdir)
+                if relpath is None:
+                    continue
+                imported[name] = relpath
+                if nextlevel >= 0:
+                    imported = parse_imported_modules(rootdir, relpath, nextlevel, imported)
+
         # Handle `from x import y` statements
         elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                imported.add(node.module)
+            if node.module in imported:
+                continue
+
+            relpath = resolve_module_to_file(node.module, rootdir)
+            if relpath is None:
+                continue
+            imported[node.module] = relpath
+            if nextlevel >= 0:
+                imported = parse_imported_modules(rootdir, relpath, nextlevel, imported)
+
     return imported
 
 def resolve_module_to_file(module_name: str, rootdir: str) -> Optional[str]:
@@ -212,12 +230,12 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         system_packages=None,
         python_version=None,
         readonly=False,
-        include_imports=False,
+        import_depth: int = -1,
     ):
         self.rootdir = rootdir
         self.environment = environment if environment else "default"
         self.source_tree = SourceTree(rootdir=self.rootdir)
-        self.include_imports = include_imports
+        self.import_depth = import_depth
         if system_packages is None:
             system_packages = get_system_packages()
         system_packages = drop_patch_version(system_packages)
@@ -302,27 +320,25 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
                     processed_filenames.add(filename)
 
             # include modules imported by the test as dependencies
-            if self.include_imports:
+            if self.import_depth >= 0:
                 test_file = home_file(context)
-                test_abs = os.path.join(self.rootdir, test_file)
-                if os.path.exists(test_abs):
-                    for mod_name in parse_imported_modules(test_abs):
-                        mod_rel = resolve_module_to_file(mod_name, self.rootdir)
-                        if not mod_rel or mod_rel in processed_filenames:
-                            continue
-                        module = self.source_tree.get_file(mod_rel)
-                        if not module:
-                            continue
-                        deps_n_outcomes["deps"].append(
-                            {
-                                "filename": mod_rel,
-                                "mtime": module.mtime,
-                                "fsha": module.fs_fsha,
-                                # Use the full method_checksums for the module as fingerprint
-                                "method_checksums": module.method_checksums,
-                            }
-                        )
-                        processed_filenames.add(mod_rel)
+                imported = parse_imported_modules(self.rootdir, test_file, level=self.import_depth)
+                for mod_rel in imported.values():
+                    if not mod_rel or mod_rel in processed_filenames:
+                        continue
+                    module = self.source_tree.get_file(mod_rel)
+                    if not module:
+                        continue
+                    deps_n_outcomes["deps"].append(
+                        {
+                            "filename": mod_rel,
+                            "mtime": module.mtime,
+                            "fsha": module.fs_fsha,
+                            # Use the full method_checksums for the module as fingerprint
+                            "method_checksums": module.method_checksums,
+                        }
+                    )
+                    processed_filenames.add(mod_rel)
 
             # Copy over execution result fields and forced flag
             deps_n_outcomes.update(process_result(reports[context]))

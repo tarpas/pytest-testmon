@@ -99,7 +99,7 @@ class TmConf:
     message: str
     collect: bool
     select: bool
-    include_imports: bool = False
+    import_depth: int = -1
     tmnet: bool = False
 
     def __eq__(self, other):
@@ -126,7 +126,7 @@ def _header_collect_select(
     if notestmon_reasons:
         return TmConf("testmon: " + notestmon_reasons, False, False)
 
-    include_imports = options['testmon_include_imports']
+    import_depth = options['testmon_imports_recursion_depth']
 
     nocollect_reasons = _get_nocollect_reasons(
         options,
@@ -150,7 +150,7 @@ def _header_collect_select(
         f"testmon: {message}",
         not bool(nocollect_reasons),
         not bool(noselect_reasons),
-        include_imports,
+        import_depth,
         bool(options.get("tmnet")),
     )
 
