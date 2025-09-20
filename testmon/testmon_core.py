@@ -64,12 +64,14 @@ def is_python_file(file_path):
 
 
 # helpers for import dependency tracking
-def parse_imported_modules(rootdir: str, source_path: str, level: int = 0, imported: dict = dict()) -> dict:
+def parse_imported_modules(rootdir: str, source_path: str, level: int = 0, imported: Optional[dict] = None) -> dict:
     """
     Return a set of module names imported by a Python file.
 
     Only `import` and `from` statements are considered.
     """
+    if imported is None:
+        imported = dict()
     fullpath = os.path.join(rootdir, source_path)
     if not os.path.exists(fullpath):
         return imported
