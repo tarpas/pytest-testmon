@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pytest-testmon"
+name = "pytest-ezmon"
 authors = [
     { name = "Tibor Arpas", email = "tibor@testmon.org" },
 ]
@@ -31,14 +31,14 @@ dependencies = [
     "coverage>=6,<8",
 ]
 
-# specify testmon and tmserver as packages of this project
+# specify ezmon and tmserver as packages of this project
 [tool.setuptools]
 packages = [
-    "testmon",
+    "ezmon",
 ]
 
 [tool.setuptools.dynamic]
-version = {attr = "testmon.TESTMON_VERSION"}
+version = {attr = "ezmon.__init__.TESTMON_VERSION"}
 
 [tool.black]
 exclude = '''
@@ -61,4 +61,4 @@ exclude = '''
 
 
 [project.entry-points.pytest11]
-pytest-testmon = "testmon.pytest_testmon"
+pytest-ezmon = "ezmon.pytest_ezmon"

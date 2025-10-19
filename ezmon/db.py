@@ -5,9 +5,9 @@ import sqlite3
 from collections import namedtuple
 from functools import lru_cache
 
-from testmon.process_code import blob_to_checksums, checksums_to_blob
+from ezmon.process_code import blob_to_checksums, checksums_to_blob
 
-from testmon.common import TestExecutions
+from ezmon.common import TestExecutions
 
 
 DATA_VERSION = 13

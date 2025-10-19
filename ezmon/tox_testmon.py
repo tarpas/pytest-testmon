@@ -9,7 +9,7 @@ hookimpl = pluggy.HookimplMarker("tox")
 def _uses_testmon(envconfig):
 
     for command in envconfig.commands:
-        if "--testmon" in command:
+        if "--ezmon" in command:
             return True
     return False
 
@@ -26,17 +26,17 @@ def installed_testmon(venv):
 def tox_runenvreport(venv, action):
     if "TESTMON_DATAFILE" in venv.envconfig.setenv:
         datafile = venv.envconfig.setenv["TESTMON_DATAFILE"]
-        action.setactivity("testmon", f"keeping TESTMON_DATAFILE={datafile}")
+        action.setactivity("ezmon", f"keeping TESTMON_DATAFILE={datafile}")
     else:
         datafile = str(venv.path.join(".testmondata"))
-        action.setactivity("testmon", f"setting TESTMON_DATAFILE={datafile}")
+        action.setactivity("ezmon", f"setting TESTMON_DATAFILE={datafile}")
         venv.envconfig.setenv["TESTMON_DATAFILE"] = datafile
 
-    if _uses_testmon(venv.envconfig) and "pytest-testmon" not in (
+    if _uses_testmon(venv.envconfig) and "pytest-ezmon" not in (
         x.name for x in venv.envconfig.deps
     ):
         if not installed_testmon(venv):
-            action.setactivity("testmon", "installing pytest-testmon")
-            venv._install([DepConfig("pytest-testmon")], action=action)
+            action.setactivity("ezmon", "installing pytest-ezmon")
+            venv._install([DepConfig("pytest-ezmon")], action=action)
 
             touch_stampfile(venv)

@@ -75,7 +75,7 @@ logger = get_logger(__name__)
 
 def get_system_packages(ignore=None):
     if not ignore:
-        ignore = set(("pytest-testmon", "pytest-testmon"))
+        ignore = set(("pytest-ezmon", "pytest-ezmon"))
     return ", ".join(
         sorted(
             {

@@ -19,16 +19,16 @@ except ImportError:
 import pytest
 from coverage import Coverage, CoverageData
 
-from testmon import db
-from testmon import TESTMON_VERSION as TM_CLIENT_VERSION
-from testmon.common import (
+from ezmon import db
+from ezmon import TESTMON_VERSION as TM_CLIENT_VERSION
+from ezmon.common import (
     get_logger,
     get_system_packages,
     drop_patch_version,
     git_current_head,
 )
 
-from testmon.process_code import (
+from ezmon.process_code import (
     match_fingerprint,
     create_fingerprint,
     methods_to_checksums,
@@ -36,7 +36,7 @@ from testmon.process_code import (
     Module,
 )
 
-from testmon.common import DepsNOutcomes, TestExecutions
+from ezmon.common import DepsNOutcomes, TestExecutions
 
 T = TypeVar("T")
 
@@ -196,7 +196,7 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         except (ConnectionRefusedError, Fault, ProtocolError, gaierror) as exc:
             logger.error(
                 (
-                    "%s error when communication with testmon.net. (falling back to"
+                    "%s error when communication with ezmon.net. (falling back to"
                     " .testmondata locally)"
                 ),
                 exc,
@@ -427,7 +427,7 @@ class TestmonCollector:
         self, rootdir, testmon_labels=None, cov_plugin=None
     ):  # TODO remove cov_plugin
         try:
-            from testmon.testmon_core import (  # pylint: disable=import-outside-toplevel
+            from ezmon.testmon_core import (  # pylint: disable=import-outside-toplevel
                 Testmon as UberTestmon,
             )
 
@@ -496,7 +496,7 @@ class TestmonCollector:
             # params["omit"] = cov.config.run_omit
             if cov.config.branch:
                 raise TestmonException(
-                    "testmon doesn't support simultaneous run with pytest-cov when "
+                    "ezmon doesn't support simultaneous run with pytest-cov when "
                     "branch coverage is on. Please disable branch coverage."
                 )
 

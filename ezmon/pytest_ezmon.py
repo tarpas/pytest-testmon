@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Main module of testmon pytest plugin.
+Main module of ezmon pytest plugin.
 """
 import time
 import xmlrpc.client
@@ -15,9 +15,9 @@ import pytest
 from _pytest.config import ExitCode, Config
 from _pytest.terminal import TerminalReporter
 
-from testmon.configure import TmConf
+from ezmon.configure import TmConf
 
-from testmon.testmon_core import (
+from ezmon.testmon_core import (
     TestmonCollector,
     eval_environment,
     TestmonData,
@@ -27,8 +27,8 @@ from testmon.testmon_core import (
     get_test_execution_module_name,
     cached_relpath,
 )
-from testmon import configure
-from testmon.common import get_logger, get_system_packages
+from ezmon import configure
+from ezmon.common import get_logger, get_system_packages
 
 SURVEY_NOTIFICATION_INTERVAL = timedelta(days=28)
 
@@ -37,13 +37,13 @@ logger = get_logger(__name__)
 
 def pytest_addoption(parser):
     group = parser.getgroup(
-        "automatically select tests affected by changes (pytest-testmon)"
+        "automatically select tests affected by changes (pytest-ezmon)"
     )
 
     group.addoption(
-        "--testmon",
+        "--ezmon",
         action="store_true",
-        dest="testmon",
+        dest="ezmon",
         help=(
             "Select tests affected by changes (based on previously collected data) "
             "and collect + write new data (.testmondata file). "
@@ -53,7 +53,7 @@ def pytest_addoption(parser):
     )
 
     group.addoption(
-        "--testmon-noselect",
+        "--ezmon-noselect",
         action="store_true",
         dest="testmon_noselect",
         help=(
@@ -63,29 +63,29 @@ def pytest_addoption(parser):
     )
 
     group.addoption(
-        "--testmon-nocollect",
+        "--ezmon-nocollect",
         action="store_true",
         dest="testmon_nocollect",
         help=(
-            "Run testmon but deactivate the collection and writing of testmon data. "
+            "Run ezmon but deactivate the collection and writing of ezmon data. "
             "Forced if you run under debugger or coverage."
         ),
     )
 
     group.addoption(
-        "--testmon-forceselect",
+        "--ezmon-forceselect",
         action="store_true",
         dest="testmon_forceselect",
         help=(
-            "Run testmon and select only tests affected by changes "
+            "Run ezmon and select only tests affected by changes "
             "and satisfying pytest selectors at the same time."
         ),
     )
 
     group.addoption(
-        "--no-testmon",
+        "--no-ezmon",
         action="store_true",
-        dest="no-testmon",
+        dest="no-ezmon",
         help=(
             "Turn off (even if activated from config by default).\n"
             "Forced if neither read nor write is possible "
@@ -94,7 +94,7 @@ def pytest_addoption(parser):
     )
 
     group.addoption(
-        "--testmon-env",
+        "--ezmon-env",
         action="store",
         type=str,
         dest="environment_expression",
@@ -122,15 +122,15 @@ def pytest_addoption(parser):
         type="args",
         default=[],
     )
-    parser.addini("tmnet_url", "URL of the testmon.net api server.")
-    parser.addini("tmnet_api_key", "testmon api key")
+    parser.addini("tmnet_url", "URL of the ezmon.net api server.")
+    parser.addini("tmnet_api_key", "ezmon api key")
 
 
 def testmon_options(config):
     result = []
     for label in [
-        "testmon",
-        "no-testmon",
+        "ezmon",
+        "no-ezmon",
         "environment_expression",
     ]:
         if config.getoption(label):
@@ -281,7 +281,7 @@ def pytest_report_header(config):
 
         if show_survey_notification:
             tm_conf.message += (
-                "\nWe'd like to hear from testmon users! "
+                "\nWe'd like to hear from ezmon users! "
                 "Please go to https://testmon.org/survey to leave feedback."
             )
     return tm_conf.message
@@ -531,7 +531,7 @@ class TestmonSelect:
         else:
             potential_or_not = "T"
         terminal_reporter.section(
-            f"{potential_or_not}estmon savings (deselected/no testmon)",
+            f"{potential_or_not}estmon savings (deselected/no ezmon)",
             "=",
             **{"blue": True},
         )

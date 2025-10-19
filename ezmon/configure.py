@@ -22,13 +22,13 @@ def _is_coverage():
 
 
 def _get_notestmon_reasons(options):
-    if options["no-testmon"]:
-        return "deactivated through --no-testmon"
+    if options["no-ezmon"]:
+        return "deactivated through --no-ezmon"
 
     if not any(
         options.get(t, False)
         for t in [
-            "testmon",
+            "ezmon",
             "testmon_noselect",
             "testmon_nocollect",
             "testmon_forceselect",
@@ -122,7 +122,7 @@ def _header_collect_select(
     if notestmon_reasons == "not mentioned":
         return TmConf(None, False, False)
     if notestmon_reasons:
-        return TmConf("testmon: " + notestmon_reasons, False, False)
+        return TmConf("ezmon: " + notestmon_reasons, False, False)
 
     nocollect_reasons = _get_nocollect_reasons(
         options,
@@ -143,7 +143,7 @@ def _header_collect_select(
         message = ""
 
     return TmConf(
-        f"testmon: {message}",
+        f"ezmon: {message}",
         not bool(nocollect_reasons),
         not bool(noselect_reasons),
         bool(options.get("tmnet")),
