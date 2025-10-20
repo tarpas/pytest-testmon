@@ -615,7 +615,7 @@ def health():
     repo_count = len(get_metadata().get("repos", {}))
     log.info("health_check repo_count=%s data_dir=%s", repo_count, BASE_DATA_DIR)
     return jsonify(
-        {"status": "healthy!", "data_dir": str(BASE_DATA_DIR), "repo_count": repo_count}
+        {"status": "healthy!!!", "data_dir": str(BASE_DATA_DIR), "repo_count": repo_count}
     )
 
 # -----------------------------------------------------------------------------
