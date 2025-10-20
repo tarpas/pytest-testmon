@@ -1,0 +1,147 @@
+name: Deploy Testmon Server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  APP_REPO_PATH: /Users/andreasloizides/pytest-testmon/ez-viz          # ⬅️ change if needed
+  DEPLOY_STATE_DIR: /Users/andreasloizides/pytest-testmon/ez-viz.deploy-state
+  PM2_NAME: testmon-server                                           # ⬅️ matches your PM2 app name
+  VENV_DIR: /Users/andreasloizides/pytest-testmon/ez-viz/.venv          # ⬅️ your venv path
+  HEALTH_URL: http://127.0.0.1:8004/health
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: ${{ env.APP_REPO_PATH }}
+
+    steps:
+      - name: Update repository
+        run: |
+          echo "🔄 Updating repository..."
+          git fetch origin
+          git reset --hard origin/main
+          git clean -fd
+
+      - name: Ensure deploy state dir
+        run: mkdir -p "${{ env.DEPLOY_STATE_DIR }}"
+
+      - name: Detect backend changes since last success
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          LAST_SUCCESS_FILE="${{ env.DEPLOY_STATE_DIR }}/backend-success"
+          LAST_SUCCESS=""
+          if [[ -f "$LAST_SUCCESS_FILE" ]]; then
+            LAST_SUCCESS=$(cat "$LAST_SUCCESS_FILE" || true)
+          fi
+
+          # Patterns that affect backend runtime
+          # - python, gunicorn/pm2/ecosystem/configs, templates/static for Flask
+          CHANGED_FILES=""
+          if [[ -z "$LAST_SUCCESS" ]]; then
+            echo "No previous successful deploy; treating as changed."
+            CHANGED_FILES="(first deploy)"
+          else
+            CHANGED_FILES=$(git diff --name-only "$LAST_SUCCESS" "$CURRENT_COMMIT" | \
+              grep -E '\.(py)$|^requirements\.txt$|^ecosystem\.config\.(cjs|js)$|^app\.py$|^templates/|^static/' || true)
+          fi
+
+          if [[ -n "$CHANGED_FILES" ]]; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            echo "Changed files:"
+            echo "$CHANGED_FILES" | sed 's/^/  - /'
+          else
+            echo "backend=false" >> "$GITHUB_OUTPUT"
+            echo "📊 No backend changes since last successful deployment"
+          fi
+
+          # Did requirements.txt change?
+          if [[ -z "$LAST_SUCCESS" ]]; then
+            echo "deps=true" >> "$GITHUB_OUTPUT"
+          else
+            if git diff --name-only "$LAST_SUCCESS" "$CURRENT_COMMIT" | grep -q '^requirements\.txt$'; then
+              echo "deps=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "deps=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Prepare venv & deps (if needed)
+        if: steps.changes.outputs.backend == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # create venv if missing
+          if [[ ! -d "${{ env.VENV_DIR }}" ]]; then
+            echo "🐍 Creating venv at ${{ env.VENV_DIR }}"
+            python3 -m venv "${{ env.VENV_DIR }}"
+          fi
+          source "${{ env.VENV_DIR }}/bin/activate"
+          python -m pip install --upgrade pip >/dev/null
+
+          if [[ "${{ steps.changes.outputs.deps }}" == "true" ]]; then
+            echo "📦 requirements.txt changed (or first deploy) — installing…"
+            pip install -r requirements.txt --quiet
+          else
+            echo "📦 requirements.txt unchanged — skipping pip install"
+          fi
+
+      - name: PM2 start or graceful reload
+        if: steps.changes.outputs.backend == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          PM2_BIN=$(command -v pm2)
+          if [[ -z "$PM2_BIN" ]]; then
+            echo "pm2 not found in PATH"; exit 1
+          fi
+
+          # If process exists -> reload; else start from ecosystem file
+          if pm2 describe "${{ env.PM2_NAME }}" >/dev/null 2>&1; then
+            echo "🔄 Reloading ${{ env.PM2_NAME }} ..."
+            pm2 reload "${{ env.PM2_NAME }}" --update-env
+          else
+            echo "▶️ Starting ${{ env.PM2_NAME }} from ecosystem file..."
+            # You can keep your ecosystem at repo root
+            pm2 start ecosystem.config.cjs --only "${{ env.PM2_NAME }}"
+          fi
+
+          pm2 save
+
+      - name: Health check
+        if: steps.changes.outputs.backend == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAX_WAIT=60
+          SLEEP=2
+          ELAPSED=0
+          echo "🔍 Checking ${{ env.HEALTH_URL }}"
+          while true; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "${{ env.HEALTH_URL }}" || echo "000")
+            if [[ "$CODE" == "200" ]]; then
+              echo "✅ Healthy"
+              break
+            fi
+            if (( ELAPSED >= MAX_WAIT )); then
+              echo "❌ Health check failed after ${MAX_WAIT}s (last HTTP ${CODE})"
+              pm2 status "${{ env.PM2_NAME }}" || true
+              pm2 logs   "${{ env.PM2_NAME }}" --lines 80 --nostream || true
+              exit 1
+            fi
+            sleep "$SLEEP"
+            ELAPSED=$((ELAPSED+SLEEP))
+          done
+
+      - name: Mark backend success
+        if: steps.changes.outputs.backend == 'true' && success()
+        run: |
+          git rev-parse HEAD > "${{ env.DEPLOY_STATE_DIR }}/backend-success"
+          echo "✅ Deployment marker updated"
