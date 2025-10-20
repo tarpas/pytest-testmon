@@ -46,6 +46,7 @@ exclude = '''
   /(
       \.eggs         # exclude a few common directories in the
     | \.git          # root of the project
+    | \ez-viz        #visualizer is not part of the plugin package
     | \.hg
     | \.mypy_cache
     | \.tox

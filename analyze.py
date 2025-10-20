@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+analyze.py
 Testmon Database Analyzer
 Displays pytest-ezmon data in a human-readable format
 """
@@ -357,7 +358,7 @@ Examples:
 
     parser.add_argument(
         '--db',
-        default='/Users/andrew_yos/ezmon-test/.testmondata',
+        default='/Users/andrew_yos/testmon-test/.testmondata',
         help='Path to .testmondata file (default: /Users/andrew_yos/ezmon-test/.testmondata)'
     )
 

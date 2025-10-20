@@ -4,7 +4,12 @@ import os
 import sqlite3
 from typing import Any, Iterable
 
-DEFAULT_DB = "/Users/andrew_yos/ezmon-test/.testmondata"
+"""
+extract_db_data.py
+"""
+
+
+DEFAULT_DB = "/Users/andrew_yos/testmon-test/.testmondata"
 
 def connect_readonly(path: str) -> sqlite3.Connection:
     # Read-only connection (safer); falls back to normal open if URI fails.

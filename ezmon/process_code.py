@@ -34,6 +34,7 @@ def debug_blob_to_code(blob):
 def methods_to_checksums(blocks) -> [int]:
     checksums = []
     for block in blocks:
+        print(f"block: !!!\n[{block}]\n!!!\n")
         checksums.append(to_signed(zlib.crc32(block.encode("UTF-8"))))
 
     return checksums
