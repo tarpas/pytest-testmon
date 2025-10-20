@@ -7,6 +7,9 @@ venv/
 # the dreaded DS_Store
 **/*.DS_Store
 
+# state used by runner to note last successful deployment
+**/ez-viz.deploy-state/
+
 #testmon data files managed by the server
 
 testmon-data/
