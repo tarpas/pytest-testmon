@@ -423,7 +423,7 @@ def index():
 def health():
     """Health check endpoint"""
     return jsonify({
-        'status': 'healthy',
+        'status': 'healthy!',
         'data_dir': str(BASE_DATA_DIR),
         'repo_count': len(get_metadata().get('repos', {}))
     })

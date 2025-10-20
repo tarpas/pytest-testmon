@@ -4,6 +4,9 @@ venv/
 # C extensions
 *.so
 
+# the dreaded DS_Store
+**/*.DS_Store
+
 #testmon data files managed by the server
 
 testmon-data/
@@ -40,7 +43,6 @@ nosetests.xml
 .pydevproject
 
 # Any hidden files
-.*
 /htmlcov/
 /tags
 /tests/
