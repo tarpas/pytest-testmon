@@ -31,11 +31,21 @@ def debug_blob_to_code(blob):
     return blob.split(";\n")
 
 
+def _strip_comment_lines(text: str) -> str:
+    """Remove lines that are comments (after leading whitespace, start with '#')."""
+    kept = []
+    for line in text.splitlines():
+        if line.lstrip().startswith("#"):
+            continue
+        kept.append(line)
+    # Normalize to '\n' joins (stable across OS line endings)
+    return "\n".join(kept)
+
 def methods_to_checksums(blocks) -> [int]:
     checksums = []
     for block in blocks:
-        print(f"block: !!!\n[{block}]\n!!!\n")
-        checksums.append(to_signed(zlib.crc32(block.encode("UTF-8"))))
+        filtered = _strip_comment_lines(block)
+        checksums.append(to_signed(zlib.crc32(filtered.encode("utf-8"))))
 
     return checksums
 
