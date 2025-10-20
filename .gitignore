@@ -4,6 +4,10 @@ venv/
 # C extensions
 *.so
 
+#testmon data files managed by the server
+
+testmon-data/
+
 # Packages
 *.egg
 *.egg-info
