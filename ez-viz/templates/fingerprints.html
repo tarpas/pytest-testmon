@@ -1,0 +1,232 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ezmon fingerprints</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; }
+    header { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    select, button { padding: 6px 8px; }
+    .row { display: flex; gap: 16px; }
+    .col { flex: 1; min-width: 320px; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-top: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; }
+    .diff del { background: #ffe1e1; text-decoration: none; }
+    .diff ins { background: #d6ffd6; text-decoration: none; }
+    .warn { color: #b00; }
+    .muted { color: #666; }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>ezmon fingerprints</h2>
+    <span class="muted">(.ezmon-fp viewer)</span>
+  </header>
+
+  <section class="card">
+    <div class="row">
+      <div class="col">
+        <label>Test:</label>
+        <select id="testSelect"></select>
+      </div>
+      <div class="col">
+        <label>Snapshot A:</label>
+        <select id="snapA"></select>
+      </div>
+      <div class="col">
+        <label>Snapshot B:</label>
+        <select id="snapB"></select>
+      </div>
+      <div>
+        <button id="loadBtn">Load</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="output"></section>
+
+  <script>
+    // Small helper: fetch JSON if present
+    async function tryFetchJSON(url) {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) return null;
+        return await r.json();
+      } catch (_) {
+        return null;
+      }
+    }
+
+    // List tests (expects /.ezmon-fp/tests.json created by your builder)
+    async function listTests() {
+      const idx = await tryFetchJSON("/.ezmon-fp/tests.json");
+      if (idx && idx.tests) return idx.tests;
+      return [];
+    }
+
+    function option(value, text) {
+      const o = document.createElement('option');
+      o.value = value;
+      o.textContent = text ?? value;
+      return o;
+    }
+
+    // Tiny LCS diff at line-level
+    function diffLines(a, b) {
+      const A = a.split(/\r?\n/), B = b.split(/\r?\n/);
+      const m = A.length, n = B.length;
+      const dp = Array.from({length: m+1}, () => Array(n+1).fill(0));
+      for (let i=1;i<=m;i++) for (let j=1;j<=n;j++)
+        dp[i][j] = (A[i-1]===B[j-1]) ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+      const out = [];
+      let i=m,j=n;
+      while (i>0 || j>0) {
+        if (i>0 && j>0 && A[i-1]===B[j-1]) { out.push({type:'eq', s:A[i-1]}); i--; j--; }
+        else if (j>0 && (i===0 || dp[i][j-1]>=dp[i-1][j])) { out.push({type:'ins', s:B[j-1]}); j--; }
+        else { out.push({type:'del', s:A[i-1]}); i--; }
+      }
+      return out.reverse();
+    }
+
+    function renderDiff(a, b) {
+      const parts = diffLines(a, b);
+      const frag = document.createElement('div');
+      frag.className = 'mono diff';
+      for (const p of parts) {
+        if (p.type === 'eq') {
+          const span = document.createElement('span');
+          span.textContent = p.s + "\n";
+          frag.appendChild(span);
+        } else if (p.type === 'ins') {
+          const ins = document.createElement('ins');
+          ins.textContent = p.s + "\n";
+          frag.appendChild(ins);
+        } else {
+          const del = document.createElement('del');
+          del.textContent = p.s + "\n";
+          frag.appendChild(del);
+        }
+      }
+      return frag;
+    }
+
+    async function loadSnapshots(test, snapId) {
+      // Allow "latest" file containing the id
+      const latestText = await fetch(`/.ezmon-fp/${test}/latest`).then(r => r.text()).catch(_=>null);
+      const latestId = latestText ? latestText.trim() : null;
+      const id = (snapId === 'latest' && latestId) ? latestId : snapId;
+      const json = await tryFetchJSON(`/.ezmon-fp/${test}/${id}/fingerprint.json`);
+      return { id, json };
+    }
+
+    function renderDepsCompare(test, A, B) {
+      const container = document.getElementById('output');
+      container.innerHTML = '';
+      if (!A.json || !B.json) {
+        const warn = document.createElement('div');
+        warn.className = 'warn card';
+        warn.innerHTML = 'One or both snapshots missing JSON. Expected <code>/.ezmon-fp/' + test + '/{id}/fingerprint.json</code>.';
+        container.appendChild(warn);
+        return;
+      }
+
+      const h = document.createElement('h3');
+      h.textContent = `${test} — ${A.id}  ⇄  ${B.id}`;
+      container.appendChild(h);
+
+      const mapA = new Map(A.json.dependencies.map(d => [d.dependency_file, d]));
+      const mapB = new Map(B.json.dependencies.map(d => [d.dependency_file, d]));
+      const files = Array.from(new Set([...mapA.keys(), ...mapB.keys()])).sort();
+
+      for (const f of files) {
+        const a = mapA.get(f), b = mapB.get(f);
+        const card = document.createElement('div');
+        card.className = 'card';
+        const title = document.createElement('h4');
+        title.textContent = f;
+        card.appendChild(title);
+
+        if (!a || !b) {
+          const p = document.createElement('div');
+          p.className = 'warn';
+          p.textContent = !a ? 'Added in B' : 'Removed in B';
+          card.appendChild(p);
+          container.appendChild(card);
+          continue;
+        }
+
+        // Checksums overview
+        const checks = document.createElement('div');
+        checks.className = 'mono';
+        checks.textContent = `checksums: \nA: ${a.checksums.join(', ')}\nB: ${b.checksums.join(', ')}`;
+        card.appendChild(checks);
+
+        // Compare blocks length first
+        const maxBlocks = Math.max(a.blocks.length, b.blocks.length);
+        for (let i=0; i<maxBlocks; i++) {
+          const ba = a.blocks[i], bb = b.blocks[i];
+          const sub = document.createElement('div');
+          sub.style.marginTop = '8px';
+          const h5 = document.createElement('div');
+          h5.innerHTML = `<b>Block ${i+1}</b>  (A crc32=${ba?.crc32_signed ?? '—'}, B crc32=${bb?.crc32_signed ?? '—'})`;
+          sub.appendChild(h5);
+
+          const pa = ba ? ba.payload : '';
+          const pb = bb ? bb.payload : '';
+          sub.appendChild(renderDiff(pa, pb));
+          card.appendChild(sub);
+        }
+        container.appendChild(card);
+      }
+    }
+
+    async function init() {
+      const testSel = document.getElementById('testSelect');
+      const snapA = document.getElementById('snapA');
+      const snapB = document.getElementById('snapB');
+      const btn = document.getElementById('loadBtn');
+
+      const tests = await listTests();
+      if (tests.length === 0) {
+        const msg = document.createElement('div');
+        msg.className = 'card warn';
+        msg.innerHTML = 'No <code>/.ezmon-fp/tests.json</code> found. Run your builder to generate it, or enable directory listing.';
+        document.getElementById('output').appendChild(msg);
+      }
+      tests.forEach(t => testSel.appendChild(option(t)));
+
+      async function refreshSnapshots() {
+        snapA.innerHTML = '';
+        snapB.innerHTML = '';
+        const test = testSel.value;
+        if (!test) return;
+        const history = await tryFetchJSON(`/.ezmon-fp/${test}/history.json`) || [];
+        // newest last; add "latest" convenience
+        snapA.appendChild(option('latest'));
+        snapB.appendChild(option('latest'));
+        history.forEach(id => {
+          snapA.appendChild(option(id));
+          snapB.appendChild(option(id));
+        });
+        // pick previous for A (if exists) and latest for B
+        snapA.selectedIndex = Math.max(0, history.length - 2) + 1;
+        snapB.selectedIndex = Math.max(0, history.length - 1) + 1;
+      }
+
+      testSel.addEventListener('change', refreshSnapshots);
+      await refreshSnapshots();
+
+      btn.addEventListener('click', async () => {
+        const test = testSel.value;
+        if (!test) return;
+        const A = await loadSnapshots(test, snapA.value);
+        const B = await loadSnapshots(test, snapB.value);
+        renderDepsCompare(test, A, B);
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

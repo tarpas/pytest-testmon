@@ -1,0 +1,10 @@
+# dependency_file: test_two.py
+# blocks_used: 2
+# --- begin blocks used for CRC32 ---
+
+# block 1
+4:ImportFrom('string_utils', alias('reverse_string', None), alias('is_palindrome', None), alias('count_vowels', None), alias('capitalize_words', None), 0), ImportFrom('calculator', alias('conditional', None), 0), FunctionDef('test_capitalize_words', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_capitalize_words2', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_should_run', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_should_not_run', arguments(, , None, , , None, ), transformed_into_block, , None, None)
+
+# block 2
+2:Expr(Call(Name('conditional', Load()), Constant(True, None), ))
+# --- end blocks ---

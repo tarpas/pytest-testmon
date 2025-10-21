@@ -1,0 +1,10 @@
+# dependency_file: test_calculator.py
+# blocks_used: 2
+# --- begin blocks used for CRC32 ---
+
+# block 1
+5:Expr(Constant('Tests for calculator module.', None)), Import(alias('pytest', None)), ImportFrom('calculator', alias('add', None), alias('subtract', None), alias('multiply', None), alias('divide', None), 0), FunctionDef('test_add', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_subtract', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_multiply', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_divide', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_divide_by_zero', arguments(, , None, , , None, ), transformed_into_block, , None, None)
+
+# block 2
+3:Assert(Compare(Call(Name('divide', Load()), Constant(10, None), Constant(2, None), ), Eq(), Constant(5, None)), None), Assert(Compare(Call(Name('divide', Load()), Constant(7, None), Constant(2, None), ), Eq(), Constant(3.5, None)), None), Assert(Compare(Call(Name('divide', Load()), UnaryOp(USub(), Constant(10, None)), Constant(2, None), ), Eq(), UnaryOp(USub(), Constant(5, None))), None)
+# --- end blocks ---

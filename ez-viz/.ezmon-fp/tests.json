@@ -1,0 +1,8 @@
+{
+  "tests": [
+    "test_calculator.py_test_divide",
+    "test_calculator.py_test_divide_by_zero",
+    "test_two.py_test_should_not_run",
+    "test_two.py_test_should_run"
+  ]
+}

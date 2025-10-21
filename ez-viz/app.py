@@ -11,7 +11,12 @@ from flask import (
     g,
     has_request_context,
 )
+# app.py — add this import at the top with the rest
+from flask import send_from_directory
+
+
 from pathlib import Path
+
 import sqlite3
 import json
 import os
@@ -24,6 +29,7 @@ import time
 import uuid
 import traceback
 
+EZMON_FP_DIR = Path(os.getenv("EZMON_FP_DIR", "./.ezmon-fp")).resolve()
 # -----------------------------------------------------------------------------
 # Logging helpers
 # -----------------------------------------------------------------------------
@@ -617,6 +623,25 @@ def health():
     return jsonify(
         {"status": "healthy!!!", "data_dir": str(BASE_DATA_DIR), "repo_count": repo_count}
     )
+
+@app.route("/fingerprints")
+def fingerprints_page():
+    log.info("fingerprints_render")
+    return render_template("fingerprints.html")
+
+@app.route("/.ezmon-fp/<path:subpath>")
+def serve_ezmon_fp(subpath: str):
+    # Static file bridge for the ezmon snapshots
+    fp_path = EZMON_FP_DIR / subpath
+    if not fp_path.exists() or fp_path.is_dir():
+        log.warning("ezmon_fp_missing path=%s", fp_path)
+        return jsonify({"error": "Not found"}), 404
+    try:
+        size = fp_path.stat().st_size
+    except Exception:
+        size = -1
+    log.info("ezmon_fp_serve path=%s size=%s", fp_path, size)
+    return send_from_directory(EZMON_FP_DIR, subpath, as_attachment=False)
 
 # -----------------------------------------------------------------------------
 # Entrypoint
