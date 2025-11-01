@@ -7,13 +7,10 @@ from flask import (
     request,
     jsonify,
     send_file,
-    render_template,
+    send_from_directory,
     g,
     has_request_context,
 )
-# app.py — add this import at the top with the rest
-from flask import send_from_directory
-
 
 from pathlib import Path
 
@@ -609,12 +606,54 @@ def get_files(repo_id: str, job_id: str):
         return jsonify({"error": "Failed to read files"}), 500
 
 # -----------------------------------------------------------------------------
-# WEB + Health
+# WEB + Health - UPDATED FOR REACT
 # -----------------------------------------------------------------------------
+
+# Serve React App for root route
 @app.route("/")
-def index():
-    log.info("index_render")
-    return render_template("index.html")
+def serve_react_root():
+    react_index = Path(app.root_path) / 'client' / 'dist' / 'index.html'
+    log.info("serve_react_root path=%s exists=%s", react_index, react_index.exists())
+
+    if react_index.exists():
+        return send_file(react_index)
+    else:
+        log.error("react_build_missing expected=%s", react_index)
+        return jsonify({"error": "React app not built. Run 'npm run build' in client directory"}), 500
+
+# Serve React App's static assets (CSS, JS, images, etc.)
+@app.route('/assets/<path:path>')
+def serve_react_assets(path):
+    assets_dir = Path(app.root_path) / 'client' / 'dist' / 'assets'
+    log.info("serve_assets path=%s dir=%s", path, assets_dir)
+    return send_from_directory(assets_dir, path)
+
+# Catch-all route for React Router (client-side routing)
+@app.route("/<path:path>")
+def serve_react_app(path):
+    # Don't catch API routes
+    if path.startswith('api/'):
+        log.warning("invalid_api_route path=%s", path)
+        return jsonify({"error": "API endpoint not found"}), 404
+
+    # Don't catch the .ezmon-fp routes
+    if path.startswith('.ezmon-fp/'):
+        return serve_ezmon_fp(path.replace('.ezmon-fp/', ''))
+
+    # Check if the path is a static file in dist
+    file_path = Path(app.root_path) / 'client' / 'dist' / path
+    if file_path.exists() and file_path.is_file():
+        return send_file(file_path)
+
+    # Otherwise, serve index.html for React Router
+    react_index = Path(app.root_path) / 'client' / 'dist' / 'index.html'
+    log.info("serve_react_app path=%s", path)
+
+    if react_index.exists():
+        return send_file(react_index)
+    else:
+        log.error("react_build_missing expected=%s", react_index)
+        return jsonify({"error": "React app not built"}), 500
 
 @app.route("/health")
 def health():
@@ -624,10 +663,10 @@ def health():
         {"status": "healthy!!!", "data_dir": str(BASE_DATA_DIR), "repo_count": repo_count}
     )
 
-@app.route("/fingerprints")
-def fingerprints_page():
-    log.info("fingerprints_render")
-    return render_template("fingerprints.html")
+# @app.route("/fingerprints")
+# def fingerprints_page():
+#     log.info("fingerprints_render")
+#     return render_template("fingerprints.html")
 
 @app.route("/.ezmon-fp/<path:subpath>")
 def serve_ezmon_fp(subpath: str):
