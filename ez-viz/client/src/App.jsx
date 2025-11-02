@@ -60,7 +60,6 @@ function App() {
                 fetch(`${API_BASE}/data/${currentRepo}/${currentJob}/tests`).then(r => r.json()),
                 fetch(`${API_BASE}/data/${currentRepo}/${currentJob}/files`).then(r => r.json())
             ]);
-
             setSummary(summaryData);
             setAllTests(testsData.tests || []);
             setAllFiles(filesData.files || []);
