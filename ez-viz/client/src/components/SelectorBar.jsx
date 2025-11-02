@@ -16,7 +16,7 @@ function SelectorBar({ repos, currentRepo, currentJob, selectedRepo, onRepoChang
                         onJobChange(null);
                     }}
                 >
-                    <option value="">Select a repository...</option>
+                    <option value="">Select a repository</option>
                     {repos.map(repo => (
                         <option key={repo.id} value={repo.id}>
                             {repo.name} ({repo.jobs.length} jobs)
@@ -35,7 +35,7 @@ function SelectorBar({ repos, currentRepo, currentJob, selectedRepo, onRepoChang
                     onChange={(e) => onJobChange(e.target.value || null)}
                     disabled={!selectedRepo}
                 >
-                    <option value="">Select a job...</option>
+                    <option value="">Select a job</option>
                     {selectedRepo?.jobs.map(job => (
                         <option key={job.id} value={job.id}>
                             {job.id} (updated: {new Date(job.last_updated).toLocaleString()})

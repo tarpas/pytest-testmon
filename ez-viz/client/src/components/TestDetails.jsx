@@ -1,14 +1,8 @@
 import React from "react";
 import EnvItem from "./EnvItem.jsx";
-import {formatDuration} from "./utils.jsx";
+import {formatDuration, getStatusText} from "./utils.jsx";
 
 function TestDetails({ test, dependencies }) {
-    const getStatusText = () => {
-        if (test.failed) return '✗ FAILED';
-        if (test.forced) return '⚠ FORCED';
-        return '✓ PASSED';
-    };
-
     return (
         <>
             <div className="mb-6">

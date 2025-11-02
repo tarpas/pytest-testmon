@@ -14,7 +14,7 @@ function MainContent({ loading, error, summary, allTests, allFiles, activeTab, s
     }
 
     if (!summary) {
-        return <div className="text-center p-16 text-gray-500 text-xl">Select a repository and job to view testmon data</div>;
+        return <div className="text-center p-16 text-gray-500 text-xl">Select a repository and job to view testmon data.</div>;
     }
 
     return (

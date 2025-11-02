@@ -1,13 +1,7 @@
 import React from "react";
-import {formatDuration} from "./utils.jsx";
+import {formatDuration, getStatusText} from "./utils.jsx";
 
 function FileDetails({ filename, tests }) {
-    const getStatusText = (test) => {
-        if (test.failed) return '✗ FAILED';
-        if (test.forced) return '⚠ FORCED';
-        return '✓ PASSED';
-    };
-
     return (
         <div>
             <h3 className="text-gray-700 mb-4 pb-2 border-b-2 border-gray-200 text-xl">

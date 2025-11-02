@@ -32,6 +32,8 @@ function App() {
     useEffect(() => {
         if (currentRepo && currentJob) {
             loadData();
+        } else {
+            setSummary(null);
         }
     }, [currentRepo, currentJob]);
 
@@ -85,6 +87,7 @@ function App() {
         }
     };
 
+    // why displaying same test twice?
     const showFileDetails = (filename) => {
         const relatedTests = allTests.filter(t =>
             t.test_name.includes(filename.replace('.py', ''))
