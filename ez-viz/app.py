@@ -606,8 +606,45 @@ def get_files(repo_id: str, job_id: str):
         return jsonify({"error": "Failed to read files"}), 500
 
 # -----------------------------------------------------------------------------
-# WEB + Health - UPDATED FOR REACT
+# WEB + Health - REACT APP
 # -----------------------------------------------------------------------------
+
+@app.route("/health")
+def health():
+    repo_count = len(get_metadata().get("repos", {}))
+    log.info("health_check repo_count=%s data_dir=%s", repo_count, BASE_DATA_DIR)
+    return jsonify(
+        {"status": "healthy!!!", "data_dir": str(BASE_DATA_DIR), "repo_count": repo_count}
+    )
+
+# Serve React App's static assets - MUST BE BEFORE CATCH-ALL
+@app.route('/assets/<path:filename>')
+def serve_react_assets(filename):
+    assets_dir = Path(app.root_path) / 'client' / 'dist' / 'assets'
+    log.info("serve_assets filename=%s dir=%s", filename, assets_dir)
+    try:
+        return send_from_directory(assets_dir, filename)
+    except Exception as e:
+        log.error("serve_assets_error filename=%s error=%s", filename, e)
+        return jsonify({"error": "Asset not found"}), 404
+
+# @app.route("/fingerprints")
+# def fingerprints_page():
+#     log.info("fingerprints_render")
+#     return render_template("fingerprints.html")
+
+@app.route("/.ezmon-fp/<path:subpath>")
+def serve_ezmon_fp(subpath: str):
+    fp_path = EZMON_FP_DIR / subpath
+    if not fp_path.exists() or fp_path.is_dir():
+        log.warning("ezmon_fp_missing path=%s", fp_path)
+        return jsonify({"error": "Not found"}), 404
+    try:
+        size = fp_path.stat().st_size
+    except Exception:
+        size = -1
+    log.info("ezmon_fp_serve path=%s size=%s", fp_path, size)
+    return send_from_directory(EZMON_FP_DIR, subpath, as_attachment=False)
 
 # Serve React App for root route
 @app.route("/")
@@ -619,22 +656,22 @@ def serve_react_root():
         return send_file(react_index)
     else:
         log.error("react_build_missing expected=%s", react_index)
-        return jsonify({"error": "React app not built. Run 'npm run build' in client directory"}), 500
+        return jsonify({"error": "React app not built"}), 500
 
-# Serve React App's static assets (CSS, JS, images, etc.)
-@app.route('/assets/<path:path>')
-def serve_react_assets(path):
-    assets_dir = Path(app.root_path) / 'client' / 'dist' / 'assets'
-    log.info("serve_assets path=%s dir=%s", path, assets_dir)
-    return send_from_directory(assets_dir, path)
-
-# Catch-all route for React Router (client-side routing)
+# Catch-all route for React Router - MUST BE LAST
 @app.route("/<path:path>")
 def serve_react_app(path):
-    # Don't catch API routes
+    log.info("catch_all_route path=%s", path)
+
+    # Don't catch API routes (they're already defined above)
     if path.startswith('api/'):
         log.warning("invalid_api_route path=%s", path)
         return jsonify({"error": "API endpoint not found"}), 404
+
+    # Don't catch assets (already handled above)
+    if path.startswith('assets/'):
+        log.warning("missed_asset_route path=%s", path)
+        return jsonify({"error": "Asset not found"}), 404
 
     # Don't catch the .ezmon-fp routes
     if path.startswith('.ezmon-fp/'):
@@ -643,44 +680,18 @@ def serve_react_app(path):
     # Check if the path is a static file in dist
     file_path = Path(app.root_path) / 'client' / 'dist' / path
     if file_path.exists() and file_path.is_file():
+        log.info("serving_static_file path=%s", file_path)
         return send_file(file_path)
 
     # Otherwise, serve index.html for React Router
     react_index = Path(app.root_path) / 'client' / 'dist' / 'index.html'
-    log.info("serve_react_app path=%s", path)
+    log.info("serve_react_spa path=%s", path)
 
     if react_index.exists():
         return send_file(react_index)
     else:
         log.error("react_build_missing expected=%s", react_index)
         return jsonify({"error": "React app not built"}), 500
-
-@app.route("/health")
-def health():
-    repo_count = len(get_metadata().get("repos", {}))
-    log.info("health_check repo_count=%s data_dir=%s", repo_count, BASE_DATA_DIR)
-    return jsonify(
-        {"status": "healthy!!!", "data_dir": str(BASE_DATA_DIR), "repo_count": repo_count}
-    )
-
-# @app.route("/fingerprints")
-# def fingerprints_page():
-#     log.info("fingerprints_render")
-#     return render_template("fingerprints.html")
-
-@app.route("/.ezmon-fp/<path:subpath>")
-def serve_ezmon_fp(subpath: str):
-    # Static file bridge for the ezmon snapshots
-    fp_path = EZMON_FP_DIR / subpath
-    if not fp_path.exists() or fp_path.is_dir():
-        log.warning("ezmon_fp_missing path=%s", fp_path)
-        return jsonify({"error": "Not found"}), 404
-    try:
-        size = fp_path.stat().st_size
-    except Exception:
-        size = -1
-    log.info("ezmon_fp_serve path=%s size=%s", fp_path, size)
-    return send_from_directory(EZMON_FP_DIR, subpath, as_attachment=False)
 
 # -----------------------------------------------------------------------------
 # Entrypoint
