@@ -24,9 +24,10 @@ function App() {
     const [fileSearch, setFileSearch] = useState('');
 
     const [modal, setModal] = useState({ open: false, title: '', content: null });
-
+    
     useEffect(() => {
         loadRepos();
+        
     }, []);
 
     useEffect(() => {
@@ -42,6 +43,7 @@ function App() {
             const response = await fetch(`${API_BASE}/repos`);
             const data = await response.json();
             setRepos(data.repos || []);
+            console.log("Response is",data)
         } catch (err) {
             console.error('Failed to load repos:', err);
             setError('Failed to load repositories');
@@ -60,7 +62,7 @@ function App() {
                 fetch(`${API_BASE}/data/${currentRepo}/${currentJob}/tests`).then(r => r.json()),
                 fetch(`${API_BASE}/data/${currentRepo}/${currentJob}/files`).then(r => r.json())
             ]);
-
+            console.log("Test data are",testsData)
             setSummary(summaryData);
             setAllTests(testsData.tests || []);
             setAllFiles(filesData.files || []);

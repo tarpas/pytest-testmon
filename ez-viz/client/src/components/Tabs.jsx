@@ -4,7 +4,9 @@ function Tabs({ activeTab, setActiveTab, testCount, fileCount }) {
     const tabs = [
         { id: 'summary', label: 'Summary' },
         { id: 'tests', label: `Tests (${testCount})` },
-        { id: 'files', label: `Files (${fileCount})` }
+        { id: 'files', label: `Files (${fileCount})` },
+        { id: 'management', label: 'Test Management'}
+
     ];
 
     return (

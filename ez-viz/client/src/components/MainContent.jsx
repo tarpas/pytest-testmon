@@ -3,6 +3,7 @@ import TestsTab from "./TestsTab.jsx";
 import FilesTab from "./FilesTab.jsx";
 import SummaryTab from "./SummaryTab.jsx";
 import React from "react";
+import TestManagementTab from "./TestManagementTab.jsx";
 
 function MainContent({ loading, error, summary, allTests, allFiles, activeTab, setActiveTab, testSearch, setTestSearch, fileSearch, setFileSearch, showTestDetails, showFileDetails, currentRepo, currentJob }) {
     if (loading) {
@@ -33,9 +34,13 @@ function MainContent({ loading, error, summary, allTests, allFiles, activeTab, s
                 {activeTab === 'files' && (
                     <FilesTab files={allFiles} search={fileSearch} setSearch={setFileSearch} showFileDetails={showFileDetails} />
                 )}
+
+                {activeTab === 'management' && (
+                    <TestManagementTab files={allFiles} currentRepo={currentRepo} currentJob={currentJob} />
+                )}
             </div>
         </>
     );
 }
 
-export default MainContent;
+export default MainContent

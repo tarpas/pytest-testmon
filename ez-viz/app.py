@@ -605,6 +605,114 @@ def get_files(repo_id: str, job_id: str):
         log_exception("files_query", repo_id=repo_id, job_id=job_id)
         return jsonify({"error": "Failed to read files"}), 500
 
+
+@app.route("/api/client/testPreferences", methods=["POST"])
+def upload_test_preferences():
+    """Store user's test preferences (which tests to always run)"""
+    
+    # Get data from request body (JSON)
+    data = request.get_json()
+    
+    repo_id = data.get("repo_id")
+    job_id = data.get("job_id")
+    selected_test_files = data.get("selectedTestFiles", [])  # Array of test file names
+    
+    # Enrich per-request context for logging
+    g.repo_id, g.job_id = repo_id or "-", job_id or "-"
+
+    if not repo_id or not job_id:
+        log.warning("preferences_missing_params")
+        return jsonify({"error": "repo_id and job_id are required"}), 400
+
+    if not isinstance(selected_test_files, list):
+        log.warning("preferences_invalid_format")
+        return jsonify({"error": "selectedTestFiles must be an array"}), 400
+
+    try:
+        # Create preferences file path
+        job_path = get_job_db_path(repo_id, job_id).parent
+        preferences_path = job_path / "test_preferences.json"
+        
+        log.info(
+            "preferences_write_attempt path=%s test_count=%s", 
+            preferences_path, 
+            len(selected_test_files)
+        )
+        
+        # Store preferences as JSON
+        preferences_data = {
+            "repo_id": repo_id,
+            "job_id": job_id,
+            "always_run_tests": selected_test_files,
+            "updated_at": now_iso(),
+        }
+        
+        with open(preferences_path, "w") as f:
+            json.dump(preferences_data, f, indent=2)
+        
+        size = preferences_path.stat().st_size
+        log.info(
+            "preferences_write_success path=%s size=%s (%s) test_count=%s",
+            preferences_path,
+            size,
+            human_bytes(size),
+            len(selected_test_files)
+        )
+
+        return jsonify({
+            "success": True,
+            "message": f"Test preferences saved for {repo_id}/{job_id}",
+            "test_count": len(selected_test_files),
+        }), 200
+
+    except Exception:
+        log_exception("preferences_handler", repo_id=repo_id, job_id=job_id)
+        return jsonify({"error": "Failed to save preferences"}), 500
+
+
+@app.route("/api/client/testPreferences", methods=["GET"])
+def get_test_preferences():
+    """Retrieve user's test preferences"""
+    
+    repo_id = request.args.get("repo_id")
+    job_id = request.args.get("job_id")
+    g.repo_id, g.job_id = repo_id or "-", job_id or "-"
+
+    if not repo_id or not job_id:
+        log.warning("preferences_get_missing_params")
+        return jsonify({"error": "repo_id and job_id are required"}), 400
+
+    try:
+        job_path = get_job_db_path(repo_id, job_id).parent
+        preferences_path = job_path / "test_preferences.json"
+        
+        log.info("preferences_read_attempt path=%s", preferences_path)
+        
+        if not preferences_path.exists():
+            log.info("preferences_not_found path=%s", preferences_path)
+            return jsonify({
+                "repo_id": repo_id,
+                "job_id": job_id,
+                "always_run_tests": [],
+                "updated_at": None,
+            }), 200
+        
+        with open(preferences_path, "r") as f:
+            preferences_data = json.load(f)
+        
+        size = preferences_path.stat().st_size
+        log.info(
+            "preferences_read_success path=%s size=%s (%s)",
+            preferences_path,
+            size,
+            human_bytes(size)
+        )
+        
+        return jsonify(preferences_data), 200
+
+    except Exception:
+        log_exception("preferences_get_handler", repo_id=repo_id, job_id=job_id)
+        return jsonify({"error": "Failed to read preferences"}), 500
 # -----------------------------------------------------------------------------
 # WEB + Health - UPDATED FOR REACT
 # -----------------------------------------------------------------------------
