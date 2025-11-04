@@ -1,0 +1,61 @@
+{
+  "test_nodeid": "test_calculator.py::test_divide_by_zero",
+  "snapshot_id": "20251021-000956-15c10e13",
+  "created_utc": "2025-10-21T00:09:56.361429Z",
+  "dependencies": [
+    {
+      "dependency_file": "test_calculator.py",
+      "mtime": 1759326396.9555976,
+      "fsha": "47aa825a031b65a903c278887b57b665c5800048",
+      "blocks": [
+        {
+          "index": 1,
+          "crc32_signed": -1591679642,
+          "start": null,
+          "end": null,
+          "name": null,
+          "payload": "5:Expr(Constant('Tests for calculator module.', None)), Import(alias('pytest', None)), ImportFrom('calculator', alias('add', None), alias('subtract', None), alias('multiply', None), alias('divide', None), 0), FunctionDef('test_add', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_subtract', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_multiply', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_divide', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_divide_by_zero', arguments(, , None, , , None, ), transformed_into_block, , None, None)"
+        },
+        {
+          "index": 2,
+          "crc32_signed": -1014303748,
+          "start": null,
+          "end": null,
+          "name": null,
+          "payload": "4:With(withitem(Call(Attribute(Name('pytest', Load()), 'raises', Load()), Name('ValueError', Load()), keyword('match', Constant('Cannot divide by zero', None))), None), Expr(Call(Name('divide', Load()), Constant(10, None), Constant(0, None), )), None)"
+        }
+      ],
+      "checksums": [
+        -1591679642,
+        -1014303748
+      ]
+    },
+    {
+      "dependency_file": "calculator.py",
+      "mtime": 1761005395.290096,
+      "fsha": "c5ae6b1acb1af8331ee96f783c58732b85684953",
+      "blocks": [
+        {
+          "index": 1,
+          "crc32_signed": 2102587528,
+          "start": null,
+          "end": null,
+          "name": null,
+          "payload": "7:Expr(Constant('Basic calculator operations.', None)), Import(alias('logging', None)), FunctionDef('add', arguments(, arg('a', None, None), arg('b', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('subtract', arguments(, arg('a', None, None), arg('b', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('multiply', arguments(, arg('a', None, None), arg('b', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('divide', arguments(, arg('a', None, None), arg('b', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('dummy2', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('dummy', arguments(, arg('a', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('conditional', arguments(, arg('should_run', None, None), None, , , None, ), transformed_into_block, , None, None)"
+        },
+        {
+          "index": 2,
+          "crc32_signed": 55458542,
+          "start": null,
+          "end": null,
+          "name": null,
+          "payload": "3:Expr(Constant('Divide a by b.', None)), If(Compare(Name('b', Load()), Eq(), Constant(0, None)), Raise(Call(Name('ValueError', Load()), Constant('Cannot divide by zero!', None), ), None), ), Return(BinOp(Name('a', Load()), Div(), Name('b', Load())))"
+        }
+      ],
+      "checksums": [
+        2102587528,
+        55458542
+      ]
+    }
+  ]
+}

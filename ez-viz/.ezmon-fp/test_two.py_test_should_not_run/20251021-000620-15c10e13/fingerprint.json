@@ -1,0 +1,61 @@
+{
+  "test_nodeid": "test_two.py::test_should_not_run",
+  "snapshot_id": "20251021-000620-15c10e13",
+  "created_utc": "2025-10-21T00:06:20.124901Z",
+  "dependencies": [
+    {
+      "dependency_file": "test_two.py",
+      "mtime": 1760971373.1006153,
+      "fsha": "ad00b0a968ba5132233e6f5b35dded98f4918598",
+      "blocks": [
+        {
+          "index": 1,
+          "crc32_signed": -190839772,
+          "start": null,
+          "end": null,
+          "name": null,
+          "payload": "4:ImportFrom('string_utils', alias('reverse_string', None), alias('is_palindrome', None), alias('count_vowels', None), alias('capitalize_words', None), 0), ImportFrom('calculator', alias('conditional', None), 0), FunctionDef('test_capitalize_words', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_capitalize_words2', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_should_run', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('test_should_not_run', arguments(, , None, , , None, ), transformed_into_block, , None, None)"
+        },
+        {
+          "index": 2,
+          "crc32_signed": 358723661,
+          "start": null,
+          "end": null,
+          "name": null,
+          "payload": "3:Expr(Call(Name('conditional', Load()), Constant(False, None), ))"
+        }
+      ],
+      "checksums": [
+        -190839772,
+        358723661
+      ]
+    },
+    {
+      "dependency_file": "calculator.py",
+      "mtime": 1761005162.3076186,
+      "fsha": "e63369ed0d1233778c7df4448b923d0c25396652",
+      "blocks": [
+        {
+          "index": 1,
+          "crc32_signed": 2102587528,
+          "start": null,
+          "end": null,
+          "name": null,
+          "payload": "7:Expr(Constant('Basic calculator operations.', None)), Import(alias('logging', None)), FunctionDef('add', arguments(, arg('a', None, None), arg('b', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('subtract', arguments(, arg('a', None, None), arg('b', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('multiply', arguments(, arg('a', None, None), arg('b', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('divide', arguments(, arg('a', None, None), arg('b', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('dummy2', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('dummy', arguments(, arg('a', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('conditional', arguments(, arg('should_run', None, None), None, , , None, ), transformed_into_block, , None, None)"
+        },
+        {
+          "index": 2,
+          "crc32_signed": 1360514944,
+          "start": null,
+          "end": null,
+          "name": null,
+          "payload": "6:If(UnaryOp(Not(), Name('should_run', Load())), Return(None), ), Assign(Name('g', Store()), Constant(4, None), None), Assign(Name('v', Store()), BinOp(Name('g', Load()), Mult(), Constant(3, None)), None), Return(Name('v', Load()))"
+        }
+      ],
+      "checksums": [
+        2102587528,
+        1360514944
+      ]
+    }
+  ]
+}

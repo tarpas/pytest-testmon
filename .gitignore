@@ -1,8 +1,19 @@
 venv/
+.venv/
 *.py[cod]
 
 # C extensions
 *.so
+
+# the dreaded DS_Store
+**/*.DS_Store
+
+# state used by runner to note last successful deployment
+**/ez-viz.deploy-state/
+
+#testmon data files managed by the server
+
+testmon-data/
 
 # Packages
 *.egg
@@ -36,7 +47,6 @@ nosetests.xml
 .pydevproject
 
 # Any hidden files
-.*
 /htmlcov/
 /tags
 /tests/

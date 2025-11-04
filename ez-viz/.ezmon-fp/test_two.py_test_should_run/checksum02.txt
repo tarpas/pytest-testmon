@@ -1,0 +1,10 @@
+# dependency_file: calculator.py
+# blocks_used: 2
+# --- begin blocks used for CRC32 ---
+
+# block 1
+7:Expr(Constant('Basic calculator operations.', None)), Import(alias('logging', None)), FunctionDef('add', arguments(, arg('a', None, None), arg('b', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('subtract', arguments(, arg('a', None, None), arg('b', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('multiply', arguments(, arg('a', None, None), arg('b', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('divide', arguments(, arg('a', None, None), arg('b', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('dummy2', arguments(, , None, , , None, ), transformed_into_block, , None, None), FunctionDef('dummy', arguments(, arg('a', None, None), None, , , None, ), transformed_into_block, , None, None), FunctionDef('conditional', arguments(, arg('should_run', None, None), None, , , None, ), transformed_into_block, , None, None)
+
+# block 2
+6:If(UnaryOp(Not(), Name('should_run', Load())), Return(None), ), Assign(Name('t', Store()), Constant(4, None), None), Assign(Name('v', Store()), BinOp(Name('t', Load()), Mult(), Constant(3, None)), None), Return(Name('v', Load()))
+# --- end blocks ---
