@@ -6,7 +6,7 @@ function TestDetails({ test, dependencies }) {
     return (
         <>
             <div className="mb-6">
-                <EnvItem label="Status" value={getStatusText()} />
+                <EnvItem label="Status" value={() => getStatusText()} />
                 <EnvItem label="Duration" value={formatDuration(test.duration)} />
             </div>
 
