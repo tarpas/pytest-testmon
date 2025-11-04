@@ -612,10 +612,11 @@ def upload_test_preferences():
     
     # Get data from request body (JSON)
     data = request.get_json()
-    
+    log.info("data is" , data)
     repo_id = data.get("repo_id")
     job_id = data.get("job_id")
-    selected_test_files = data.get("selectedTestFiles", [])  # Array of test file names
+    
+    selected_test_files = data.get("selectedTests", [])  # Array of test file names
     
     # Enrich per-request context for logging
     g.repo_id, g.job_id = repo_id or "-", job_id or "-"
@@ -626,7 +627,7 @@ def upload_test_preferences():
 
     if not isinstance(selected_test_files, list):
         log.warning("preferences_invalid_format")
-        return jsonify({"error": "selectedTestFiles must be an array"}), 400
+        return jsonify({"error": "selectedTests must be an array"}), 400
 
     try:
         # Create preferences file path
