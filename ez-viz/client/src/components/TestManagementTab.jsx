@@ -30,8 +30,9 @@ function TestManagementTab({ files , currentRepo , currentJob }) {
       },
       body: JSON.stringify({
         repo_id:currentRepo,
-        job_id:currentJob,
+        currentJob:currentJob,
         selectedTests: selectedTests,
+        
       })
     });
 

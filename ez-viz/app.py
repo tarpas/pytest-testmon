@@ -612,7 +612,7 @@ def upload_test_preferences():
     
     # Get data from request body (JSON)
     data = request.get_json()
-    log.info('Incoming request is', data)
+    
     repo_id = data.get("repo_id")
     job_id = data.get("job_id")
     selected_test_files = data.get("selectedTestFiles", [])  # Array of test file names
