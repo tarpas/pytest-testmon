@@ -81,7 +81,7 @@ def get_system_packages(ignore=None):
             {
                 f"{package} {version}"
                 for (package, version) in get_system_packages_raw()
-                if not package in ignore
+                if package not in ignore and package != "UNKNOWN" and version != "0.0.0"
             }
         )
     )
