@@ -656,6 +656,7 @@ class DB:  # pylint: disable=too-many-public-methods
                 id, environment_name, system_packages, python_version
                 FROM environment
                 WHERE environment_name = ?
+                ORDER BY id DESC
                 """,
                 (environment_name,),
             ).fetchone()
