@@ -42,3 +42,6 @@ nosetests.xml
 /tests/
 /tox.ini
 tmserver
+
+!tests/test_process_code.py
+!tox.ini
