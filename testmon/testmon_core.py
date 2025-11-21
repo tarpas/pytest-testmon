@@ -165,6 +165,9 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         system_packages=None,
         python_version=None,
         readonly=False,
+        exec_id=None,
+        system_packages_change=None,
+        files_of_interest=None,
     ):
         self.rootdir = rootdir
         self.environment = environment if environment else "default"
@@ -182,35 +185,42 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
                 os.path.join(self.rootdir, get_data_file_path()), readonly=readonly
             )  # pylint: disable=invalid-name
 
-        try:
-            result = self.db.initiate_execution(
-                self.environment,
-                system_packages,
-                python_version,
-                {
-                    "tm_client_version": TM_CLIENT_VERSION,
-                    "git_head_sha": git_current_head(),
-                    "ci": os.environ.get("CI"),
-                },
-            )
-        except (ConnectionRefusedError, Fault, ProtocolError, gaierror) as exc:
-            logger.error(
-                (
-                    "%s error when communication with testmon.net. (falling back to"
-                    " .testmondata locally)"
-                ),
-                exc,
-            )
-            self.db = db.DB(
-                os.path.join(self.rootdir, get_data_file_path())
-            )  # pylint: disable=invalid-name
-            result = self.db.initiate_execution(
-                self.environment, system_packages, python_version, {}
-            )
-        self.exec_id = result["exec_id"]
+        # If exec_id is provided (e.g., from controller via xdist), use it directly
+        if exec_id is not None:
+            self.exec_id = exec_id
+            self.system_packages_change = system_packages_change
+            self.files_of_interest = files_of_interest
+        else:
+            # Otherwise, initiate execution (controller or single process)
+            try:
+                result = self.db.initiate_execution(
+                    self.environment,
+                    system_packages,
+                    python_version,
+                    {
+                        "tm_client_version": TM_CLIENT_VERSION,
+                        "git_head_sha": git_current_head(),
+                        "ci": os.environ.get("CI"),
+                    },
+                )
+            except (ConnectionRefusedError, Fault, ProtocolError, gaierror) as exc:
+                logger.error(
+                    (
+                        "%s error when communication with testmon.net. (falling back to"
+                        " .testmondata locally)"
+                    ),
+                    exc,
+                )
+                self.db = db.DB(
+                    os.path.join(self.rootdir, get_data_file_path())
+                )  # pylint: disable=invalid-name
+                result = self.db.initiate_execution(
+                    self.environment, system_packages, python_version, {}
+                )
+            self.exec_id = result["exec_id"]
 
-        self.system_packages_change = result["packages_changed"]
-        self.files_of_interest = result["filenames"]
+            self.system_packages_change = result["packages_changed"]
+            self.files_of_interest = result["filenames"]
 
         self.all_files = {}
         self.unstable_test_names = None
@@ -282,7 +292,7 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         with self.db as database:
             database.delete_test_executions(to_delete, self.exec_id)
 
-    def determine_stable(self, assert_old=True):
+    def determine_stable(self):
         files_fshas = {}
         for filename in self.files_of_interest:
             module = self.source_tree.get_file(filename)
@@ -299,9 +309,6 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         tests = self.db.determine_tests(self.exec_id, files_mhashes)
         affected_tests, self.failing_tests = tests["affected"], tests["failing"]
 
-        if assert_old:
-            self.assert_old_determin_stable(affected_tests)
-
         self.all_files = set(self.db.filenames(self.exec_id))
         self.unstable_test_names = set()
         self.unstable_files = set()
@@ -312,47 +319,6 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
 
         self.stable_test_names = set(self.all_tests) - self.unstable_test_names
         self.stable_files = set(self.all_files) - self.unstable_files
-
-    def assert_old_determin_stable(self, new_fingerprint_misses):
-        filenames_fingerprints = self.db.filenames_fingerprints(self.exec_id)
-
-        _, fsha_misses = split_filter(
-            self.source_tree, check_fsha, filenames_fingerprints
-        )  # check 2. fsha vs filesystem
-
-        # with the list of fingerprint_ids go to the database
-        # and fetch all the data needed for next step
-
-        changed_file_data = self.db.fetch_changed_file_data(
-            [fsha_miss["fingerprint_id"] for fsha_miss in (fsha_misses)],
-            self.exec_id,
-        )
-
-        # changed_file_data:
-        # [(filename, test_name, method_fshas, fingerprint_id, failed )]
-        # All the test_names in this list have a dependency on one
-        # or more changed files. And we also have the fingerprints
-        # of data content which they depend on. So it’s possible to
-        # filter out the node_ids where the content of the changed file
-        # still matches the fingerprint
-
-        _, fingerprint_misses = split_filter(
-            self.source_tree, check_fingerprint, changed_file_data
-        )
-
-        if {fingerprint_miss[1] for fingerprint_miss in fingerprint_misses} != set(
-            new_fingerprint_misses
-        ):
-            print("ERROR: old and new fingerprint misses differ.. printing old algo")
-            print(
-                "\n".join(
-                    sorted(
-                        {fingerprint_miss[1] for fingerprint_miss in fingerprint_misses}
-                    )
-                )
-            )
-            print("printing new algo")
-            print("\n".join(sorted(new_fingerprint_misses)))
 
     @property
     def avg_durations(self) -> dict:
