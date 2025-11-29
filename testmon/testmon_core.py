@@ -231,7 +231,10 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
 
     @property
     def new_db(self):
-        return self.db.file_created
+        # Only local DB instances have file_created attribute
+        if isinstance(self.db, db.DB):
+            return self.db.file_created
+        return False
 
     def close_connection(self):
         pass

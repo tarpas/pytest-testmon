@@ -10,6 +10,7 @@ from testmon.process_code import (
     match_fingerprint_source,
     create_fingerprint_source,
     get_source_sha,
+    noncached_get_files_shas,
 )
 from testmon.testmon_core import SourceTree
 
@@ -302,7 +303,7 @@ class TestReadSrc:
 
         """,
         )
-        run(["git", "init"])
+        run(["git", "init", "-b", "main"])
         run(["git", "add", f"file{ext}"])
 
         source, fsha = get_source_sha(testdir.tmpdir.strpath, f"file{ext}")
@@ -316,7 +317,7 @@ class TestReadSrc:
 
         """
         )
-        run(["git", "init"])
+        run(["git", "init", "-b", "main"])
         run(["git", "add", "filename.py"])
         run(["git", "commit", "-m", "Reasonable commit message"])
         source, fsha = get_source_sha(testdir.tmpdir.strpath, "filename.py")
@@ -325,7 +326,7 @@ class TestReadSrc:
 
     def test_sha_git_change(self, testdir):
         testdir.makepyfile(filename=" ")
-        run(["git", "init"])
+        run(["git", "init", "-b", "main"])
         run(["git", "add", "filename.py"])
         testdir.makepyfile(
             filename="""
@@ -482,8 +483,17 @@ class TestModule:
 
         """
         )
-        run(["git", "init"])
+        run(["git", "init", "-b", "main"])
         run(["git", "add", "a.py"])
         run(["git", "commit", "-m", "Reasonable commit message"])
         module = SourceTree("").get_file("a.py")
         assert "pass" in module.source_code
+
+
+def test_noncached_get_files_shas(testdir):
+    testdir.run("git", "init", "-b", "main")
+    testdir.makepyfile(test_file="def test(): pass")
+    testdir.run("git", "add", ".")
+    testdir.run("git", "commit", "-m", "Initial commit")
+
+    assert isinstance(noncached_get_files_shas(testdir.tmpdir.strpath), dict)

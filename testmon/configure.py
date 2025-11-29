@@ -78,7 +78,8 @@ def _get_noselect_reasons(options):
     if options["lf"]:
         return ["--lf was used"]
 
-    if any(re.match(r"(.*)\.py::(.*)", opt) for opt in options["file_or_dir"] or []):
+    file_or_dir = options.get("file_or_dir") or []
+    if any(re.match(r"(.*)\.py::(.*)", opt) for opt in file_or_dir):
         return ["you selected tests manually"]
 
     return []

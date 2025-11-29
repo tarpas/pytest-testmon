@@ -238,7 +238,8 @@ def noncached_get_files_shas(directory):
         result = run(
             ["git", "ls-files", "--stage", "-m", directory],
             capture_output=True,
-            universal_newlines=True,
+            text=True,
+            encoding="utf-8",
             check=True,
         )
     except (FileNotFoundError, CalledProcessError):

@@ -10,7 +10,7 @@ from testmon.process_code import blob_to_checksums, checksums_to_blob
 from testmon.common import TestExecutions
 
 
-DATA_VERSION = 13
+DATA_VERSION = 14
 
 ChangedFileData = namedtuple(
     "ChangedFileData", "filename name method_checksums id failed"

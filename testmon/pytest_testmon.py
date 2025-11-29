@@ -165,14 +165,17 @@ def init_testmon_data(config: Config):
                     )
                 else:
                     tmnet_api_key = os.getenv("TMNET_API_KEY")
-            elif tmnet_api_key is None:
-                logger.warning(
-                    "TMNET_API_KEY not set.",
+
+            if not tmnet_api_key.strip():
+                raise ValueError(
+                    "TMNET_API_KEY is required when using --tmnet. "
+                    "Please set it in pytest.ini, pyproject.toml, or as an environment variable. "
                 )
+
             rpc_proxy = xmlrpc.client.ServerProxy(
                 url,
                 allow_none=True,
-                headers=[("x-api-key", tmnet_api_key)],
+                headers=[("x-api-key", tmnet_api_key.strip())],
             )
 
     # Check if we're a worker and have exec_id from controller
