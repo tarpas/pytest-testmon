@@ -192,16 +192,24 @@ def init_testmon_data(config: Config):
         )
         files_of_interest = config.workerinput.get("testmon_files_of_interest")
 
-    testmon_data: TestmonData = TestmonData(
-        rootdir=config.rootdir.strpath,
-        database=rpc_proxy,
-        environment=environment,
-        system_packages=system_packages,
-        readonly=running_as == "worker",
-        exec_id=exec_id,
-        system_packages_change=system_packages_change,
-        files_of_interest=files_of_interest,
-    )
+    if running_as == "worker" and exec_id is not None:
+        # Initialize for xdist worker run
+        testmon_data: TestmonData = TestmonData.for_worker(
+            rootdir=config.rootdir.strpath,
+            exec_id=exec_id,
+            database=rpc_proxy,
+            system_packages_change=system_packages_change,
+            files_of_interest=files_of_interest,
+            environment=environment,
+        )
+    else:
+        # Initialize for local run (controller or single process)
+        testmon_data: TestmonData = TestmonData.for_local_run(
+            rootdir=config.rootdir.strpath,
+            database=rpc_proxy,
+            environment=environment,
+            system_packages=system_packages,
+        )
     testmon_data.determine_stable()
     config.testmon_data = testmon_data
 

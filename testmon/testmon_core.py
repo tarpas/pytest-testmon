@@ -157,26 +157,14 @@ def collect_mhashes(source_tree, new_changed_file_data):
 class TestmonData:  # pylint: disable=too-many-instance-attributes
     __test__ = False
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         rootdir,
         database=None,
-        environment=None,
-        system_packages=None,
-        python_version=None,
         readonly=False,
-        exec_id=None,
-        system_packages_change=None,
-        files_of_interest=None,
     ):
         self.rootdir = rootdir
-        self.environment = environment if environment else "default"
         self.source_tree = SourceTree(rootdir=self.rootdir)
-        if system_packages is None:
-            system_packages = get_system_packages()
-        system_packages = drop_patch_version(system_packages)
-        if not python_version:
-            python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
         if database:
             self.db = database  # pylint: disable=invalid-name
@@ -185,49 +173,109 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
                 os.path.join(self.rootdir, get_data_file_path()), readonly=readonly
             )  # pylint: disable=invalid-name
 
-        # If exec_id is provided (e.g., from controller via xdist), use it directly
-        if exec_id is not None:
-            self.exec_id = exec_id
-            self.system_packages_change = system_packages_change
-            self.files_of_interest = files_of_interest
-        else:
-            # Otherwise, initiate execution (controller or single process)
-            try:
-                result = self.db.initiate_execution(
-                    self.environment,
-                    system_packages,
-                    python_version,
-                    {
-                        "tm_client_version": TM_CLIENT_VERSION,
-                        "git_head_sha": git_current_head(),
-                        "ci": os.environ.get("CI"),
-                    },
-                )
-            except (ConnectionRefusedError, Fault, ProtocolError, gaierror) as exc:
-                logger.error(
-                    (
-                        "%s error when communication with testmon.net. (falling back to"
-                        " .testmondata locally)"
-                    ),
-                    exc,
-                )
-                self.db = db.DB(
-                    os.path.join(self.rootdir, get_data_file_path())
-                )  # pylint: disable=invalid-name
-                result = self.db.initiate_execution(
-                    self.environment, system_packages, python_version, {}
-                )
-            self.exec_id = result["exec_id"]
-
-            self.system_packages_change = result["packages_changed"]
-            self.files_of_interest = result["filenames"]
-
+        # Initialize instance variables (will be set by init methods)
+        self.environment = None
+        self.exec_id = None
+        self.system_packages_change = None
+        self.files_of_interest = None
         self.all_files = {}
         self.unstable_test_names = None
         self.unstable_files = None
         self.stable_test_names = None
         self.stable_files = None
         self.failing_tests = None
+
+    @classmethod
+    def for_local_run(
+        cls,
+        rootdir,
+        database=None,
+        environment=None,
+        system_packages=None,
+        python_version=None,
+    ):
+        instance = cls(rootdir, database=database, readonly=False)
+        instance._init_for_local_run(environment, system_packages, python_version)
+        return instance
+
+    def _init_for_local_run(
+        self,
+        environment=None,
+        system_packages=None,
+        python_version=None,
+    ):
+        """Internal method to initialize for local run."""
+        self.environment = environment if environment else "default"
+
+        if system_packages is None:
+            system_packages = get_system_packages()
+        system_packages = drop_patch_version(system_packages)
+
+        if not python_version:
+            python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+
+        # Initiate execution (controller or single process)
+        try:
+            result = self.db.initiate_execution(
+                self.environment,
+                system_packages,
+                python_version,
+                {
+                    "tm_client_version": TM_CLIENT_VERSION,
+                    "git_head_sha": git_current_head(),
+                    "ci": os.environ.get("CI"),
+                },
+            )
+        except (ConnectionRefusedError, Fault, ProtocolError, gaierror) as exc:
+            logger.error(
+                (
+                    "%s error when communication with testmon.net. (falling back to"
+                    " .testmondata locally)"
+                ),
+                exc,
+            )
+            self.db = db.DB(
+                os.path.join(self.rootdir, get_data_file_path())
+            )  # pylint: disable=invalid-name
+            result = self.db.initiate_execution(
+                self.environment, system_packages, python_version, {}
+            )
+
+        self.exec_id = result["exec_id"]
+        self.system_packages_change = result["packages_changed"]
+        self.files_of_interest = result["filenames"]
+
+    @classmethod
+    def for_worker(  # pylint: disable=too-many-arguments
+        cls,
+        rootdir,
+        exec_id,
+        database=None,
+        system_packages_change=None,
+        files_of_interest=None,
+        environment=None,
+    ):
+        instance = cls(rootdir, database=database, readonly=True)
+        instance._init_for_worker(
+            exec_id, system_packages_change, files_of_interest, environment
+        )
+        return instance
+
+    def _init_for_worker(
+        self,
+        exec_id,
+        system_packages_change=None,
+        files_of_interest=None,
+        environment=None,
+    ):
+        """Internal method to initialize for worker run."""
+        self.exec_id = exec_id
+        self.system_packages_change = system_packages_change
+        self.files_of_interest = files_of_interest
+        if environment:
+            self.environment = environment
+        elif not hasattr(self, "environment") or self.environment is None:
+            self.environment = "default"
 
     @property
     def new_db(self):
