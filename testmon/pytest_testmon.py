@@ -111,7 +111,7 @@ def pytest_addoption(parser):
         action="store_true",
         dest="tmnet",
         help=(
-            "This is used for internal beta. Please don't use. You can go to https://www.testmon.net/ to register."
+            "Use tmnet cloud for storage instead of .testmondata file used by --testmon (see https://www.testmon.net)."
         ),
     )
 
