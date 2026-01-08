@@ -230,6 +230,12 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
             TestmonSelect(config, config.testmon_data), "TestmonSelect"
         )
 
+        # Register TestmonXdistSync whenever testmon is active and xdist is being used.
+        # This is needed even in --testmon-nocollect mode to properly share exec_id
+        # from controller to workers, preventing SQLite locking issues.
+        if config.pluginmanager.hasplugin("xdist"):
+            config.pluginmanager.register(TestmonXdistSync(should_collect=should_collect))
+
     if should_collect:
         config.pluginmanager.register(
             TestmonCollect(
@@ -243,8 +249,6 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
             ),
             "TestmonCollect",
         )
-        if config.pluginmanager.hasplugin("xdist"):
-            config.pluginmanager.register(TestmonXdistSync())
 
 
 def pytest_configure(config):
@@ -441,14 +445,15 @@ class TestmonCollect:
 
 
 class TestmonXdistSync:
-    def __init__(self):
+    def __init__(self, should_collect=True):
         self.await_nodes = 0
+        self._should_collect = should_collect
 
     def pytest_configure_node(self, node):
         """
         Send exec_id and related data from controller to worker during xdist initialization.
         This avoids each worker having to independently determine the environment and check
-        for package changes.
+        for package changes, which would cause SQLite locking issues.
 
         Note: This hook is called on the controller side for each worker node.
         The node.config here is the controller's config, not the worker's config.
@@ -477,7 +482,9 @@ class TestmonXdistSync:
         self, node, ids
     ):  # pylint: disable=invalid-name
         self.await_nodes += -1
-        if self.await_nodes == 0:
+        # Only sync tests when collection is enabled (not in --testmon-nocollect mode)
+        # In nocollect mode, the database is opened read-only and sync would fail
+        if self.await_nodes == 0 and self._should_collect:
             node.config.testmon_data.sync_db_fs_tests(retain=set(ids))
 
 
