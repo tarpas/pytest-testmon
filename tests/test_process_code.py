@@ -497,3 +497,16 @@ def test_noncached_get_files_shas(testdir):
     testdir.run("git", "commit", "-m", "Initial commit")
 
     assert isinstance(noncached_get_files_shas(testdir.tmpdir.strpath), dict)
+
+
+def test_get_file_extensionless(tmp_path):
+    """Test that SourceTree.get_file handles files without extensions."""
+    extensionless = tmp_path / "Dockerfile"
+    extensionless.write_text("FROM python:3.10\n")
+
+    source_tree = SourceTree(str(tmp_path))
+    module = source_tree.get_file("Dockerfile")
+
+    assert module is not None
+    assert module.ext == ""
+    assert len(module.blocks) == 1
