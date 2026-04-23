@@ -246,6 +246,19 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         self.files_of_interest = result["filenames"]
 
     @classmethod
+    def for_readonly(cls, rootdir, environment=None):
+        instance = cls(rootdir, readonly=True)
+        instance.environment = environment if environment else "default"
+        exec_id = instance.db.fetch_most_recent_environment_id(instance.environment)
+        if exec_id is None:
+            raise TestmonException(
+                f"No testmon data found for environment '{instance.environment}'. "
+                "Run tests with --testmon first to collect data."
+            )
+        instance.exec_id = exec_id
+        return instance
+
+    @classmethod
     def for_worker(  # pylint: disable=too-many-arguments
         cls,
         rootdir,
@@ -404,6 +417,9 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
     def save_test_execution_file_fps(self, test_executions_fingerprints):
         self.db.insert_test_file_fps(test_executions_fingerprints, self.exec_id)
 
+    def save_test_execution_lines(self, nodes_files_lines):
+        self.db.insert_test_execution_lines(nodes_files_lines, self.exec_id)
+
     def fetch_saving_stats(self, select):
         return self.db.fetch_saving_stats(self.exec_id, select)
 
@@ -464,6 +480,7 @@ class TestmonCollector:
         self.check_stack = []
         self.is_started = False
         self._interrupted_at = None
+        self._import_lines = {}
 
     def start_cov(self):
         if not self.cov._started:
@@ -598,7 +615,7 @@ class TestmonCollector:
                     files_lines.setdefault(file, set()).add(lineno)
         nodes_files_lines.pop(dont_include, None)
         self.batched_test_names.discard(dont_include)
-        nodes_files_lines.pop("", None)
+        self._import_lines = nodes_files_lines.pop("", None) or {}
         for test_name in self.batched_test_names:
             if home_file(test_name) not in nodes_files_lines.setdefault(test_name, {}):
                 nodes_files_lines[test_name].setdefault(home_file(test_name), {1})

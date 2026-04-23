@@ -115,6 +115,20 @@ def pytest_addoption(parser):
         ),
     )
 
+    group.addoption(
+        "--testmon-cov",
+        action="store",
+        type=str,
+        dest="testmon_cov",
+        default=None,
+        nargs="?",
+        const="coverage.xml",
+        help=(
+            "Generate a Cobertura XML coverage report from testmon data. "
+            "Optional: output filename (default: coverage.xml)."
+        ),
+    )
+
     parser.addini("environment_expression", "environment expression", default="")
     parser.addini(
         "testmon_ignore_dependencies",
@@ -272,6 +286,24 @@ def pytest_configure(config):
         except TestmonException as error:
             pytest.exit(str(error))
 
+    testmon_cov = config.getoption("testmon_cov", default=None)
+    if testmon_cov:
+        try:
+            if not hasattr(config, "testmon_data"):
+                environment = config.getoption(
+                    "environment_expression"
+                ) or eval_environment(config.getini("environment_expression"))
+                testmon_data = TestmonData.for_readonly(
+                    config.rootdir.strpath, environment=environment
+                )
+                config.testmon_data = testmon_data
+            config.pluginmanager.register(
+                TestmonCovReport(config, config.testmon_data, testmon_cov),
+                "TestmonCovReport",
+            )
+        except TestmonException as error:
+            pytest.exit(str(error))
+
 
 def pytest_report_header(config):
     tm_conf = config.testmon_config
@@ -419,6 +451,11 @@ class TestmonCollect:
                 self.testmon_data.save_test_execution_file_fps(
                     test_executions_fingerprints
                 )
+                lines_with_imports = _merge_import_lines(
+                    report.nodes_files_lines,
+                    getattr(self.testmon, "_import_lines", {}),
+                )
+                self.testmon_data.save_test_execution_lines(lines_with_imports)
 
     def pytest_keyboard_interrupt(self, excinfo):  # pylint: disable=unused-argument
         if self._running_as == "single":
@@ -428,6 +465,11 @@ class TestmonCollect:
                 nodes_files_lines, self.reports
             )
             self.testmon_data.save_test_execution_file_fps(test_executions_fingerprints)
+            lines_with_imports = _merge_import_lines(
+                nodes_files_lines,
+                getattr(self.testmon, "_import_lines", {}),
+            )
+            self.testmon_data.save_test_execution_lines(lines_with_imports)
             self.testmon.close()
 
     def pytest_sessionfinish(self, session):  # pylint: disable=unused-argument
@@ -479,6 +521,28 @@ class TestmonXdistSync:
         self.await_nodes += -1
         if self.await_nodes == 0:
             node.config.testmon_data.sync_db_fs_tests(retain=set(ids))
+
+
+def _merge_import_lines(nodes_files_lines, import_lines):
+    """Merge import-time lines (the "" context) into each test's file coverage.
+
+    coverage.py attributes lines executed at import time (class/def statements,
+    top-level code) to the empty "" context. Testmon strips this context for
+    fingerprinting, but for coverage reporting we need these lines attributed
+    to the tests that triggered the import.
+    """
+    if not import_lines:
+        return nodes_files_lines
+    result = {}
+    for test_name, files_lines in nodes_files_lines.items():
+        merged = {}
+        for filename, lines in files_lines.items():
+            if filename in import_lines:
+                merged[filename] = lines | import_lines[filename]
+            else:
+                merged[filename] = lines
+        result[test_name] = merged
+    return result
 
 
 def did_fail(reports):
@@ -614,6 +678,31 @@ class TestmonSelect:
 
     def pytest_keyboard_interrupt(self, excinfo):  # pylint: disable=unused-argument
         self._interrupted = True
+
+
+class TestmonCovReport:
+    def __init__(self, config, testmon_data, output_file):
+        self.config = config
+        self.testmon_data = testmon_data
+        self.output_file = output_file
+
+    @pytest.hookimpl(trylast=True)
+    def pytest_sessionfinish(self, session):
+        from testmon.cobertura import generate_cobertura_xml
+
+        output_path = generate_cobertura_xml(
+            self.testmon_data.rootdir,
+            self.testmon_data.db,
+            self.testmon_data.exec_id,
+            self.output_file,
+        )
+        terminal_reporter = session.config.pluginmanager.get_plugin(
+            "terminalreporter"
+        )
+        if terminal_reporter:
+            terminal_reporter.write_line(
+                f"testmon-cov: wrote {output_path}"
+            )
 
 
 class FakeItemFromTestmon:  # pylint: disable=too-few-public-methods
