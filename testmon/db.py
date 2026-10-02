@@ -75,6 +75,10 @@ class DB:  # pylint: disable=too-many-public-methods
             self.file_created = True
         else:
             self.file_created = False
+            if not readonly:
+                self.con.executescript(
+                    self._create_test_execution_ffp_fingerprint_index_statement()
+                )
 
         self.con.executescript(self._local_temp_tables_statement())
 
@@ -408,6 +412,15 @@ class DB:  # pylint: disable=too-many-public-methods
                 CREATE UNIQUE INDEX sefch_suite_id_filename_sha ON suite_execution_file_fsha(suite_execution_id, filename, fsha);
             """
 
+    def _create_test_execution_ffp_fingerprint_index_statement(  # pylint: disable=invalid-name
+        self,
+    ) -> str:
+        # Without this index, the foreign key check behind every row deleted by
+        # vacuum_file_fp scans the whole test_execution_file_fp table.
+        return """
+            CREATE INDEX IF NOT EXISTS test_execution_file_fp_fingerprint_id ON test_execution_file_fp (fingerprint_id);
+            """
+
     def init_tables(self):
         connection = self.con
 
@@ -418,6 +431,7 @@ class DB:  # pylint: disable=too-many-public-methods
             + self._create_temp_tables_statement()
             + self._create_file_fp_statement()
             + self._create_test_execution_ffp_statement()
+            + self._create_test_execution_ffp_fingerprint_index_statement()
         )
 
         connection.execute(f"PRAGMA user_version = {self.version_compatibility()}")
