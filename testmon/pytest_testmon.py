@@ -2,6 +2,7 @@
 """
 Main module of testmon pytest plugin.
 """
+
 import time
 import xmlrpc.client
 import os
@@ -183,7 +184,6 @@ def init_testmon_data(config: Config):
     exec_id = None
     system_packages_change = None
     files_of_interest = None
-
     if running_as == "worker" and hasattr(config, "workerinput"):
         # Use exec_id sent from controller
         exec_id = config.workerinput.get("testmon_exec_id")
@@ -191,11 +191,15 @@ def init_testmon_data(config: Config):
             "testmon_system_packages_change"
         )
         files_of_interest = config.workerinput.get("testmon_files_of_interest")
-
+    rootdir = (
+        str(config.rootpath.absolute())
+        if hasattr(config, "rootpath")
+        else config.rootdir.strpath
+    )
     if running_as == "worker" and exec_id is not None:
         # Initialize for xdist worker run
         testmon_data: TestmonData = TestmonData.for_worker(
-            rootdir=str(config.rootpath.absolute()),
+            rootdir=rootdir,
             exec_id=exec_id,
             database=rpc_proxy,
             system_packages_change=system_packages_change,
@@ -205,7 +209,7 @@ def init_testmon_data(config: Config):
     else:
         # Initialize for local run (controller or single process)
         testmon_data: TestmonData = TestmonData.for_local_run(
-            rootdir=str(config.rootpath.absolute()),
+            rootdir=rootdir,
             database=rpc_proxy,
             environment=environment,
             system_packages=system_packages,
@@ -231,10 +235,15 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
         )
 
     if should_collect:
+        rootdir = (
+            str(config.rootpath.absolute())
+            if hasattr(config, "rootpath")
+            else config.rootdir.strpath
+        )
         config.pluginmanager.register(
             TestmonCollect(
                 TestmonCollector(
-                    str(config.rootpath.absolute()),
+                    rootdir,
                     testmon_labels=testmon_options(config),
                     cov_plugin=cov_plugin,
                 ),
@@ -463,12 +472,12 @@ class TestmonXdistSync:
         if hasattr(node.config, "testmon_data") and hasattr(node, "workerinput"):
             testmon_data: TestmonData = node.config.testmon_data
             node.workerinput["testmon_exec_id"] = testmon_data.exec_id
-            node.workerinput[
-                "testmon_system_packages_change"
-            ] = testmon_data.system_packages_change
-            node.workerinput[
-                "testmon_files_of_interest"
-            ] = testmon_data.files_of_interest
+            node.workerinput["testmon_system_packages_change"] = (
+                testmon_data.system_packages_change
+            )
+            node.workerinput["testmon_files_of_interest"] = (
+                testmon_data.files_of_interest
+            )
 
     def pytest_testnodeready(self, node):  # pylint: disable=unused-argument
         self.await_nodes += 1
@@ -530,7 +539,12 @@ class TestmonSelect:
         self._interrupted = False
 
     def pytest_ignore_collect(self, collection_path: Path, config):
-        strpath = cached_relpath(str(collection_path), str(config.rootpath.absolute()))
+        rootdir = (
+            str(config.rootpath.absolute())
+            if hasattr(config, "rootpath")
+            else config.rootdir.strpath
+        )
+        strpath = cached_relpath(str(collection_path), rootdir)
         if strpath in self.deselected_files and self.config.testmon_config.select:
             return True
         return None
