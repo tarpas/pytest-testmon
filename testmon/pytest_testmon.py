@@ -2,7 +2,6 @@
 """
 Main module of testmon pytest plugin.
 """
-
 import time
 import xmlrpc.client
 import os
@@ -184,6 +183,7 @@ def init_testmon_data(config: Config):
     exec_id = None
     system_packages_change = None
     files_of_interest = None
+
     if running_as == "worker" and hasattr(config, "workerinput"):
         # Use exec_id sent from controller
         exec_id = config.workerinput.get("testmon_exec_id")
@@ -191,6 +191,7 @@ def init_testmon_data(config: Config):
             "testmon_system_packages_change"
         )
         files_of_interest = config.workerinput.get("testmon_files_of_interest")
+
     rootdir = (
         str(config.rootpath.absolute())
         if hasattr(config, "rootpath")
@@ -472,12 +473,12 @@ class TestmonXdistSync:
         if hasattr(node.config, "testmon_data") and hasattr(node, "workerinput"):
             testmon_data: TestmonData = node.config.testmon_data
             node.workerinput["testmon_exec_id"] = testmon_data.exec_id
-            node.workerinput["testmon_system_packages_change"] = (
-                testmon_data.system_packages_change
-            )
-            node.workerinput["testmon_files_of_interest"] = (
-                testmon_data.files_of_interest
-            )
+            node.workerinput[
+                "testmon_system_packages_change"
+            ] = testmon_data.system_packages_change
+            node.workerinput[
+                "testmon_files_of_interest"
+            ] = testmon_data.files_of_interest
 
     def pytest_testnodeready(self, node):  # pylint: disable=unused-argument
         self.await_nodes += 1
