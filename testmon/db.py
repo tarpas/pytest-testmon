@@ -216,9 +216,9 @@ class DB:  # pylint: disable=too-many-public-methods
                 FROM
                     file_fp
                 WHERE
-                    filename = ? AND method_checksums = ?
+                    filename = ? AND fsha = ? AND method_checksums = ?
                 """,
-                (filename, method_checksums),
+                (filename, fsha, method_checksums),
             ).fetchone()
 
         return fingerprint_id
