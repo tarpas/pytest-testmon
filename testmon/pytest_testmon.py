@@ -244,8 +244,8 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
             ),
             "TestmonCollect",
         )
-        if config.pluginmanager.hasplugin("xdist"):
-            config.pluginmanager.register(TestmonXdistSync())
+    if (should_select or should_collect) and config.pluginmanager.hasplugin("xdist"):
+        config.pluginmanager.register(TestmonXdistSync(sync=should_collect))
 
 
 def pytest_configure(config):
@@ -436,8 +436,9 @@ class TestmonCollect:
 
 
 class TestmonXdistSync:
-    def __init__(self):
+    def __init__(self, sync=True):
         self.await_nodes = 0
+        self.sync = sync
 
     def pytest_configure_node(self, node):
         """
@@ -470,7 +471,7 @@ class TestmonXdistSync:
 
     def pytest_xdist_node_collection_finished(self, node, ids):  # pylint: disable=invalid-name
         self.await_nodes += -1
-        if self.await_nodes == 0:
+        if self.await_nodes == 0 and self.sync:
             node.config.testmon_data.sync_db_fs_tests(retain=set(ids))
 
 
