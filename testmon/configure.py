@@ -75,7 +75,8 @@ def _get_noselect_reasons(options):
     if options["markexpr"]:
         return ["-m was used"]
 
-    if options["lf"]:
+    # `--lf` is registered by the cacheprovider plugin, absent with `-p no:cacheprovider`
+    if options.get("lf"):
         return ["--lf was used"]
 
     file_or_dir = options.get("file_or_dir") or []
