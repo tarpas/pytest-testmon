@@ -11,7 +11,7 @@ dynamic =  ["version"]
 
 description = "selects tests affected by changed files and methods"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 keywords = ["testing", "pytest", "plugin"]
 license = { text = "MIT" }
 classifiers = [
@@ -62,3 +62,4 @@ exclude = '''
 
 [project.entry-points.pytest11]
 pytest-testmon = "testmon.pytest_testmon"
+

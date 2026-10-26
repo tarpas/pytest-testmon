@@ -234,9 +234,7 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
                 ),
                 exc,
             )
-            self.db = db.DB(
-                os.path.join(self.rootdir, get_data_file_path())
-            )  # pylint: disable=invalid-name
+            self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))  # pylint: disable=invalid-name
             result = self.db.initiate_execution(
                 self.environment, system_packages, python_version, {}
             )

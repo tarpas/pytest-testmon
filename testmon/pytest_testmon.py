@@ -2,6 +2,7 @@
 """
 Main module of testmon pytest plugin.
 """
+
 import time
 import xmlrpc.client
 import os
@@ -362,9 +363,7 @@ class TestmonCollect:
         self._sessionstarttime = time.time()
 
     @pytest.hookimpl(tryfirst=True, hookwrapper=True)
-    def pytest_pycollect_makeitem(
-        self, collector, name, obj
-    ):  # pylint: disable=unused-argument
+    def pytest_pycollect_makeitem(self, collector, name, obj):  # pylint: disable=unused-argument
         makeitem_result = yield
         items = makeitem_result.get_result() or []
         try:
@@ -375,9 +374,7 @@ class TestmonCollect:
             pass
 
     @pytest.hookimpl(tryfirst=True)
-    def pytest_collection_modifyitems(
-        self, session, config, items
-    ):  # pylint: disable=unused-argument
+    def pytest_collection_modifyitems(self, session, config, items):  # pylint: disable=unused-argument
         should_sync = not session.testsfailed and self._running_as in (
             "single",
             "controller",
@@ -386,9 +383,7 @@ class TestmonCollect:
             config.testmon_data.sync_db_fs_tests(retain=set(self.raw_test_names))
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_protocol(
-        self, item, nextitem
-    ):  # pylint: disable=unused-argument
+    def pytest_runtest_protocol(self, item, nextitem):  # pylint: disable=unused-argument
         self.testmon.start_testmon(item.nodeid, nextitem.nodeid if nextitem else None)
         result = yield
         if result.excinfo and issubclass(result.excinfo[0], BaseException):
@@ -463,19 +458,17 @@ class TestmonXdistSync:
         if hasattr(node.config, "testmon_data") and hasattr(node, "workerinput"):
             testmon_data: TestmonData = node.config.testmon_data
             node.workerinput["testmon_exec_id"] = testmon_data.exec_id
-            node.workerinput[
-                "testmon_system_packages_change"
-            ] = testmon_data.system_packages_change
-            node.workerinput[
-                "testmon_files_of_interest"
-            ] = testmon_data.files_of_interest
+            node.workerinput["testmon_system_packages_change"] = (
+                testmon_data.system_packages_change
+            )
+            node.workerinput["testmon_files_of_interest"] = (
+                testmon_data.files_of_interest
+            )
 
     def pytest_testnodeready(self, node):  # pylint: disable=unused-argument
         self.await_nodes += 1
 
-    def pytest_xdist_node_collection_finished(
-        self, node, ids
-    ):  # pylint: disable=invalid-name
+    def pytest_xdist_node_collection_finished(self, node, ids):  # pylint: disable=invalid-name
         self.await_nodes += -1
         if self.await_nodes == 0:
             node.config.testmon_data.sync_db_fs_tests(retain=set(ids))
@@ -536,9 +529,7 @@ class TestmonSelect:
         return None
 
     @pytest.hookimpl(trylast=True)
-    def pytest_collection_modifyitems(
-        self, session, config, items
-    ):  # pylint: disable=unused-argument
+    def pytest_collection_modifyitems(self, session, config, items):  # pylint: disable=unused-argument
         selected = []
         deselected = []
         for item in items:
