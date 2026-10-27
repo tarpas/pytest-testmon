@@ -5,12 +5,25 @@ import sqlite3
 from collections import namedtuple
 from functools import lru_cache
 
+from array import array
+
 from testmon.process_code import blob_to_checksums, checksums_to_blob
+
+
+def lines_to_blob(lines):
+    blob = array("I", sorted(lines))
+    return sqlite3.Binary(blob.tobytes())
+
+
+def blob_to_lines(blob):
+    arr = array("I")
+    arr.frombytes(blob)
+    return set(arr.tolist())
 
 from testmon.common import TestExecutions
 
 
-DATA_VERSION = 14
+DATA_VERSION = 15
 
 ChangedFileData = namedtuple(
     "ChangedFileData", "filename name method_checksums id failed"
@@ -404,6 +417,17 @@ class DB:  # pylint: disable=too-many-public-methods
                 CREATE UNIQUE INDEX sefch_suite_id_filename_sha ON suite_execution_file_fsha(suite_execution_id, filename, fsha);
             """
 
+    def _create_test_execution_lines_statement(self):
+        return """
+            CREATE TABLE test_execution_lines (
+                test_execution_id INTEGER,
+                filename TEXT,
+                lines BLOB,
+                FOREIGN KEY(test_execution_id) REFERENCES test_execution(id) ON DELETE CASCADE
+            );
+            CREATE INDEX test_execution_lines_te_id ON test_execution_lines (test_execution_id);
+            """
+
     def init_tables(self):
         connection = self.con
 
@@ -414,6 +438,7 @@ class DB:  # pylint: disable=too-many-public-methods
             + self._create_temp_tables_statement()
             + self._create_file_fp_statement()
             + self._create_test_execution_ffp_statement()
+            + self._create_test_execution_lines_statement()
         )
 
         connection.execute(f"PRAGMA user_version = {self.version_compatibility()}")
@@ -586,6 +611,104 @@ class DB:  # pylint: disable=too-many-public-methods
                 (exec_id,),
             )
         }
+
+    def fetch_all_file_checksums(self, exec_id):
+        """Returns {filename: set_of_checksums} unioning all fingerprints per file."""
+        cursor = self.con.execute(
+            f"""
+            SELECT f.filename, f.method_checksums
+            FROM file_fp f
+            JOIN test_execution_file_fp tefp ON tefp.fingerprint_id = f.id
+            JOIN test_execution te ON te.id = tefp.test_execution_id
+            WHERE te.{self._test_execution_fk_column()} = ?
+            """,
+            (exec_id,),
+        )
+        result = {}
+        for row in cursor:
+            filename = row["filename"]
+            checksums = set(blob_to_checksums(row["method_checksums"]))
+            if filename in result:
+                result[filename] |= checksums
+            else:
+                result[filename] = checksums
+        return result
+
+    def insert_test_execution_lines(self, nodes_files_lines, exec_id):
+        """Store line-level coverage data for each test execution."""
+        with self.con as con:
+            for test_name, files_lines in nodes_files_lines.items():
+                te_row = con.execute(
+                    f"""
+                    SELECT id FROM test_execution
+                    WHERE {self._test_execution_fk_column()} = ? AND test_name = ?
+                    ORDER BY id DESC LIMIT 1
+                    """,
+                    (exec_id, test_name),
+                ).fetchone()
+                if not te_row:
+                    continue
+                te_id = te_row["id"]
+                con.execute(
+                    "DELETE FROM test_execution_lines WHERE test_execution_id = ?",
+                    (te_id,),
+                )
+                rows = []
+                for filename, lines in files_lines.items():
+                    if lines:
+                        rows.append((te_id, filename, lines_to_blob(lines)))
+                if rows:
+                    con.executemany(
+                        "INSERT INTO test_execution_lines (test_execution_id, filename, lines) VALUES (?, ?, ?)",
+                        rows,
+                    )
+
+    def fetch_all_file_lines(self, exec_id):
+        """Returns {filename: set_of_line_numbers} unioning line data across all tests."""
+        cursor = self.con.execute(
+            f"""
+            SELECT tel.filename, tel.lines
+            FROM test_execution_lines tel
+            JOIN test_execution te ON te.id = tel.test_execution_id
+            WHERE te.{self._test_execution_fk_column()} = ?
+            """,
+            (exec_id,),
+        )
+        result = {}
+        for row in cursor:
+            filename = row["filename"]
+            lines = blob_to_lines(row["lines"])
+            if filename in result:
+                result[filename] |= lines
+            else:
+                result[filename] = lines
+        return result
+
+    def has_line_data(self, exec_id):
+        """Check if line-level coverage data exists for this execution."""
+        row = self.con.execute(
+            f"""
+            SELECT 1 FROM test_execution_lines tel
+            JOIN test_execution te ON te.id = tel.test_execution_id
+            WHERE te.{self._test_execution_fk_column()} = ?
+            LIMIT 1
+            """,
+            (exec_id,),
+        ).fetchone()
+        return row is not None
+
+    def fetch_most_recent_environment_id(self, environment_name):
+        cursor = self.con.execute(
+            """
+            SELECT id FROM environment
+            WHERE environment_name = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (environment_name,),
+        )
+        row = cursor.fetchone()
+        return row["id"] if row else None
 
     def filenames(self, exec_id):
         cursor = self.con.execute(
