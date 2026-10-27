@@ -18,6 +18,7 @@ except ImportError:
 
 import pytest
 from coverage import Coverage, CoverageData
+from coverage.exceptions import CoverageException
 
 from testmon import db
 from testmon import TESTMON_VERSION as TM_CLIENT_VERSION
@@ -435,6 +436,22 @@ def cached_relpath(path, basepath):
     return os.path.relpath(path, basepath).replace(os.sep, "/")
 
 
+# coverage 7.10+ defaults to the sys.monitoring core on CPython 3.14+. That core
+# doesn't support dynamic contexts: sys.monitoring disables a line event once the
+# line has been recorded, so a line executed by several tests of one batch is
+# attributed to the first test only and the other tests lose the dependency.
+# testmon relies on contexts_by_lineno, so it needs the C tracer.
+COVERAGE_CORE = "ctrace"
+
+
+def force_context_capable_core(cov: Coverage):
+    try:
+        cov.set_option("run:core", COVERAGE_CORE)
+    except CoverageException:
+        # coverage < 7.10 has no core option and never defaults to sys.monitoring.
+        pass
+
+
 class TestmonCollector:
     coverage_stack: [Coverage] = []
 
@@ -517,6 +534,7 @@ class TestmonCollector:
 
         self.cov = Coverage(data_file=self.sub_cov_file, config_file=False, **params)
         self.cov._warn_no_data = False
+        force_context_capable_core(self.cov)
         if TestmonCollector.coverage_stack:
             TestmonCollector.coverage_stack[-1].stop()
 
@@ -615,6 +633,7 @@ class TestmonCollector:
             TestmonCollector.coverage_stack.pop()
         if self.sub_cov_file:
             os.remove(self.sub_cov_file + "_rc")
+            os.environ.pop("COVERAGE_CORE", None)
         os.environ.pop("COVERAGE_PROCESS_START", None)
         self.cov = None
         if TestmonCollector.coverage_stack:
