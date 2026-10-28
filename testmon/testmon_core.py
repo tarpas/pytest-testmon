@@ -6,7 +6,7 @@ import sysconfig
 import textwrap
 from functools import lru_cache
 from collections import defaultdict
-from xmlrpc.client import Fault, ProtocolError
+from xmlrpc.client import Fault, ProtocolError, ServerProxy
 from socket import gaierror
 
 from typing import TypeVar
@@ -283,9 +283,23 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         return False
 
     def close_connection(self):
-        pass
-        # TODO this is why there are "too many open files" on MacOS.
-        # we need the leave the connection open for tests
+        """Release the storage: the sqlite connection, or the transport of a tmnet proxy.
+
+        Idempotent. Tests that inspect the data after a run reopen it (see tests/lib4tests.py).
+        """
+        database, self.db = self.db, None
+        if database is None:
+            return
+        if isinstance(database, ServerProxy):
+            database("close")()  # attribute access would be a remote call
+        else:
+            database.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close_connection()
 
     @property
     def all_tests(self):
@@ -319,27 +333,25 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
     def sync_db_fs_tests(self, retain):
         collected = retain.union(set(self.stable_test_names))
         add = list(collected - set(self.all_tests))
-        with self.db:
-            test_execution_file_fps = {
-                test_name: {
-                    "deps": (
-                        {
-                            "filename": home_file(test_name),
-                            "method_checksums": methods_to_checksums(["0match"]),
-                            "mtime": None,
-                            "fsha": None,
-                        },
-                    )
-                }
-                for test_name in add
-                if is_python_file(home_file(test_name))
+        test_execution_file_fps = {
+            test_name: {
+                "deps": (
+                    {
+                        "filename": home_file(test_name),
+                        "method_checksums": methods_to_checksums(["0match"]),
+                        "mtime": None,
+                        "fsha": None,
+                    },
+                )
             }
-            if test_execution_file_fps:
-                self.save_test_execution_file_fps(test_execution_file_fps)
+            for test_name in add
+            if is_python_file(home_file(test_name))
+        }
+        if test_execution_file_fps:
+            self.save_test_execution_file_fps(test_execution_file_fps)
 
         to_delete = list(set(self.all_tests) - collected)
-        with self.db as database:
-            database.delete_test_executions(to_delete, self.exec_id)
+        self.db.delete_test_executions(to_delete, self.exec_id)
 
     def determine_stable(self):
         files_fshas = {}

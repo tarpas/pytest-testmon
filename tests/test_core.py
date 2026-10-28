@@ -88,7 +88,8 @@ class CoreTestmonDataForTest(CoreTestmonData):
 
 @pytest.fixture
 def tmdata(testdir):
-    return CoreTestmonDataForTest(system_packages="default")
+    with CoreTestmonDataForTest(system_packages="default") as tmdata:
+        yield tmdata
 
 
 @pytest.fixture
@@ -124,6 +125,7 @@ class TestMisc(object):
 
         cursor = con.execute("SELECT length(c) FROM A")
         assert cursor.fetchone()[0] == len(checksums) * 4
+        con.close()
 
     def test_sqlite_assumption_foreign_key(self, tmdata):
         def test_execution_count(test_execution_id):
@@ -296,14 +298,14 @@ DEFAULT_DURATION = 0.1
 
 class TestData:
     def test_read_nonexistent(self, testdir):
-        td = CoreTestmonData.for_local_run("", environment="V2")
-        assert td.db.fetch_attribute("1") is None
+        with CoreTestmonData.for_local_run("", environment="V2") as td:
+            assert td.db.fetch_attribute("1") is None
 
     def test_write_read_attribute(self, testdir):
-        td = CoreTestmonData.for_local_run("", environment="V1")
-        td.db.write_attribute("1", {"a": 1})
-        td2 = CoreTestmonData.for_local_run("", environment="V1")
-        assert td2.db.fetch_attribute("1") == {"a": 1}
+        with CoreTestmonData.for_local_run("", environment="V1") as td:
+            td.db.write_attribute("1", {"a": 1})
+            with CoreTestmonData.for_local_run("", environment="V1") as td2:
+                assert td2.db.fetch_attribute("1") == {"a": 1}
 
     def test_write_read_nodedata(self, tmdata):
         tmdata.write_fixture("test_a.py::n1", {"test_a.py": FINGERPRINT1})
@@ -314,11 +316,11 @@ class TestData:
 
     def test_write_and_clean_tests_simultaneously(self, tmdata):
         tmdata.write_fixture("test_a.py::n1", {"test_a.py": FINGERPRINT1})
-        tmdata2 = CoreTestmonDataForTest(system_packages="default")
-        tmdata2.determine_stable()
-        tmdata2.sync_db_fs_tests(retain=set())
-        tmdata2.db.finish_execution(tmdata.exec_id)
-        tmdata.write_fixture("test_a.py::n2", {"test_a.py": FINGERPRINT1})
+        with CoreTestmonDataForTest(system_packages="default") as tmdata2:
+            tmdata2.determine_stable()
+            tmdata2.sync_db_fs_tests(retain=set())
+            tmdata2.db.finish_execution(tmdata.exec_id)
+            tmdata.write_fixture("test_a.py::n2", {"test_a.py": FINGERPRINT1})
 
     def test_filenames_fingerprints(self, tmdata):
         tmdata.write_fixture("test_1.py::test_1", {"test_1.py": FINGERPRINT1}, failed=1)
@@ -516,9 +518,9 @@ class TestData:
         tmdata.sync_db_fs_tests(retain=set())
         tmdata.close_connection()
 
-        td2 = CoreTestmonData.for_local_run("")
-        td2.determine_stable()
-        assert set(td2.all_tests) == set()
+        with CoreTestmonData.for_local_run("") as td2:
+            td2.determine_stable()
+            assert set(td2.all_tests) == set()
 
     def test_remove_unused_fingerprints(self, tmdata):
         tmdata.write_fixture("n1", {"test_a.py": FINGERPRINT1})
@@ -561,20 +563,19 @@ class TestData:
         environemnt_name = "default"
         system_packages = "first_package 1.0.0, second_package 2.0.1, third_package 3.0 fourth_package 4"
         python_version = "3.11"
-        td = CoreTestmonData.for_local_run(
+        with CoreTestmonData.for_local_run(
             "",
             environment=environemnt_name,
             system_packages=system_packages,
             python_version=python_version,
-        )
-        td2 = CoreTestmonData.for_local_run(
-            "",
-            environment=environemnt_name,
-            system_packages=system_packages,
-            python_version=python_version,
-        )
-
-        assert td.exec_id == td2.exec_id
+        ) as td:
+            with CoreTestmonData.for_local_run(
+                "",
+                environment=environemnt_name,
+                system_packages=system_packages,
+                python_version=python_version,
+            ) as td2:
+                assert td.exec_id == td2.exec_id
 
     def test_environment_diff_name(self, testdir):
         # environment differs in name -> different execution id
@@ -582,20 +583,19 @@ class TestData:
         environemnt_name2 = "default2"
         system_packages = "first_package 1.0.0, second_package 2.0.0"
         python_version = "3.11"
-        td = CoreTestmonData.for_local_run(
+        with CoreTestmonData.for_local_run(
             "",
             environment=environemnt_name,
             system_packages=system_packages,
             python_version=python_version,
-        )
-        td2 = CoreTestmonData.for_local_run(
-            "",
-            environment=environemnt_name2,
-            system_packages=system_packages,
-            python_version=python_version,
-        )
-
-        assert td.exec_id != td2.exec_id
+        ) as td:
+            with CoreTestmonData.for_local_run(
+                "",
+                environment=environemnt_name2,
+                system_packages=system_packages,
+                python_version=python_version,
+            ) as td2:
+                assert td.exec_id != td2.exec_id
 
     def test_environment_same_packages(self, testdir):
         # environment differs in system_packages -> different execution id
@@ -603,20 +603,19 @@ class TestData:
         system_packages = "first_package 1.0.0, second_package 2.0, third_package 3"
         system_packages2 = "first_package 1.0.1, second_package 2.0, third_package 3"
         python_version = "3.11"
-        td = CoreTestmonData.for_local_run(
+        with CoreTestmonData.for_local_run(
             "",
             environment=environemnt_name,
             system_packages=system_packages,
             python_version=python_version,
-        )
-        td2 = CoreTestmonData.for_local_run(
-            "",
-            environment=environemnt_name,
-            system_packages=system_packages2,
-            python_version=python_version,
-        )
-
-        assert td.exec_id == td2.exec_id
+        ) as td:
+            with CoreTestmonData.for_local_run(
+                "",
+                environment=environemnt_name,
+                system_packages=system_packages2,
+                python_version=python_version,
+            ) as td2:
+                assert td.exec_id == td2.exec_id
 
     def test_environment_diff_packages(self, testdir):
         # environment differs in system_packages -> different execution id
@@ -624,20 +623,19 @@ class TestData:
         system_packages = "first_package 1.0.0, second_package 2.0, third_package 3"
         system_packages2 = "first_package 1.1.0, second_package 2.0, third_package 3"
         python_version = "3.11"
-        td = CoreTestmonData.for_local_run(
+        with CoreTestmonData.for_local_run(
             "",
             environment=environemnt_name,
             system_packages=system_packages,
             python_version=python_version,
-        )
-        td2 = CoreTestmonData.for_local_run(
-            "",
-            environment=environemnt_name,
-            system_packages=system_packages2,
-            python_version=python_version,
-        )
-
-        assert td.exec_id != td2.exec_id
+        ) as td:
+            with CoreTestmonData.for_local_run(
+                "",
+                environment=environemnt_name,
+                system_packages=system_packages2,
+                python_version=python_version,
+            ) as td2:
+                assert td.exec_id != td2.exec_id
 
     def test_environment_diff_pyversion(self, testdir):
         # environment differs in python_version -> different execution id
@@ -646,20 +644,19 @@ class TestData:
         python_version = "3.11"
         python_version2 = "3.7"
 
-        td = CoreTestmonData.for_local_run(
+        with CoreTestmonData.for_local_run(
             "",
             environment=environemnt_name,
             system_packages=system_packages,
             python_version=python_version,
-        )
-        td2 = CoreTestmonData.for_local_run(
-            "",
-            environment=environemnt_name,
-            system_packages=system_packages,
-            python_version=python_version2,
-        )
-
-        assert td.exec_id != td2.exec_id
+        ) as td:
+            with CoreTestmonData.for_local_run(
+                "",
+                environment=environemnt_name,
+                system_packages=system_packages,
+                python_version=python_version2,
+            ) as td2:
+                assert td.exec_id != td2.exec_id
 
 
 class TestCoreTestmon:

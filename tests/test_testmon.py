@@ -19,7 +19,6 @@ from testmon.process_code import (
 )
 from testmon.testmon_core import (
     eval_environment,
-    DB_FILENAME,
     TestmonData,
 )
 from testmon.process_code import blob_to_checksums
@@ -40,8 +39,6 @@ from testmon.common import get_system_packages
 
 pytest_plugins = ("pytester",)
 
-datafilename = os.environ.get("TESTMON_DATAFILE", DB_FILENAME)
-
 
 def two_lines_function():
     a = 1
@@ -50,21 +47,21 @@ def two_lines_function():
 
 def track_it(testdir, func):
     testmon = CoreTestmon(rootdir=testdir.tmpdir.strpath, testmon_labels=set())
-    testmon_data = CoreTestmonData.for_local_run("")
-    #    testmon.setup_coverage()
-    testmon.start_testmon("test_a.py::test_1")
-    func()
-    nodes_files_lines = testmon.get_batch_coverage_data()
-    testmon.close()
+    with CoreTestmonData.for_local_run("") as testmon_data:
+        #    testmon.setup_coverage()
+        testmon.start_testmon("test_a.py::test_1")
+        func()
+        nodes_files_lines = testmon.get_batch_coverage_data()
+        testmon.close()
 
-    files_fingerprints = {}
-    for filename, lines in nodes_files_lines["test_a.py::test_1"].items():
-        module = testmon_data.source_tree.get_file(filename)
-        if module:
-            fingerprint = create_fingerprint(module, lines)
-            files_fingerprints[filename] = fingerprint
+        files_fingerprints = {}
+        for filename, lines in nodes_files_lines["test_a.py::test_1"].items():
+            module = testmon_data.source_tree.get_file(filename)
+            if module:
+                fingerprint = create_fingerprint(module, lines)
+                files_fingerprints[filename] = fingerprint
 
-    return files_fingerprints
+        return files_fingerprints
 
 
 @pytest.fixture
@@ -91,7 +88,9 @@ def write_source_code_to_a_file(file_handle, source_code):
 @pytest.fixture
 def local_remote(request, testdir) -> LocalRemote:
     """Parametrized in tests/conftest.py over the registered flavours; the param is the factory."""
-    return request.param(testdir)
+    lr = request.param(testdir)
+    yield lr
+    lr.close()
 
 
 class TestCoreTestmon:
@@ -232,14 +231,14 @@ FINGERPRINTPRINT = create_fingerprint_source("print(1)", {1})
 
 class TestVariant:
     def test_separation(self, testdir):
-        td1 = CoreTestmonDataForTest(environment="1")
-        td1.write_fixture("test_a.py::test_1", {"test_a.py": FINGERPRINTPRINT})
+        with CoreTestmonDataForTest(environment="1") as td1:
+            td1.write_fixture("test_a.py::test_1", {"test_a.py": FINGERPRINTPRINT})
 
-        td2 = CoreTestmonDataForTest(environment="2")
-        td2.write_fixture("test_a.py::test_2", {"test_a.py": FINGERPRINTPRINT})
+            with CoreTestmonDataForTest(environment="2") as td2:
+                td2.write_fixture("test_a.py::test_2", {"test_a.py": FINGERPRINTPRINT})
 
-        td3 = CoreTestmonData.for_local_run("", environment="2")
-        assert set(td3.all_tests) == {"test_a.py::test_2"}
+                with CoreTestmonData.for_local_run("", environment="2") as td3:
+                    assert set(td3.all_tests) == {"test_a.py::test_2"}
 
     def test_header(self, testdir):
         testdir.makeini(
@@ -731,11 +730,9 @@ def test_add():    assert add(1, 2) == 3
         )
         testdir.runpytest_inprocess("--testmon")
 
-        tmdata_with_dummy_packages = CoreTestmonData.for_local_run("")
-        tmdata_with_dummy_packages.determine_stable()
-
-        assert bool(not tmdata_with_dummy_packages.system_packages_change)
-        tmdata_with_dummy_packages.close_connection()
+        with CoreTestmonData.for_local_run("") as tmdata_with_dummy_packages:
+            tmdata_with_dummy_packages.determine_stable()
+            assert bool(not tmdata_with_dummy_packages.system_packages_change)
 
     def test_packages_miss(self, testdir):
         testdir.makepyfile(
@@ -746,13 +743,11 @@ def test_add():    assert add(1, 2) == 3
         )
         testdir.runpytest_inprocess("--testmon")
 
-        tmdata_with_dummy_packages = CoreTestmonData.for_local_run(
+        with CoreTestmonData.for_local_run(
             "", system_packages="nonsense"
-        )
-        tmdata_with_dummy_packages.determine_stable()
-
-        assert bool(tmdata_with_dummy_packages.system_packages_change)
-        tmdata_with_dummy_packages.close_connection()
+        ) as tmdata_with_dummy_packages:
+            tmdata_with_dummy_packages.determine_stable()
+            assert bool(tmdata_with_dummy_packages.system_packages_change)
 
     def test_interrupted(self, test_a, testdir):
         testdir.runpytest_inprocess("--testmon")
@@ -763,15 +758,16 @@ def test_add():    assert add(1, 2) == 3
                 raise KeyboardInterrupt
          """
         )
-        os.utime(datafilename, (1800000000, 1800000000))
         tf.setmtime(1800000000)
 
         testdir.runpytest_subprocess(
             "--testmon",
         )
 
-        # interrupted run shouldn't save .testmondata
-        assert 1800000000 == os.path.getmtime(datafilename)
+        # the interrupted test is not saved: it stays unstable
+        with CoreTestmonData.for_local_run("") as td:
+            td.determine_stable()
+            assert td.unstable_test_names == {"test_a.py::test_1"}
 
     @pytest.mark.xfail(
         strict=True,
@@ -826,11 +822,11 @@ def test_add():    assert add(1, 2) == 3
          """
         )
         result = testdir.runpytest_subprocess("--testmon", "-n1", "-v")
-        testmon_data = CoreTestmonData.for_local_run("")
-        testmon_data.determine_stable()
-        assert "test_a.py::test_1" not in testmon_data.unstable_test_names
-        assert "test_a.py::test_7" in testmon_data.unstable_test_names
-        assert result.ret == 2, result
+        with CoreTestmonData.for_local_run("") as testmon_data:
+            testmon_data.determine_stable()
+            assert "test_a.py::test_1" not in testmon_data.unstable_test_names
+            assert "test_a.py::test_7" in testmon_data.unstable_test_names
+            assert result.ret == 2, result
 
     def test_interrupted01(self, testdir):
         testdir.makepyfile(
@@ -861,19 +857,19 @@ def test_add():    assert add(1, 2) == 3
                     time.sleep(0.035)
          """
         )
-        td = CoreTestmonData.for_local_run("")
-        td.determine_stable()
-        assert td.unstable_test_names == {
-            "test_a.py::test_1",
-            "test_a.py::test_2",
-            "test_a.py::test_3",
-        }
+        with CoreTestmonData.for_local_run("") as td:
+            td.determine_stable()
+            assert td.unstable_test_names == {
+                "test_a.py::test_1",
+                "test_a.py::test_2",
+                "test_a.py::test_3",
+            }
 
-        result = testdir.runpytest_subprocess("--testmon", "-v")
-        result.stdout.no_fnmatch_line("*test_a.py::test_2 PASSED*")
+            result = testdir.runpytest_subprocess("--testmon", "-v")
+            result.stdout.no_fnmatch_line("*test_a.py::test_2 PASSED*")
 
-        td.determine_stable()
-        assert td.unstable_test_names == {"test_a.py::test_2", "test_a.py::test_3"}
+            td.determine_stable()
+            assert td.unstable_test_names == {"test_a.py::test_2", "test_a.py::test_3"}
 
     def test_interrupted_chdir(self, testdir):
         testdir.makepyfile(
@@ -965,19 +961,18 @@ def test_add():    assert add(1, 2) == 3
                     time.sleep(0.035)
          """
         )
-        td = CoreTestmonData.for_local_run("")
+        with CoreTestmonData.for_local_run("") as td:
+            td.determine_stable()
+            assert td.unstable_test_names == {
+                "test_a.py::test_1",
+                "test_a.py::test_2",
+                "test_a.py::test_3",
+            }
 
-        td.determine_stable()
-        assert td.unstable_test_names == {
-            "test_a.py::test_1",
-            "test_a.py::test_2",
-            "test_a.py::test_3",
-        }
+            testdir.runpytest_subprocess("--testmon")
 
-        testdir.runpytest_subprocess("--testmon")
-
-        td.determine_stable()
-        assert td.unstable_test_names == {"test_a.py::test_2", "test_a.py::test_3"}
+            td.determine_stable()
+            assert td.unstable_test_names == {"test_a.py::test_2", "test_a.py::test_3"}
 
     def test_outcomes_exit(self, test_a, testdir):
         testdir.runpytest_inprocess("--testmon")
@@ -989,13 +984,14 @@ def test_add():    assert add(1, 2) == 3
                  pytest.exit("pytest_exit")
          """
         )
-        os.utime(datafilename, (1800000000, 1800000000))
         tf.setmtime(1800000000)
         testdir.runpytest_inprocess(
             "--testmon",
         )
-        # interrupted run shouldn't save .testmondata
-        assert 1800000000 == os.path.getmtime(datafilename)
+        # the exiting test is not saved: it stays unstable
+        with CoreTestmonData.for_local_run("") as td:
+            td.determine_stable()
+            assert td.unstable_test_names == {"test_a.py::test_1"}
 
     def test_nonfunc_class(self, local_remote, monkeypatch):
         cs1 = CodeSample(
@@ -2124,9 +2120,9 @@ class TestmonCollect:
         testdir.runpytest_inprocess(
             "--testmon",
         )
-        td = CoreTestmonData.for_local_run("")
-        td.determine_stable()
-        assert td.all_files == {"fixture.py", "test_a.py"}
+        with CoreTestmonData.for_local_run("") as td:
+            td.determine_stable()
+            assert td.all_files == {"fixture.py", "test_a.py"}
 
     def test_remove_dependent_file_subdir_1(self, testdir):
         source_subdir_path = testdir.mkpydir("source")
@@ -2868,14 +2864,14 @@ class TestPlusCov:
         result = testdir.runpytest_subprocess(
             "-v", "--testmon", "--cov=.", "-s", "--cov-report", "term-missing"
         )
-        td = CoreTestmonData("")
-        result.stdout.fnmatch_lines(["*test_a.py       4      0   100%*"])
-        checksums = blob_to_checksums(
-            td.db.con.execute("select method_checksums from file_fp").fetchone()[
-                "method_checksums"
-            ]
-        )
-        assert create_fingerprint_source("print(1928)", {1})[0] in checksums
+        with CoreTestmonData("") as td:
+            result.stdout.fnmatch_lines(["*test_a.py       4      0   100%*"])
+            checksums = blob_to_checksums(
+                td.db.con.execute("select method_checksums from file_fp").fetchone()[
+                    "method_checksums"
+                ]
+            )
+            assert create_fingerprint_source("print(1928)", {1})[0] in checksums
 
     @pytest.mark.skipif(
         "cov" not in os.environ.get("TOX_ENV_NAME", "cov"),
@@ -2905,13 +2901,13 @@ class TestPlusCov:
         )
         result.stdout.no_fnmatch_line("test_a.py **")
         result.stdout.fnmatch_lines(["TOTAL           1      0   100%"])
-        td = CoreTestmonData("")
-        checksums = blob_to_checksums(
-            td.db.con.execute("select method_checksums from file_fp").fetchone()[
-                "method_checksums"
-            ]
-        )
-        assert create_fingerprint_source("print(1928)", {1})[0] in checksums
+        with CoreTestmonData("") as td:
+            checksums = blob_to_checksums(
+                td.db.con.execute("select method_checksums from file_fp").fetchone()[
+                    "method_checksums"
+                ]
+            )
+            assert create_fingerprint_source("print(1928)", {1})[0] in checksums
 
     @pytest.mark.skipif(
         "cov" not in os.environ.get("TOX_ENV_NAME", "cov"),
@@ -2938,13 +2934,13 @@ class TestPlusCov:
         result.stdout.fnmatch_lines(["src/__init__.py       0      0   100%*"])
         result.stdout.fnmatch_lines(["TOTAL                 0      0   100%*"])
 
-        td = CoreTestmonData("")
-        checksums = blob_to_checksums(
-            td.db.con.execute("select method_checksums from file_fp").fetchone()[
-                "method_checksums"
-            ]
-        )
-        assert create_fingerprint_source("print(1928)", {1})[0] in checksums
+        with CoreTestmonData("") as td:
+            checksums = blob_to_checksums(
+                td.db.con.execute("select method_checksums from file_fp").fetchone()[
+                    "method_checksums"
+                ]
+            )
+            assert create_fingerprint_source("print(1928)", {1})[0] in checksums
 
 
 class TestXdist(object):
@@ -3034,13 +3030,13 @@ class TestForcedFlag(object):
             """
         )
         testdir.runpytest_inprocess("--testmon")
-        testmon_data = CoreTestmonData("")
-        assert (
-            2
-            == testmon_data.db.con.execute(
-                "SELECT count(*) FROM test_execution WHERE forced IS NOT NULL"
-            ).fetchone()[0]
-        )
+        with CoreTestmonData("") as testmon_data:
+            assert (
+                2
+                == testmon_data.db.con.execute(
+                    "SELECT count(*) FROM test_execution WHERE forced IS NOT NULL"
+                ).fetchone()[0]
+            )
 
     def test_one_changed(self, testdir):
         testdir.makepyfile(
@@ -3063,25 +3059,25 @@ class TestForcedFlag(object):
             """
         )
         testdir.runpytest_inprocess("--testmon")
-        testmon_data = CoreTestmonData("")
-        assert (
-            testmon_data.db.con.execute(
-                "SELECT count(*) FROM test_execution WHERE forced IS NULL"
-            ).fetchone()[0]
-            == 1
-        )
-        assert (
-            testmon_data.db.con.execute(
-                "SELECT count(*) FROM test_execution WHERE forced == 0"
-            ).fetchone()[0]
-            == 1
-        )
-        assert (
-            testmon_data.db.con.execute(
-                "SELECT count(*) FROM test_execution WHERE forced == 1"
-            ).fetchone()[0]
-            == 0
-        )
+        with CoreTestmonData("") as testmon_data:
+            assert (
+                testmon_data.db.con.execute(
+                    "SELECT count(*) FROM test_execution WHERE forced IS NULL"
+                ).fetchone()[0]
+                == 1
+            )
+            assert (
+                testmon_data.db.con.execute(
+                    "SELECT count(*) FROM test_execution WHERE forced == 0"
+                ).fetchone()[0]
+                == 1
+            )
+            assert (
+                testmon_data.db.con.execute(
+                    "SELECT count(*) FROM test_execution WHERE forced == 1"
+                ).fetchone()[0]
+                == 0
+            )
 
 
 class TestStats:
@@ -3093,16 +3089,16 @@ class TestStats:
                    """
         )
         testdir.runpytest_subprocess("--testmon")
-        td = CoreTestmonData.for_local_run(
+        with CoreTestmonData.for_local_run(
             testdir.tmpdir.strpath,
             system_packages=get_system_packages(),
             python_version=f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
-        )
-        assert td.db.fetch_attribute(attribute="tests_all") == 1
-        assert td.db.fetch_attribute(attribute="tests_saved") == 0
-        testdir.runpytest_subprocess("--testmon")
-        assert td.db.fetch_attribute(attribute="tests_saved") == 1
-        assert td.db.fetch_attribute(attribute="tests_all") == 2
+        ) as td:
+            assert td.db.fetch_attribute(attribute="tests_all") == 1
+            assert td.db.fetch_attribute(attribute="tests_saved") == 0
+            testdir.runpytest_subprocess("--testmon")
+            assert td.db.fetch_attribute(attribute="tests_saved") == 1
+            assert td.db.fetch_attribute(attribute="tests_all") == 2
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Windows platform")
     def test_savings_time(self, testdir):
@@ -3113,12 +3109,12 @@ class TestStats:
                    """
         )
         testdir.runpytest_subprocess("--testmon")
-        td = CoreTestmonData.for_local_run(
+        with CoreTestmonData.for_local_run(
             testdir.tmpdir.strpath,
             system_packages=get_system_packages(),
             python_version=f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
-        )
-        assert td.db.fetch_attribute(attribute="time_saved") == 0
-        assert td.db.fetch_attribute(attribute="time_all") > 0
-        testdir.runpytest_subprocess("--testmon")
-        assert td.db.fetch_attribute(attribute="time_saved") > 0
+        ) as td:
+            assert td.db.fetch_attribute(attribute="time_saved") == 0
+            assert td.db.fetch_attribute(attribute="time_all") > 0
+            testdir.runpytest_subprocess("--testmon")
+            assert td.db.fetch_attribute(attribute="time_saved") > 0

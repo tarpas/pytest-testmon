@@ -1,3 +1,7 @@
+import gc
+
+import pytest
+
 from tests.lib4tests import FLAVORS
 
 
@@ -21,3 +25,15 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize(
             "local_remote", list(flavors.values()), ids=list(flavors), indirect=True
         )
+
+
+@pytest.fixture(autouse=True)
+def _collect_garbage():
+    """Finalize what the test left behind while its warnings are still being captured.
+
+    Under pytest a leaked sqlite connection is not finalized when the test returns but by a later
+    garbage collection; collecting here makes its ResourceWarning fail this test (see filterwarnings
+    in tox.ini) instead of surfacing at interpreter exit or in an unrelated later test.
+    """
+    yield
+    gc.collect()

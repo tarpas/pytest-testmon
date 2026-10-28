@@ -79,12 +79,14 @@ class DB:  # pylint: disable=too-many-public-methods
     def version_compatibility(self):
         return DATA_VERSION
 
+    def close(self):
+        self.con.close()
+
     def __enter__(self):
-        self.con = self.con.__enter__()
         return self
 
-    def __exit__(self, *args, **kwargs):
-        self.con.__exit__(*args, **kwargs)
+    def __exit__(self, *args):
+        self.close()
 
     def _test_execution_fk_column(self) -> str:
         return "environment_id"
@@ -553,23 +555,24 @@ class DB:  # pylint: disable=too-many-public-methods
             return {"affected": method_misses, "failing": failing_tests}
 
     def delete_test_executions(self, test_names, exec_id):
-        self.con.executemany(
-            f"""
-            DELETE
-            FROM test_execution_file_fp
-            WHERE test_execution_id IN
-                (SELECT id FROM test_execution WHERE {self._test_execution_fk_column()} = ? AND test_name = ?)
-                """,
-            [(exec_id, test_name) for test_name in test_names],
-        )
-        self.con.executemany(
-            f"""
-            DELETE
-            FROM test_execution
-            WHERE {self._test_execution_fk_column()} = ?
-              AND test_name = ?""",
-            [(exec_id, test_name) for test_name in test_names],
-        )
+        with self.con as con:
+            con.executemany(
+                f"""
+                DELETE
+                FROM test_execution_file_fp
+                WHERE test_execution_id IN
+                    (SELECT id FROM test_execution WHERE {self._test_execution_fk_column()} = ? AND test_name = ?)
+                    """,
+                [(exec_id, test_name) for test_name in test_names],
+            )
+            con.executemany(
+                f"""
+                DELETE
+                FROM test_execution
+                WHERE {self._test_execution_fk_column()} = ?
+                  AND test_name = ?""",
+                [(exec_id, test_name) for test_name in test_names],
+            )
 
     def all_test_executions(self, exec_id):
         return {

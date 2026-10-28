@@ -10,7 +10,8 @@ pytest_plugins = ("pytester",)
 
 @pytest.fixture
 def tmdatafs(testdir):
-    return CoreTestmonDataForTest()
+    with CoreTestmonDataForTest() as tmdata:
+        yield tmdata
 
 
 class TestFileSystem(object):
@@ -27,6 +28,6 @@ class TestFileSystem(object):
         # let's execute some minimal but realistic work
         # which should happen between executions
         tmdatafs.write_fixture("test_a.py::n1", {"test_a.py": FINGERPRINT1})
-        CoreTestmonDataForTest()
+        CoreTestmonDataForTest().close_connection()
         file_b = testdir.makepyfile(file_b="print('hello')")
         assert (file_b.mtime() - file_a.mtime()) != 0
