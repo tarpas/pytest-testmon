@@ -509,3 +509,28 @@ def test_noncached_get_files_shas(testdir):
     git("commit", "-m", "Initial commit")
 
     assert isinstance(noncached_get_files_shas(testdir.tmpdir.strpath), dict)
+
+
+class TestReadSrcNonAsciiFsha:
+    """The computed file sha must equal git's blob hash for non-ASCII files too.
+
+    get_source_sha prefers the real git hash of tracked files, and both hashes
+    go into the same database column, so the fallback computation must agree
+    with git for any content (see test_sha_git_file). For a multi-byte
+    encoding (UTF-8) it only does when the blob header carries the byte
+    length, not the decoded string length.
+    """
+
+    def test_read_nonascii_utf8_file_matches_git(self, testdir):
+        content = 'x = "caf\u00e9"\n'
+        test_file = Path(testdir.tmpdir) / "nonascii.py"
+        test_file.write_bytes(content.encode("utf-8"))
+
+        _, fsha = read_source_sha(test_file)
+        git_sha = run(
+            ["git", "hash-object", str(test_file)],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        assert fsha == git_sha
