@@ -351,6 +351,44 @@ class TestReadSrc:
         assert fsha == "fc80254b619d488138a43632b617124a3d324702"
         assert source is not None
 
+    @pytest.mark.parametrize(
+        "content",
+        [
+            b"# multi-byte utf-8: P\xc5\x99\xc3\xadli\xc5\xa1\ndef f():\n    return 1\n",
+            b"def f():\n\f    return 1\n",
+            b"def f():\r\n    return 1\r\n",
+        ],
+        ids=["utf8", "formfeed", "crlf"],
+    )
+    def test_fsha_matches_git_index(self, testdir, content):
+        # The computed fsha must equal what `git ls-files --stage` reports, otherwise
+        # a file looks changed whenever it flips between modified and unmodified.
+        test_file = Path(testdir.tmpdir) / "file.py"
+        test_file.write_bytes(content)
+        git_init()
+        git("config", "core.autocrlf", "true")
+        git("add", "file.py")
+        index_sha = git("ls-files", "--stage", "file.py").stdout.split()[1].decode()
+
+        _, fsha = read_source_sha(test_file)
+        assert fsha == index_sha
+
+    def test_sha_git_file_from_subdirectory(self, testdir):
+        testdir.mkpydir("pkg")
+        testdir.makepyfile(**{"pkg/inner": "pass\n"})
+        git_init()
+        git("add", ".")
+
+        index_sha = (
+            git("ls-files", "--stage", "pkg/inner.py").stdout.split()[1].decode()
+        )
+
+        rootdir = testdir.tmpdir.strpath
+        with testdir.tmpdir.join("pkg").as_cwd():
+            source, fsha = get_source_sha(rootdir, "pkg/inner.py")
+        assert source is None
+        assert fsha == index_sha
+
     def test_sha_non_git_file(self, testdir):
         # This file will not be recognized as git file because it's not in a git repo
         # sha will be calculated manually

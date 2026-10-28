@@ -86,14 +86,17 @@ class Block:
 
 @lru_cache(300)
 def bytes_to_string_and_fsha(byte_stream: bytes) -> Union[str, bytes]:
+    # The fsha must equal git's blob sha of the CRLF-normalized bytes, so that it
+    # matches the index entry returned by get_files_shas() and no read is needed
+    # for files git reports as unmodified. The header length is the byte length,
+    # and hashing happens before the \f replacement (git does not touch \f).
+    byte_stream = byte_stream.replace(b"\r\n", b"\n")
+    hsh = hashlib.sha1()
+    hsh.update(b"blob %u\0" % len(byte_stream))
+    hsh.update(byte_stream)
     # Replace \f because of http://bugs.python.org/issue19035
     byte_stream = byte_stream.replace(b"\f", b" ")
-    byte_stream = byte_stream.replace(b"\r\n", b"\n")
     byte_string = byte_stream.decode(source_encoding(byte_stream), "replace")
-    git_header = b"blob %u\0" % len(byte_string)
-    hsh = hashlib.sha1()
-    hsh.update(git_header)
-    hsh.update(byte_stream)
     if byte_string and byte_string[-1] != "\n":
         byte_string += "\n"
     return byte_string, hsh.hexdigest()
@@ -235,14 +238,18 @@ def read_source_sha(filename: str):
 def noncached_get_files_shas(directory):
     all_shas = {}
     try:
+        # Run inside `directory` so the printed paths are relative to it (they
+        # are the keys testmon looks up); a pathspec argument would print paths
+        # relative to the current working directory instead.
         result = run(
-            ["git", "ls-files", "--stage", "-m", directory],
+            ["git", "ls-files", "--stage", "-m"],
+            cwd=directory or None,
             capture_output=True,
             text=True,
             encoding="utf-8",
             check=True,
         )
-    except (FileNotFoundError, CalledProcessError):
+    except (FileNotFoundError, NotADirectoryError, CalledProcessError):
         return all_shas
 
     modified_files = set()
