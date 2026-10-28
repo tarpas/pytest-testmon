@@ -1,0 +1,43 @@
+name: Lint and test
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+    - run: uv sync --locked
+    - run: uv run ruff check testmon/ tests/
+    - run: uv run ruff format --check testmon/ tests/
+
+  tox:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, python-version: '3.11' }
+          - { os: ubuntu-latest, python-version: '3.14' }
+          - { os: ubuntu-latest, python-version: '3.15' }
+          - { os: windows-latest, python-version: '3.11' }
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+    - run: uv sync --locked
+    # tox-gh-actions picks the envs for this interpreter from [gh-actions] in tox.ini
+    - run: uv run tox

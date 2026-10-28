@@ -15,7 +15,6 @@ try:
     from pytest_cov.plugin import CovPlugin
 except ImportError:
     pass
-
 import pytest
 from coverage import Coverage, CoverageData
 from coverage.exceptions import CoverageException
@@ -531,7 +530,8 @@ class TestmonCollector:
                     "testmon doesn't support simultaneous run with pytest-cov when "
                     "branch coverage is on. Please disable branch coverage."
                 )
-
+        if subprocess:
+            self.setup_subprocess(params["include"])
         self.cov = Coverage(data_file=self.sub_cov_file, config_file=False, **params)
         self.cov._warn_no_data = False
         force_context_capable_core(self.cov)
@@ -638,6 +638,29 @@ class TestmonCollector:
         self.cov = None
         if TestmonCollector.coverage_stack:
             TestmonCollector.coverage_stack[-1].start()
+
+    def setup_subprocess(self, includes):
+        # This can be redone to use functionality from pytest-cov
+        if not os.path.exists(".tmontmp"):
+            os.makedirs(".tmontmp")
+        self.sub_cov_file = os.path.abspath(
+            ".tmontmp/.testmoncoverage" + str(random.randint(0, 1000000))
+        )
+        with open(self.sub_cov_file + "_rc", "w", encoding="utf-8") as subprocess_rc:
+            rc_content = textwrap.dedent(
+                """\
+                    [run]
+                    data_file = {}
+                    include = {}
+                    parallel=True
+                    """
+            ).format(
+                self.sub_cov_file,
+                "\n ".join(includes),
+            )
+            subprocess_rc.write(rc_content)
+        os.environ["COVERAGE_PROCESS_START"] = self.sub_cov_file + "_rc"
+        os.environ["COVERAGE_CORE"] = COVERAGE_CORE
 
 
 def eval_environment(environment, **kwargs):

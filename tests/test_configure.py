@@ -81,19 +81,16 @@ class TestConfigure:
             False,
         )
 
-    def test_nocollect_coverage(self, options):  # duplicate lower
+    def test_nocollect_coverage_without_cov_plugin(self, options):
         options["testmon"] = True
-        assert configure._header_collect_select(options, coverage=True) == (
-            (
-                "testmon: collection automatically deactivated "
-                "because coverage.py was detected and simultaneous collection is not supported, "
-            ),
+        assert configure._header_collect_select(options, coverage=True) == TmConf(
+            "testmon: collection automatically deactivated "
+            "because coverage.py was detected and simultaneous collection is not supported, ",
             False,
             True,
         )
 
-    # whatchout, duplicate name test_nocollect_coverage
-    def test_nocollect_coverage(self, options):  # noqa: F811
+    def test_nocollect_coverage_with_cov_plugin(self, options):
         options["testmon"] = True
         assert configure._header_collect_select(
             options, coverage=True, cov_plugin=True

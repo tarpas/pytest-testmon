@@ -7,7 +7,7 @@ name = "pytest-testmon"
 authors = [
     { name = "Tibor Arpas", email = "tibor@testmon.org" },
 ]
-dynamic =  ["version"]
+dynamic = ["version"]
 
 description = "selects tests affected by changed files and methods"
 readme = "README.md"
@@ -27,39 +27,32 @@ classifiers = [
     "Framework :: Pytest",
 ]
 dependencies = [
-    "pytest>=7,<10",
+    "pytest>=5,<10",
     "coverage>=6,<8",
 ]
 
-# specify testmon and tmserver as packages of this project
-[tool.setuptools]
-packages = [
-    "testmon",
-]
-
-[tool.setuptools.dynamic]
-version = {attr = "testmon.TESTMON_VERSION"}
-
-[tool.black]
-exclude = '''
-(
-  /(
-      \.eggs         # exclude a few common directories in the
-    | \.git          # root of the project
-    | \.hg
-    | \.mypy_cache
-    | \.tox
-    | \.venv
-    | _build
-    | buck-out
-    | build
-    | dist
-  )/
-  | io.intellij/
-)
-'''
-
+[project.urls]
+Homepage = "https://testmon.org"
+Source = "https://github.com/tarpas/pytest-testmon"
 
 [project.entry-points.pytest11]
 pytest-testmon = "testmon.pytest_testmon"
 
+[tool.setuptools]
+packages = ["testmon"]
+
+[tool.setuptools.dynamic]
+version = {attr = "testmon.TESTMON_VERSION"}
+
+# Development dependencies, managed by uv: `uv sync` then `uv run pytest` / `uv run tox`.
+[dependency-groups]
+dev = [
+    "pytest==8.3.5",
+    "pytest-cov",
+    "pytest-xdist",
+    "pytest-mock",
+    "ruff",
+    "tox",
+    "tox-gh-actions",
+    "pre-commit",
+]

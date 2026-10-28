@@ -22,6 +22,18 @@ except ImportError:
 pytest_plugins = ("pytester",)
 
 
+def git(*args):
+    """Run git in the current directory and fail loudly if it fails."""
+    return run(["git", *args], check=True, capture_output=True)
+
+
+def git_init():
+    """A repo with an identity, so commits work on machines without a global git config."""
+    git("init", "-b", "main")
+    git("config", "user.name", "testmon tests")
+    git("config", "user.email", "tests@testmon.org")
+
+
 class TestCreateAndMatchFingerprintRoundtrip:
     def test_minimal_module(self):
         fingerprint = create_fingerprint_source(
@@ -303,8 +315,8 @@ class TestReadSrc:
 
         """,
         )
-        run(["git", "init", "-b", "main"])
-        run(["git", "add", f"file{ext}"])
+        git_init()
+        git("add", f"file{ext}")
 
         source, fsha = get_source_sha(testdir.tmpdir.strpath, f"file{ext}")
         assert fsha == "fc80254b619d488138a43632b617124a3d324702"
@@ -317,17 +329,17 @@ class TestReadSrc:
 
         """
         )
-        run(["git", "init", "-b", "main"])
-        run(["git", "add", "filename.py"])
-        run(["git", "commit", "-m", "Reasonable commit message"])
+        git_init()
+        git("add", "filename.py")
+        git("commit", "-m", "Reasonable commit message")
         source, fsha = get_source_sha(testdir.tmpdir.strpath, "filename.py")
         assert fsha == "fc80254b619d488138a43632b617124a3d324702"
         assert source is None
 
     def test_sha_git_change(self, testdir):
         testdir.makepyfile(filename=" ")
-        run(["git", "init", "-b", "main"])
-        run(["git", "add", "filename.py"])
+        git_init()
+        git("add", "filename.py")
         testdir.makepyfile(
             filename="""
             pass
@@ -483,17 +495,17 @@ class TestModule:
 
         """
         )
-        run(["git", "init", "-b", "main"])
-        run(["git", "add", "a.py"])
-        run(["git", "commit", "-m", "Reasonable commit message"])
+        git_init()
+        git("add", "a.py")
+        git("commit", "-m", "Reasonable commit message")
         module = SourceTree("").get_file("a.py")
         assert "pass" in module.source_code
 
 
 def test_noncached_get_files_shas(testdir):
-    testdir.run("git", "init", "-b", "main")
+    git_init()
     testdir.makepyfile(test_file="def test(): pass")
-    testdir.run("git", "add", ".")
-    testdir.run("git", "commit", "-m", "Initial commit")
+    git("add", ".")
+    git("commit", "-m", "Initial commit")
 
     assert isinstance(noncached_get_files_shas(testdir.tmpdir.strpath), dict)

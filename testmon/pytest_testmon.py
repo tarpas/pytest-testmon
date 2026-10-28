@@ -106,7 +106,12 @@ def pytest_addoption(parser):
             " code serving different endpoints or Django settings."
         ),
     )
-
+    group.addoption(
+        "--testmon-singleprocess",
+        action="store_false",
+        dest="testmon_singleprocess",
+        help="Don't track subprocesses",
+    )
     group.addoption(
         "--tmnet",
         action="store_true",
@@ -133,6 +138,7 @@ def testmon_options(config):
         "testmon",
         "no-testmon",
         "environment_expression",
+        "testmon_singleprocess",
     ]:
         if config.getoption(label):
             result.append(label.replace("testmon_", ""))
@@ -267,6 +273,10 @@ def pytest_configure(config):
     )
     config.testmon_config: TmConf = tm_conf
     if tm_conf.select or tm_conf.collect:
+        if config.pluginmanager.has_plugin(
+            "TestmonSelect"
+        ) or config.pluginmanager.has_plugin("TestmonCollect"):
+            pytest.exit("You cannot use two instances of testmon plugin.")
         try:
             init_testmon_data(config)
             register_plugins(config, tm_conf.select, tm_conf.collect, cov_plugin)

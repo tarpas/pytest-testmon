@@ -5,10 +5,8 @@ import sqlite3
 from collections import namedtuple
 from functools import lru_cache
 
-from testmon.process_code import blob_to_checksums, checksums_to_blob
-
 from testmon.common import TestExecutions
-
+from testmon.process_code import blob_to_checksums, checksums_to_blob
 
 DATA_VERSION = 14
 
