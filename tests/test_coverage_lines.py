@@ -1,4 +1,14 @@
-#  -- coding:utf8 --
+"""Which source lines coverage.py reports as executed for small sample modules, and the
+fingerprint testmon derives from them. These are assumptions about coverage.py that the
+method-checksum algorithm relies on, not tests of testmon's own logic.
+
+Until 2026 this file was test_human_coverage.py: in 2018 testmon switched to the line set
+coverage.py shows in its reports ("coverage for humans": blank lines, else:/finally: lines,
+continuation lines) and ported coverage.py's own statement tests to check per-line fingerprints.
+That line algorithm was replaced by the AST/method-checksum one in 2021 and those tests were
+deactivated by renaming their classes, then deleted; the two assumption tests here are what remains.
+"""
+
 from tests.coveragepy.coveragetest import CoverageTest
 from tests.test_testmon import CodeSample
 from testmon.process_code import (
