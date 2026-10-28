@@ -465,6 +465,11 @@ class TestmonXdistSync:
         if running_as != "controller":
             return  # Safety check: only run on controller
 
+        # Count the node here, before it starts: counting it when it reports ready would let a
+        # fast worker's collection trigger sync_db_fs_tests while a slow one is still determining
+        # stability, which then sees the placeholder rows as stable tests and collects nothing.
+        self.await_nodes += 1
+
         # Only proceed if testmon_data has been initialized and workerinput exists
         if hasattr(node.config, "testmon_data") and hasattr(node, "workerinput"):
             testmon_data: TestmonData = node.config.testmon_data
@@ -475,9 +480,6 @@ class TestmonXdistSync:
             node.workerinput["testmon_files_of_interest"] = (
                 testmon_data.files_of_interest
             )
-
-    def pytest_testnodeready(self, node):  # pylint: disable=unused-argument
-        self.await_nodes += 1
 
     def pytest_xdist_node_collection_finished(self, node, ids):  # pylint: disable=invalid-name
         self.await_nodes += -1

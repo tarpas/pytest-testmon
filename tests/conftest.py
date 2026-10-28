@@ -1,4 +1,5 @@
 import gc
+import warnings
 
 import pytest
 
@@ -28,12 +29,17 @@ def pytest_generate_tests(metafunc):
 
 
 @pytest.fixture(autouse=True)
-def _collect_garbage():
-    """Finalize what the test left behind while its warnings are still being captured.
+def _no_leaked_connections():
+    """Fail the test that leaked a sqlite connection.
 
-    Under pytest a leaked sqlite connection is not finalized when the test returns but by a later
-    garbage collection; collecting here makes its ResourceWarning fail this test (see filterwarnings
-    in tox.ini) instead of surfacing at interpreter exit or in an unrelated later test.
+    Under pytest a leaked connection is not finalized when the test returns but by a later garbage
+    collection, so its ResourceWarning would surface at interpreter exit or in an unrelated test.
+    Collecting here, with the warning recorded only for the duration of the collection, pins it on
+    the right test without a process-wide warning filter (which in-process pytester runs inherit).
     """
     yield
-    gc.collect()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", ResourceWarning)
+        gc.collect()
+    leaks = [str(w.message) for w in caught if "unclosed database" in str(w.message)]
+    assert not leaks, f"leaked sqlite connections: {leaks}"
