@@ -199,37 +199,46 @@ class TestMisc(object):
 
 
 class TestTestmonRecursive:
+    """Collectors nested in collectors: a test that starts its own TestmonCollector
+    (dogfooding) must get its own data without corrupting the outer one."""
+
     @pytest.fixture
-    def parent_testmon(self, testdir):
-        parent_testmon = CoreTestmon(rootdir="parent_rootdir")
+    def parent_testmon(self, collector_backend):
+        parent_testmon = CoreTestmon(
+            rootdir="parent_rootdir", backend=collector_backend
+        )
         yield parent_testmon
         parent_testmon.close()
 
-    def test_filter_excluded_cov_data(self, testdir, parent_testmon):
+    def test_filter_excluded_cov_data(self, testdir, parent_testmon, collector_backend):
         p = testdir.mkdir("child_rootdir").join("a.py")
         p.write("pass")
 
         parent_testmon.start_testmon("1")
 
-        testmon = CoreTestmon(rootdir="child_rootdir")
+        testmon = CoreTestmon(rootdir="child_rootdir", backend=collector_backend)
         testmon.setup_coverage()
         testmon.start_testmon("2")
         testdir.inline_run("child_rootdir/a.py")
-        assert testmon.cov.get_data().measured_files()
+        assert testmon.get_batch_coverage_data()["2"]["a.py"] == {1}
         testmon.close()
 
         parent_testmon.discard_current()
-        assert not parent_testmon.cov.get_data().measured_files()
+        # a.py is outside parent_rootdir, and "1" was discarded anyway
+        assert parent_testmon.get_batch_coverage_data() == {}
 
-    def test_shared_line_recorded_for_every_test_in_batch(self, testdir):
+    def test_shared_line_recorded_for_every_test_in_batch(
+        self, testdir, collector_backend
+    ):
         # coverage's sys.monitoring core (its default on CPython 3.14+) records a
         # line only for the first dynamic context that executes it. testmon must
-        # pick a core where every test of a batch gets its lines.
+        # pick a core where every test of a batch gets its lines; the sysmon
+        # backend re-arms its events at every test switch for the same reason.
         testdir.makepyfile(shared_dep="def f(x):\n    return x + 1\n")
         testdir.syspathinsert()
         import shared_dep  # pylint: disable=import-error,import-outside-toplevel
 
-        testmon = CoreTestmon(rootdir=str(testdir.tmpdir))
+        testmon = CoreTestmon(rootdir=str(testdir.tmpdir), backend=collector_backend)
         testmon.setup_coverage()
         testmon.start_testmon("1", next_test_name="2")
         shared_dep.f(1)
@@ -242,9 +251,9 @@ class TestTestmonRecursive:
         assert nodes_files_lines["1"]["shared_dep.py"] == {2}
         assert nodes_files_lines["2"]["shared_dep.py"] == {2}
 
-    def test_easy(self, testdir):
+    def test_easy(self, testdir, collector_backend):
         testdir.makepyfile(
-            test_a="""
+            test_a=f"""
             import os
             from testmon.testmon_core import TestmonCollector as CoreTestmon
 
@@ -260,34 +269,32 @@ class TestTestmonRecursive:
                 relpath = os.path.relpath(__file__).replace(os.sep, "/")
 
                 def nested():
-                    nested_testmon = CoreTestmon("")
+                    nested_testmon = CoreTestmon("", backend="{collector_backend}")
                     nested_testmon.setup_coverage()
                     nested_testmon.start_testmon("1")
                     one()
                     nested_coverage = nested_testmon.get_batch_coverage_data()["1"][relpath]
                     nested_testmon.close()
-                    assert {one()} == nested_coverage
-                    assert one() in testmon.cov.get_data().lines(__file__)
+                    assert {{one()}} == nested_coverage
                     two()
                     return nested_coverage
 
-                testmon = CoreTestmon("")
+                testmon = CoreTestmon("", backend="{collector_backend}")
                 testmon.setup_coverage(subprocess=False)
                 testmon.start_testmon(
                     "2"
-                )  # coverage really starts only after a method call or return
+                )  # collection really starts only with the next function call
                 nested_coverage = nested()
 
-                testmon.cov.get_data().set_query_contexts(None)
-                this_coverage = testmon.cov.get_data().lines(os.path.abspath(__file__))
-                assert nested_coverage == {one()}, f"nested_coverage={nested_coverage}"
+                this_coverage = testmon.get_batch_coverage_data()["2"][relpath]
+                assert nested_coverage == {{one()}}, f"nested_coverage={{nested_coverage}}"
                 assert (
                     one() in this_coverage and two() in this_coverage
-                       ), f"this_coverage={this_coverage}"
+                ), f"this_coverage={{this_coverage}}"
                 testmon.close()
                 """
         )
-        result = testdir.runpytest_inprocess("")
+        result = testdir.runpytest_inprocess("-p", "no:testmon")
         result.assert_outcomes(passed=1)
 
 

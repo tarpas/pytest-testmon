@@ -3,7 +3,11 @@ from typing import Callable
 
 import pytest
 
+from testmon.collectors import COVERAGE_BACKEND, SYSMON, SYSMON_BACKEND
 from testmon.testmon_core import TestmonData
+
+# Every collection backend this interpreter can run; tests of the collector take all.
+COLLECTOR_BACKENDS = [COVERAGE_BACKEND] + ([SYSMON_BACKEND] if SYSMON else [])
 
 
 class GetTestmonDataPlugin:

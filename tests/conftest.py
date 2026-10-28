@@ -1,4 +1,12 @@
-from tests.lib4tests import FLAVORS
+import pytest
+
+from tests.lib4tests import COLLECTOR_BACKENDS, FLAVORS
+
+
+@pytest.fixture(params=COLLECTOR_BACKENDS)
+def collector_backend(request):
+    """Name of a collection backend, for `TestmonCollector(..., backend=...)`."""
+    return request.param
 
 
 class TestmonTestHooks:

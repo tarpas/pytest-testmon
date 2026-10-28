@@ -20,6 +20,14 @@ affected tests](https://testmon.org/blog/determining-affected-tests/)
 To learn more about different options you can use with testmon, please
 head to [testmon.org](https://testmon.org)
 
+## How the dependencies are collected
+
+On CPython 3.12 and newer testmon listens to `sys.monitoring` function-start events
+with its own tool id: the overhead is within a few percent of an untraced run, and it
+coexists with pytest-cov, coverage.py and debuggers. On older Pythons, and when
+subprocess tracking is on, it drives coverage.py's C tracer with dynamic contexts.
+Set `TESTMON_COLLECTOR=coverage` to force the coverage.py backend on any Python.
+
 ## Call for opensource projects: try testmon in CI with no effort or risk.
 
 We would like to run testmon within your project, collect data and improve!
