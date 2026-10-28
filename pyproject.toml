@@ -27,7 +27,7 @@ classifiers = [
     "Framework :: Pytest",
 ]
 dependencies = [
-    "pytest>=5,<10",
+    "pytest<10,>=5",
     "coverage>=6,<8",
 ]
 
@@ -47,7 +47,7 @@ version = {attr = "testmon.TESTMON_VERSION"}
 # Development dependencies, managed by uv: `uv sync` then `uv run pytest` / `uv run tox`.
 [dependency-groups]
 dev = [
-    "pytest==8.3.5",
+    "pytest==9.0.3",
     "pytest-cov",
     "pytest-xdist",
     "pytest-mock",
