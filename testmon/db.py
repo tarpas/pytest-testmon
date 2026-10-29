@@ -8,7 +8,7 @@ from functools import lru_cache
 from testmon.common import TestExecutions
 from testmon.process_code import blob_to_checksums, checksums_to_blob
 
-DATA_VERSION = 14
+DATA_VERSION = 15
 
 ChangedFileData = namedtuple(
     "ChangedFileData", "filename name method_checksums id failed"
@@ -390,10 +390,12 @@ class DB:  # pylint: disable=too-many-public-methods
             CREATE TABLE test_execution_file_fp (
                 test_execution_id INTEGER,
                 fingerprint_id INTEGER,
+                PRIMARY KEY (test_execution_id, fingerprint_id),
                 FOREIGN KEY(test_execution_id) REFERENCES test_execution(id) ON DELETE CASCADE,
                 FOREIGN KEY(fingerprint_id) REFERENCES file_fp(id)
-            );
-            CREATE INDEX test_execution_file_fp_both ON test_execution_file_fp (test_execution_id, fingerprint_id);
+            ) WITHOUT ROWID;
+            -- Index the child key used when deleting orphaned fingerprints.
+            CREATE INDEX test_execution_file_fp_fingerprint_id ON test_execution_file_fp (fingerprint_id);
             -- the following table stores the same data coarsely, but is used for faster queries
             CREATE TABLE suite_execution_file_fsha (
                 suite_execution_id INTEGER,
