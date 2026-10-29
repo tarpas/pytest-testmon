@@ -7,11 +7,11 @@ name = "pytest-testmon"
 authors = [
     { name = "Tibor Arpas", email = "tibor@testmon.org" },
 ]
-dynamic =  ["version"]
+dynamic = ["version"]
 
 description = "selects tests affected by changed files and methods"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 keywords = ["testing", "pytest", "plugin"]
 license = { text = "MIT" }
 classifiers = [
@@ -27,38 +27,32 @@ classifiers = [
     "Framework :: Pytest",
 ]
 dependencies = [
-    "pytest>=5,<10",
+    "pytest<10,>=5",
     "coverage>=6,<8",
 ]
 
-# specify testmon and tmserver as packages of this project
+[project.urls]
+Homepage = "https://testmon.org"
+Source = "https://github.com/tarpas/pytest-testmon"
+
+[project.entry-points.pytest11]
+pytest-testmon = "testmon.pytest_testmon"
+
 [tool.setuptools]
-packages = [
-    "testmon",
-]
+packages = ["testmon"]
 
 [tool.setuptools.dynamic]
 version = {attr = "testmon.TESTMON_VERSION"}
 
-[tool.black]
-exclude = '''
-(
-  /(
-      \.eggs         # exclude a few common directories in the
-    | \.git          # root of the project
-    | \.hg
-    | \.mypy_cache
-    | \.tox
-    | \.venv
-    | _build
-    | buck-out
-    | build
-    | dist
-  )/
-  | io.intellij/
-)
-'''
-
-
-[project.entry-points.pytest11]
-pytest-testmon = "testmon.pytest_testmon"
+# Development dependencies, managed by uv: `uv sync` then `uv run pytest` / `uv run tox`.
+[dependency-groups]
+dev = [
+    "pytest==9.0.3",
+    "pytest-cov",
+    "pytest-xdist",
+    "pytest-mock",
+    "ruff",
+    "tox",
+    "tox-gh-actions",
+    "pre-commit",
+]

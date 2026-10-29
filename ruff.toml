@@ -1,0 +1,49 @@
+line-length = 88
+target-version = "py311"
+
+exclude = [
+  ".eggs",
+  ".git",
+  ".hg",
+  ".mypy_cache",
+  ".tox",
+  ".venv",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "archive",
+  "io.intellij",
+  "tools/__init__.py",
+  "tools/common.py",
+  "tools/autotester/__init__.py",
+  "tools/autotester/main.py",
+  "tools/autotester/tasks.py",
+  "tools/benchmark/benchmark.py",
+  "tools/benchmark/cachegrind.py",
+  "tools/benchmark/grindscore.py",
+  "tools/benchmark/script_generator.py",
+  "tools/build/build.py",
+  "tools/ci/__init__.py",
+  "tools/ci/create_db.py",
+  "tools/ci/lint.py",
+  "tools/ci/mermaid.py",
+  "tools/gha/coredis.py",
+  "tools/gha/lib.py",
+  "tools/gha/logs.py",
+  "tools/gha/openbb.py",
+  "tools/gha/psycopg.py",
+  "tests/samples/**",
+]
+
+[lint]
+select = ["E", "F"]
+ignore = [ "E501", "F841"]
+exclude = [ "tests/**", ]
+
+[lint.per-file-ignores]
+"registration/registration/production.py" = ["F403", "F405"]
+
+[format]
+
+

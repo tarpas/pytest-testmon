@@ -6,7 +6,7 @@ import sysconfig
 import textwrap
 from functools import lru_cache
 from collections import defaultdict
-from xmlrpc.client import Fault, ProtocolError
+from xmlrpc.client import Fault, ProtocolError, ServerProxy
 from socket import gaierror
 
 from typing import TypeVar
@@ -15,9 +15,9 @@ try:
     from pytest_cov.plugin import CovPlugin
 except ImportError:
     pass
-
 import pytest
 from coverage import Coverage, CoverageData
+from coverage.exceptions import CoverageException
 
 from testmon import db
 from testmon import TESTMON_VERSION as TM_CLIENT_VERSION
@@ -234,9 +234,7 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
                 ),
                 exc,
             )
-            self.db = db.DB(
-                os.path.join(self.rootdir, get_data_file_path())
-            )  # pylint: disable=invalid-name
+            self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))  # pylint: disable=invalid-name
             result = self.db.initiate_execution(
                 self.environment, system_packages, python_version, {}
             )
@@ -285,9 +283,23 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         return False
 
     def close_connection(self):
-        pass
-        # TODO this is why there are "too many open files" on MacOS.
-        # we need the leave the connection open for tests
+        """Release the storage: the sqlite connection, or the transport of a tmnet proxy.
+
+        Idempotent. Tests that inspect the data after a run reopen it (see tests/lib4tests.py).
+        """
+        database, self.db = self.db, None
+        if database is None:
+            return
+        if isinstance(database, ServerProxy):
+            database("close")()  # attribute access would be a remote call
+        else:
+            database.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close_connection()
 
     @property
     def all_tests(self):
@@ -321,27 +333,25 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
     def sync_db_fs_tests(self, retain):
         collected = retain.union(set(self.stable_test_names))
         add = list(collected - set(self.all_tests))
-        with self.db:
-            test_execution_file_fps = {
-                test_name: {
-                    "deps": (
-                        {
-                            "filename": home_file(test_name),
-                            "method_checksums": methods_to_checksums(["0match"]),
-                            "mtime": None,
-                            "fsha": None,
-                        },
-                    )
-                }
-                for test_name in add
-                if is_python_file(home_file(test_name))
+        test_execution_file_fps = {
+            test_name: {
+                "deps": (
+                    {
+                        "filename": home_file(test_name),
+                        "method_checksums": methods_to_checksums(["0match"]),
+                        "mtime": None,
+                        "fsha": None,
+                    },
+                )
             }
-            if test_execution_file_fps:
-                self.save_test_execution_file_fps(test_execution_file_fps)
+            for test_name in add
+            if is_python_file(home_file(test_name))
+        }
+        if test_execution_file_fps:
+            self.save_test_execution_file_fps(test_execution_file_fps)
 
         to_delete = list(set(self.all_tests) - collected)
-        with self.db as database:
-            database.delete_test_executions(to_delete, self.exec_id)
+        self.db.delete_test_executions(to_delete, self.exec_id)
 
     def determine_stable(self):
         files_fshas = {}
@@ -437,6 +447,22 @@ def cached_relpath(path, basepath):
     return os.path.relpath(path, basepath).replace(os.sep, "/")
 
 
+# coverage 7.10+ defaults to the sys.monitoring core on CPython 3.14+. That core
+# doesn't support dynamic contexts: sys.monitoring disables a line event once the
+# line has been recorded, so a line executed by several tests of one batch is
+# attributed to the first test only and the other tests lose the dependency.
+# testmon relies on contexts_by_lineno, so it needs the C tracer.
+COVERAGE_CORE = "ctrace"
+
+
+def force_context_capable_core(cov: Coverage):
+    try:
+        cov.set_option("run:core", COVERAGE_CORE)
+    except CoverageException:
+        # coverage < 7.10 has no core option and never defaults to sys.monitoring.
+        pass
+
+
 class TestmonCollector:
     coverage_stack: [Coverage] = []
 
@@ -516,9 +542,11 @@ class TestmonCollector:
                     "testmon doesn't support simultaneous run with pytest-cov when "
                     "branch coverage is on. Please disable branch coverage."
                 )
-
+        if subprocess:
+            self.setup_subprocess(params["include"])
         self.cov = Coverage(data_file=self.sub_cov_file, config_file=False, **params)
         self.cov._warn_no_data = False
+        force_context_capable_core(self.cov)
         if TestmonCollector.coverage_stack:
             TestmonCollector.coverage_stack[-1].stop()
 
@@ -617,10 +645,34 @@ class TestmonCollector:
             TestmonCollector.coverage_stack.pop()
         if self.sub_cov_file:
             os.remove(self.sub_cov_file + "_rc")
+            os.environ.pop("COVERAGE_CORE", None)
         os.environ.pop("COVERAGE_PROCESS_START", None)
         self.cov = None
         if TestmonCollector.coverage_stack:
             TestmonCollector.coverage_stack[-1].start()
+
+    def setup_subprocess(self, includes):
+        # This can be redone to use functionality from pytest-cov
+        if not os.path.exists(".tmontmp"):
+            os.makedirs(".tmontmp")
+        self.sub_cov_file = os.path.abspath(
+            ".tmontmp/.testmoncoverage" + str(random.randint(0, 1000000))
+        )
+        with open(self.sub_cov_file + "_rc", "w", encoding="utf-8") as subprocess_rc:
+            rc_content = textwrap.dedent(
+                """\
+                    [run]
+                    data_file = {}
+                    include = {}
+                    parallel=True
+                    """
+            ).format(
+                self.sub_cov_file,
+                "\n ".join(includes),
+            )
+            subprocess_rc.write(rc_content)
+        os.environ["COVERAGE_PROCESS_START"] = self.sub_cov_file + "_rc"
+        os.environ["COVERAGE_CORE"] = COVERAGE_CORE
 
 
 def eval_environment(environment, **kwargs):

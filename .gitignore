@@ -35,13 +35,13 @@ nosetests.xml
 .project
 .pydevproject
 
-# Any hidden files
+# Any hidden files, except the ones that belong to the repo
 .*
+!.gitignore
+!.github
+!.pre-commit-config.yaml
 /htmlcov/
 /tags
-/tests/
-/tox.ini
-tmserver
-
-!tests/test_process_code.py
-!tox.ini
+# uv / build output
+/.venv/
+/uv.lock.bak

@@ -2,6 +2,7 @@
 """
 Main module of testmon pytest plugin.
 """
+
 import time
 import xmlrpc.client
 import os
@@ -105,7 +106,12 @@ def pytest_addoption(parser):
             " code serving different endpoints or Django settings."
         ),
     )
-
+    group.addoption(
+        "--testmon-singleprocess",
+        action="store_false",
+        dest="testmon_singleprocess",
+        help="Don't track subprocesses",
+    )
     group.addoption(
         "--tmnet",
         action="store_true",
@@ -132,6 +138,7 @@ def testmon_options(config):
         "testmon",
         "no-testmon",
         "environment_expression",
+        "testmon_singleprocess",
     ]:
         if config.getoption(label):
             result.append(label.replace("testmon_", ""))
@@ -195,7 +202,7 @@ def init_testmon_data(config: Config):
     if running_as == "worker" and exec_id is not None:
         # Initialize for xdist worker run
         testmon_data: TestmonData = TestmonData.for_worker(
-            rootdir=config.rootdir.strpath,
+            rootdir=str(config.rootpath),
             exec_id=exec_id,
             database=rpc_proxy,
             system_packages_change=system_packages_change,
@@ -205,7 +212,7 @@ def init_testmon_data(config: Config):
     else:
         # Initialize for local run (controller or single process)
         testmon_data: TestmonData = TestmonData.for_local_run(
-            rootdir=config.rootdir.strpath,
+            rootdir=str(config.rootpath),
             database=rpc_proxy,
             environment=environment,
             system_packages=system_packages,
@@ -234,7 +241,7 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
         config.pluginmanager.register(
             TestmonCollect(
                 TestmonCollector(
-                    config.rootdir.strpath,
+                    str(config.rootpath),
                     testmon_labels=testmon_options(config),
                     cov_plugin=cov_plugin,
                 ),
@@ -243,8 +250,8 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
             ),
             "TestmonCollect",
         )
-        if config.pluginmanager.hasplugin("xdist"):
-            config.pluginmanager.register(TestmonXdistSync())
+    if (should_select or should_collect) and config.pluginmanager.hasplugin("xdist"):
+        config.pluginmanager.register(TestmonXdistSync(sync=should_collect))
 
 
 def pytest_configure(config):
@@ -266,6 +273,10 @@ def pytest_configure(config):
     )
     config.testmon_config: TmConf = tm_conf
     if tm_conf.select or tm_conf.collect:
+        if config.pluginmanager.has_plugin(
+            "TestmonSelect"
+        ) or config.pluginmanager.has_plugin("TestmonCollect"):
+            pytest.exit("You cannot use two instances of testmon plugin.")
         try:
             init_testmon_data(config)
             register_plugins(config, tm_conf.select, tm_conf.collect, cov_plugin)
@@ -362,9 +373,7 @@ class TestmonCollect:
         self._sessionstarttime = time.time()
 
     @pytest.hookimpl(tryfirst=True, hookwrapper=True)
-    def pytest_pycollect_makeitem(
-        self, collector, name, obj
-    ):  # pylint: disable=unused-argument
+    def pytest_pycollect_makeitem(self, collector, name, obj):  # pylint: disable=unused-argument
         makeitem_result = yield
         items = makeitem_result.get_result() or []
         try:
@@ -375,9 +384,7 @@ class TestmonCollect:
             pass
 
     @pytest.hookimpl(tryfirst=True)
-    def pytest_collection_modifyitems(
-        self, session, config, items
-    ):  # pylint: disable=unused-argument
+    def pytest_collection_modifyitems(self, session, config, items):  # pylint: disable=unused-argument
         should_sync = not session.testsfailed and self._running_as in (
             "single",
             "controller",
@@ -386,9 +393,7 @@ class TestmonCollect:
             config.testmon_data.sync_db_fs_tests(retain=set(self.raw_test_names))
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_protocol(
-        self, item, nextitem
-    ):  # pylint: disable=unused-argument
+    def pytest_runtest_protocol(self, item, nextitem):  # pylint: disable=unused-argument
         self.testmon.start_testmon(item.nodeid, nextitem.nodeid if nextitem else None)
         result = yield
         if result.excinfo and issubclass(result.excinfo[0], BaseException):
@@ -441,8 +446,9 @@ class TestmonCollect:
 
 
 class TestmonXdistSync:
-    def __init__(self):
+    def __init__(self, sync=True):
         self.await_nodes = 0
+        self.sync = sync
 
     def pytest_configure_node(self, node):
         """
@@ -459,25 +465,25 @@ class TestmonXdistSync:
         if running_as != "controller":
             return  # Safety check: only run on controller
 
+        # Count the node here, before it starts: counting it when it reports ready would let a
+        # fast worker's collection trigger sync_db_fs_tests while a slow one is still determining
+        # stability, which then sees the placeholder rows as stable tests and collects nothing.
+        self.await_nodes += 1
+
         # Only proceed if testmon_data has been initialized and workerinput exists
         if hasattr(node.config, "testmon_data") and hasattr(node, "workerinput"):
             testmon_data: TestmonData = node.config.testmon_data
             node.workerinput["testmon_exec_id"] = testmon_data.exec_id
-            node.workerinput[
-                "testmon_system_packages_change"
-            ] = testmon_data.system_packages_change
-            node.workerinput[
-                "testmon_files_of_interest"
-            ] = testmon_data.files_of_interest
+            node.workerinput["testmon_system_packages_change"] = (
+                testmon_data.system_packages_change
+            )
+            node.workerinput["testmon_files_of_interest"] = (
+                testmon_data.files_of_interest
+            )
 
-    def pytest_testnodeready(self, node):  # pylint: disable=unused-argument
-        self.await_nodes += 1
-
-    def pytest_xdist_node_collection_finished(
-        self, node, ids
-    ):  # pylint: disable=invalid-name
+    def pytest_xdist_node_collection_finished(self, node, ids):  # pylint: disable=invalid-name
         self.await_nodes += -1
-        if self.await_nodes == 0:
+        if self.await_nodes == 0 and self.sync:
             node.config.testmon_data.sync_db_fs_tests(retain=set(ids))
 
 
@@ -530,15 +536,13 @@ class TestmonSelect:
         self._interrupted = False
 
     def pytest_ignore_collect(self, collection_path: Path, config):
-        strpath = cached_relpath(str(collection_path), config.rootdir.strpath)
+        strpath = cached_relpath(str(collection_path), str(config.rootpath))
         if strpath in self.deselected_files and self.config.testmon_config.select:
             return True
         return None
 
     @pytest.hookimpl(trylast=True)
-    def pytest_collection_modifyitems(
-        self, session, config, items
-    ):  # pylint: disable=unused-argument
+    def pytest_collection_modifyitems(self, session, config, items):  # pylint: disable=unused-argument
         selected = []
         deselected = []
         for item in items:
