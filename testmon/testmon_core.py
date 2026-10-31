@@ -597,7 +597,10 @@ class TestmonCollector:
                     filtered_lines_data
                 )
 
-            self.cov.erase()
+            # Erase the data, not the Coverage: Coverage.erase() makes the next start()
+            # rebuild the collector and the file matchers, which, once per test, costs
+            # more than the tests.
+            self.cov.get_data().erase()
             self.cov.start()
             self.batched_test_names = set()
         return nodes_files_lines
