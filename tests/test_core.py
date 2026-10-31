@@ -8,6 +8,8 @@ from array import array
 from collections import defaultdict
 from inspect import getframeinfo, currentframe
 
+from coverage import env as coverage_env
+
 from testmon.common import git_path, git_current_branch, git_current_head
 from testmon.process_code import (
     Module,
@@ -26,6 +28,7 @@ from testmon.testmon_core import (
     check_fsha,
     get_new_mtimes,
     TestmonCollector as CoreTestmon,
+    supports_contexts,
     collect_mhashes,
     split_filter,
 )
@@ -223,10 +226,14 @@ class TestTestmonRecursive:
         parent_testmon.discard_current()
         assert not parent_testmon.cov.get_data().measured_files()
 
-    def test_shared_line_recorded_for_every_test_in_batch(self, testdir):
+    @pytest.mark.parametrize("core", ["ctrace", "sysmon"])
+    def test_shared_line_recorded_for_every_test_in_batch(self, testdir, monkeypatch, core):
         # coverage's sys.monitoring core (its default on CPython 3.14+) records a
-        # line only for the first dynamic context that executes it. testmon must
-        # pick a core where every test of a batch gets its lines.
+        # line only for the first dynamic context that executes it. testmon keeps
+        # the core coverage chose, and every test still gets its lines.
+        if core == "sysmon" and not coverage_env.PYBEHAVIOR.pep669:
+            pytest.skip("sys.monitoring needs CPython 3.12+")
+        monkeypatch.setenv("COVERAGE_CORE", core)
         testdir.makepyfile(shared_dep="def f(x):\n    return x + 1\n")
         testdir.syspathinsert()
         import shared_dep  # pylint: disable=import-error,import-outside-toplevel
@@ -235,10 +242,11 @@ class TestTestmonRecursive:
         testmon.setup_coverage()
         testmon.start_testmon("1", next_test_name="2")
         shared_dep.f(1)
-        assert testmon.get_batch_coverage_data() == {}
+        nodes_files_lines = testmon.get_batch_coverage_data()
         testmon.start_testmon("2", next_test_name=None)
         shared_dep.f(2)
-        nodes_files_lines = testmon.get_batch_coverage_data()
+        nodes_files_lines.update(testmon.get_batch_coverage_data())
+        assert supports_contexts(testmon.cov) == (core == "ctrace")
         testmon.close()
 
         assert nodes_files_lines["1"]["shared_dep.py"] == {2}
