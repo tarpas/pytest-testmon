@@ -160,8 +160,8 @@ class TestPytestReportHeader:
 
     def test_survey_notification(self, local_remote):
         match_string = (
-            "We'd like to hear from testmon users! "
-            "Please go to https://testmon.org/survey to leave feedback."
+            "Help shape testmon! Tell us what saves you time "
+            "and what we can improve: https://testmon.org/survey"
         )
         result = local_remote.runpytest_inprocess("--testmon")
         result.stdout.fnmatch_lines([match_string])
