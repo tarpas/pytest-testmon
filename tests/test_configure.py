@@ -32,6 +32,13 @@ class TestConfigure:
         options["lf"] = False
         assert configure._get_noselect_reasons(options) == []
 
+    def test_marker_expression_keeps_selection_enabled(self, options):
+        options["testmon"] = True
+        options["markexpr"] = "not slow"
+        assert configure._header_collect_select(options) == TmConf(
+            "testmon: ", True, True
+        )
+
     def test_easy(self, options):
         options["testmon"] = True
         assert configure._header_collect_select(options) == TmConf(
