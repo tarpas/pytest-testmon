@@ -2209,11 +2209,143 @@ class TestmonCollect:
         td = local_remote.td
         assert set(td.db.filenames(td.exec_id)) == {"test_a.py"}
 
+    @pytest.mark.parametrize("selector", [("-m", "not slow"), ("-k", "not slow")])
+    def test_marker_deselected_test_kept_for_later(self, local_remote, selector):
+        local_remote.testdir.makeini("""
+            [pytest]
+            markers = slow: slow test
+            pythonpath = .
+        """)
+        local_remote.makepyfile(
+            dep="def value(): return 1",
+            test_marked="""
+                import pytest
+                import dep
+
+                def test_fast():
+                    assert dep.value() == 1
+
+                @pytest.mark.slow
+                def test_slow():
+                    assert dep.value() == 1
+            """,
+        )
+        args = ("--testmon", "--import-mode=importlib", "--ff", *selector)
+        local_remote.runpytest_inprocess(*args).assert_outcomes(passed=1)
+        assert "test_marked.py::test_slow" in local_remote.td.all_tests
+        local_remote.runpytest_inprocess(*args).assert_outcomes()
+
+        changepyfile(local_remote.testdir, dep="def value(): return 1 + 0")
+        local_remote.runpytest_inprocess(*args).assert_outcomes(passed=1)
+
+        local_remote.runpytest_inprocess("--testmon", "-m", "slow").assert_outcomes(
+            passed=1
+        )
+        local_remote.runpytest_inprocess("--testmon").assert_outcomes()
+
+    def test_marker_matching_nothing_keeps_tests(self, local_remote):
+        local_remote.testdir.makeini("""
+            [pytest]
+            markers = slow: slow test
+        """)
+        local_remote.makepyfile(test_marked="def test_fast(): pass")
+        local_remote.runpytest_inprocess("--testmon").assert_outcomes(passed=1)
+        local_remote.runpytest_inprocess("--testmon", "-m", "slow").assert_outcomes()
+        assert "test_marked.py::test_fast" in local_remote.td.all_tests
+        local_remote.runpytest_inprocess("--testmon").assert_outcomes()
+
+    def test_marker_keeps_items_not_made_by_pycollect_makeitem(self, local_remote):
+        local_remote.testdir.makeini("""
+            [pytest]
+            markers = slow: slow test
+        """)
+        local_remote.makepyfile(
+            test_marked="""
+            import unittest
+            import pytest
+
+            class Tests(unittest.TestCase):
+                def test_fast(self):
+                    pass
+
+                @pytest.mark.slow
+                def test_slow(self):
+                    self.fail("must run")
+        """
+        )
+        args = ("--testmon", "-m", "not slow")
+        local_remote.runpytest_inprocess(*args).assert_outcomes(passed=1)
+        assert "test_marked.py::Tests::test_fast" in local_remote.td.all_tests
+        assert "test_marked.py::Tests::test_slow" in local_remote.td.all_tests
+        local_remote.runpytest_inprocess(*args).assert_outcomes()
+        local_remote.runpytest_inprocess("--testmon").assert_outcomes(failed=1)
+
+    def test_marker_keeps_items_added_by_other_plugins(self, local_remote):
+        local_remote.testdir.makeini("""
+            [pytest]
+            markers = slow: slow test
+        """)
+        local_remote.makepyfile(test_marked="def test_fast(): pass")
+        local_remote.testdir.makeconftest("""
+            import pytest
+
+            def pytest_collection_modifyitems(items):
+                def added():
+                    pass
+                items.append(
+                    pytest.Function.from_parent(items[0].parent, name="test_added", callobj=added)
+                )
+        """)
+        args = ("--testmon", "-m", "not slow")
+        local_remote.runpytest_inprocess(*args).assert_outcomes(passed=2)
+        assert "test_marked.py::test_added" in local_remote.td.all_tests
+        local_remote.runpytest_inprocess(*args).assert_outcomes()
+
+    def test_marker_with_xdist_loadgroup(self, local_remote):
+        if local_remote.name != "xdist":
+            pytest.skip("--dist loadgroup needs xdist workers")
+        local_remote.testdir.makeini("""
+            [pytest]
+            markers = slow: slow test
+        """)
+        local_remote.makepyfile(
+            test_marked="""
+            import pytest
+
+            @pytest.mark.xdist_group("g")
+            def test_fast(): pass
+
+            @pytest.mark.xdist_group("g")
+            @pytest.mark.slow
+            def test_slow(): pass
+        """
+        )
+        args = ("--testmon", "--dist", "loadgroup", "-m", "not slow")
+        local_remote.runpytest_inprocess(*args).assert_outcomes(passed=1)
+        local_remote.runpytest_inprocess(*args).assert_outcomes()
+        local_remote.runpytest_inprocess(
+            "--testmon", "--dist", "loadgroup", "-m", "slow"
+        ).assert_outcomes(passed=1)
+        local_remote.runpytest_inprocess(
+            "--testmon", "--dist", "loadgroup"
+        ).assert_outcomes()
+
+    def test_marker_prunes_removed_tests(self, local_remote):
+        local_remote.testdir.makeini("""
+            [pytest]
+            markers = slow: slow test
+        """)
+        local_remote.makepyfile(
+            test_a="def test_old(): pass", test_gone="def test_gone(): pass"
+        )
+        args = ("--testmon", "-m", "not slow")
+        local_remote.runpytest_inprocess(*args).assert_outcomes(passed=2)
+        (local_remote.tmpdir / "test_gone.py").remove()
+        changepyfile(local_remote.testdir, test_a="def test_new(): pass")
+        local_remote.runpytest_inprocess(*args).assert_outcomes(passed=1)
+        assert set(local_remote.td.all_tests) == {"test_a.py::test_new"}
+
     def test_pytest_k_deselect(self, local_remote):
-        if local_remote.name == "xdist":
-            pytest.xfail(
-                "under xdist, tests deselected by -k or externally in the previous run are not collected again"
-            )
         local_remote.makepyfile(
             test_a="""
             def test_1():
@@ -2233,11 +2365,7 @@ class TestmonCollect:
         """
         )
         result = local_remote.runpytest_inprocess("--testmon", "-v")
-        result.stdout.fnmatch_lines(
-            [
-                "*test_2 PASSED*",
-            ]
-        )
+        result.stdout.re_match_lines([r".*(test_2 PASSED|PASSED .*::test_2)"])
 
     def test_pytest_argument_deselect(self, testdir):
         testdir.makepyfile(
