@@ -32,9 +32,10 @@ class TestConfigure:
         options["lf"] = False
         assert configure._get_noselect_reasons(options) == []
 
-    def test_marker_expression_keeps_selection_enabled(self, options):
+    @pytest.mark.parametrize("option", ["markexpr", "keyword"])
+    def test_deselect_expression_keeps_selection_enabled(self, options, option):
         options["testmon"] = True
-        options["markexpr"] = "not slow"
+        options[option] = "not slow"
         assert configure._header_collect_select(options) == TmConf(
             "testmon: ", True, True
         )
@@ -80,12 +81,7 @@ class TestConfigure:
         options["keyword"] = "test1"
         options["testmon_nocollect"] = True
         assert configure._header_collect_select(options) == TmConf(
-            (
-                "testmon: collection deactivated, "
-                "selection automatically deactivated because -k was used, "
-            ),
-            False,
-            False,
+            "testmon: collection deactivated, ", False, True
         )
 
     def test_nocollect_coverage_without_cov_plugin(self, options):

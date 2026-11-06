@@ -2209,7 +2209,8 @@ class TestmonCollect:
         td = local_remote.td
         assert set(td.db.filenames(td.exec_id)) == {"test_a.py"}
 
-    def test_marker_deselected_test_kept_for_later(self, local_remote):
+    @pytest.mark.parametrize("selector", [("-m", "not slow"), ("-k", "not slow")])
+    def test_marker_deselected_test_kept_for_later(self, local_remote, selector):
         local_remote.testdir.makeini("""
             [pytest]
             markers = slow: slow test
@@ -2229,7 +2230,7 @@ class TestmonCollect:
                     assert dep.value() == 1
             """,
         )
-        args = ("--testmon", "--import-mode=importlib", "--ff", "-m", "not slow")
+        args = ("--testmon", "--import-mode=importlib", "--ff", *selector)
         local_remote.runpytest_inprocess(*args).assert_outcomes(passed=1)
         assert "test_marked.py::test_slow" in local_remote.td.all_tests
         local_remote.runpytest_inprocess(*args).assert_outcomes()
@@ -2345,10 +2346,6 @@ class TestmonCollect:
         assert set(local_remote.td.all_tests) == {"test_a.py::test_new"}
 
     def test_pytest_k_deselect(self, local_remote):
-        if local_remote.name == "xdist":
-            pytest.xfail(
-                "under xdist, tests deselected by -k or externally in the previous run are not collected again"
-            )
         local_remote.makepyfile(
             test_a="""
             def test_1():
@@ -2368,11 +2365,7 @@ class TestmonCollect:
         """
         )
         result = local_remote.runpytest_inprocess("--testmon", "-v")
-        result.stdout.fnmatch_lines(
-            [
-                "*test_2 PASSED*",
-            ]
-        )
+        result.stdout.re_match_lines([r".*(test_2 PASSED|PASSED .*::test_2)"])
 
     def test_pytest_argument_deselect(self, testdir):
         testdir.makepyfile(

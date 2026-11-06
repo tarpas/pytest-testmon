@@ -59,7 +59,7 @@ def pytest_addoption(parser):
         dest="testmon_noselect",
         help=(
             "Reorder and prioritize the tests most likely to fail first, but don't deselect anything. "
-            "Forced if you use -k, -l, -lf, test_file.py::test_name"
+            "Forced if you use -l, -lf, test_file.py::test_name"
         ),
     )
 
@@ -231,6 +231,11 @@ def get_running_as(config):
     return "controller"
 
 
+def deselects_by_expression(config):
+    """-m and -k deselect after collection, so collected but unselected tests must be kept."""
+    return bool(config.option.markexpr or config.option.keyword)
+
+
 def register_plugins(config, should_select, should_collect, cov_plugin):
     if should_select or should_collect:
         config.pluginmanager.register(
@@ -399,11 +404,11 @@ class TestmonCollect:
             config.testmon_data.sync_db_fs_tests(retain=set(self.raw_test_names))
 
     def pytest_collection_finish(self, session):
-        # xdist only reports the ids left after -m; the controller needs all of them. Read the
+        # xdist only reports the ids left after -m/-k; the controller needs all of them. Read the
         # ids now, after every plugin has added items or rewritten ids (e.g. --dist loadgroup).
         if (
             self._running_as == "worker"
-            and session.config.option.markexpr
+            and deselects_by_expression(session.config)
             and not session.testsfailed
         ):
             session.config.workeroutput["testmon_raw_test_names"] = sorted(
@@ -504,14 +509,18 @@ class TestmonXdistSync:
 
     def pytest_xdist_node_collection_finished(self, node, ids):  # pylint: disable=invalid-name
         self.await_nodes += -1
-        if self.await_nodes == 0 and self.sync and not node.config.option.markexpr:
+        if (
+            self.await_nodes == 0
+            and self.sync
+            and not deselects_by_expression(node.config)
+        ):
             node.config.testmon_data.sync_db_fs_tests(retain=set(ids))
 
     def pytest_testnodedown(self, node, error):
-        # With -m, `ids` above lack the deselected tests, so sync from the workers'
+        # With -m/-k, `ids` above lack the deselected tests, so sync from the workers'
         # pre-deselection names once every worker is done; skip it if any worker failed.
         self.running_nodes -= 1
-        if not (self.sync and node.config.option.markexpr):
+        if not (self.sync and deselects_by_expression(node.config)):
             return
         names = None if error else node.workeroutput.get("testmon_raw_test_names")
         if names is None:
