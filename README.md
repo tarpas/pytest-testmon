@@ -30,6 +30,15 @@ with no data, or with no data for the current packages hash (e.g. after a
 requirements bump on the target branch), is seeded from the PR target branch
 (`GITHUB_BASE_REF` etc.) and then `testmon_s3_fallback_branch` (default `main`).
 
+The packages hash comes from the installed packages, or from the files named in
+`testmon_packages_from`: requirements files, or a `uv.lock` (Python 3.11+), which
+gives one `name==version` per locked package plus the source of a package that
+does not come from a registry (a git dependency's commit).
+
+    # pyproject.toml
+    [tool.pytest.ini_options]
+    testmon_packages_from = ["uv.lock"]
+
 `--testmon-s3-read-branch=master` selects against a read-only snapshot of that
 branch's object only: no local `.testmondata`, no seeding, no upload, and an
 error if the object does not exist. Pair it with `--testmon-nocollect` on CI

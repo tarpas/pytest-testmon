@@ -75,10 +75,12 @@ logger = get_logger(__name__)
 
 def get_packages_from_requirements(paths, rootdir=None) -> str:
     """
-    Build a packages string from requirements.txt files.
+    Build a packages string from requirements.txt files and uv.lock files.
 
-    Recurses into -r / --requirement and -c / --constraint includes.
-    Skips other pip options (lines starting with -).
+    requirements.txt: recurses into -r / --requirement and -c / --constraint
+    includes, skips other pip options (lines starting with -).
+    uv.lock (a path whose file name is exactly "uv.lock"): one spec per locked
+    package, see _read_uv_lock.
     Returns a sorted, deduplicated comma-joined string of package specs.
     """
     specs: set[str] = set()
@@ -95,6 +97,9 @@ def _read_requirements(paths, base_dir, specs, seen):
             continue
         seen.add(abs_path)
         try:
+            if os.path.basename(abs_path) == "uv.lock":
+                specs.update(_read_uv_lock(abs_path))
+                continue
             with open(abs_path, encoding="utf-8") as f:
                 lines = f.readlines()
         except FileNotFoundError:
@@ -112,6 +117,42 @@ def _read_requirements(paths, base_dir, specs, seen):
                 continue  # skip other pip options / flags
             else:
                 specs.add(line)
+
+
+def _read_uv_lock(abs_path):
+    """
+    Return one spec per package in a uv.lock file.
+
+    A package from a registry gives "name==version". Any other source (git,
+    url, path, ...) is added in brackets, because its version can stay the
+    same while the code changes: a git source carries the commit.
+    The project itself (source "virtual") is left out.
+    Wheel lists, hashes and markers are not part of the result, so a lock that
+    is written again without a version change gives the same specs.
+    """
+    try:
+        import tomllib  # pylint: disable=import-outside-toplevel
+    except ImportError as exc:  # Python 3.10
+        raise RuntimeError(
+            "testmon: reading uv.lock in testmon_packages_from needs Python 3.11 or newer"
+        ) from exc
+
+    with open(abs_path, "rb") as f:
+        lock = tomllib.load(f)
+
+    specs = set()
+    for package in lock.get("package", []):
+        source = package.get("source", {})
+        if "virtual" in source:
+            continue
+        spec = package["name"]
+        if "version" in package:
+            spec = f"{spec}=={package['version']}"
+        if "registry" not in source:
+            details = ", ".join(f"{key}={source[key]}" for key in sorted(source))
+            spec = f"{spec} ({details})"
+        specs.add(spec)
+    return specs
 
 
 def get_system_packages(ignore=None):

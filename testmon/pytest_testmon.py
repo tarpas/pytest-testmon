@@ -190,9 +190,10 @@ def pytest_addoption(parser):
     )
     parser.addini(
         "testmon_packages_from",
-        "One or more paths to requirements.txt files used to compute the "
+        "One or more paths to requirements.txt or uv.lock files used to compute the "
         "environment key instead of scanning all installed packages. "
         "Paths are relative to rootdir; -r/-c includes are followed recursively. "
+        "A file named uv.lock gives one name==version per locked package (Python 3.11+). "
         "pyproject.toml: testmon_packages_from = [\"requirements/base.txt\", \"requirements/dev.txt\"] "
         "pytest.ini: testmon_packages_from = requirements/base.txt requirements/dev.txt",
         type="args",
