@@ -190,10 +190,6 @@ class TestPytestReportHeader:
             ]
         )
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="an enclosing `coverage run` is not detected; testmon starts collecting anyway",
-    )
     def test_deactivated_bc_coverage(self, testdir, test_a):
         result = testdir.run("coverage", "run", "-m", "pytest", "--testmon")
         result.stdout.fnmatch_lines(

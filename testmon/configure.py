@@ -8,6 +8,8 @@ except ImportError:
 
 from dataclasses import dataclass
 
+from coverage import Coverage
+
 
 def _is_dogfooding(coverage_stack):
     return coverage_stack
@@ -18,7 +20,9 @@ def _is_debugger():
 
 
 def _is_coverage():
-    return False
+    # An outer coverage.py measurement, e.g. `coverage run -m pytest`. Starting
+    # testmon's own Coverage would pause it for the whole session.
+    return Coverage.current() is not None
 
 
 def _get_notestmon_reasons(options):
@@ -159,5 +163,7 @@ def header_collect_select(config, coverage_stack, cov_plugin=None) -> TmConf:
         debugger=_is_debugger(),
         coverage=_is_coverage(),
         dogfooding=_is_dogfooding(coverage_stack),
-        cov_plugin=cov_plugin,
+        # pytest-cov is registered whenever it is installed; it only shares its
+        # measurement with testmon when it was started with --cov.
+        cov_plugin=cov_plugin if getattr(cov_plugin, "_started", False) else None,
     )
