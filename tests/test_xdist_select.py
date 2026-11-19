@@ -2,6 +2,8 @@ import socket
 
 import pytest
 
+from testmon.testmon_core import get_data_file_path
+
 pytest_plugins = ("pytester",)
 
 pytest.importorskip("xdist")
@@ -55,4 +57,4 @@ def test_workers_follow_the_controller_to_local_storage(pytester, monkeypatch):
     result = pytester.runpytest_inprocess("--tmnet", "-n", "2")
 
     result.assert_outcomes(passed=1)
-    assert (pytester.path / ".testmondata").exists()
+    assert (pytester.path / get_data_file_path()).exists()
