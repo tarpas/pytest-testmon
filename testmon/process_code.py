@@ -290,6 +290,14 @@ def match_fingerprint(module: Module, fingerprint):
     return True
 
 
+def root_fingerprint(module) -> [int]:
+    """Checksum of the module-level code (function bodies excluded)."""
+    if module.ext != "py" or not module.blocks:
+        return []
+    # dump_and_block appends the block of the module body last.
+    return methods_to_checksums([module.blocks[-1].code])
+
+
 def create_fingerprint_source(source_code, lines, ext="py"):
     module = Module(source_code=source_code, ext=ext)
     return create_fingerprint(module, lines)

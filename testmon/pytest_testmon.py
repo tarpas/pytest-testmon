@@ -399,6 +399,9 @@ class TestmonCollect:
         if call.when == "teardown":
             report = result.get_result()
             report.nodes_files_lines = self.testmon.get_batch_coverage_data()
+            report.nodes_imports = self.testmon.import_graph.nodes_imports(
+                report.nodes_files_lines
+            )
             result.force_result(
                 report
             )  # under xdist, report is serialized on the worker and sent to the controller
@@ -412,7 +415,9 @@ class TestmonCollect:
         if report.when == "teardown" and hasattr(report, "nodes_files_lines"):
             if report.nodes_files_lines:
                 test_executions_fingerprints = self.testmon_data.get_tests_fingerprints(
-                    report.nodes_files_lines, self.reports
+                    report.nodes_files_lines,
+                    self.reports,
+                    getattr(report, "nodes_imports", None),
                 )
                 self.testmon_data.save_test_execution_file_fps(
                     test_executions_fingerprints
@@ -423,7 +428,9 @@ class TestmonCollect:
             nodes_files_lines = self.testmon.get_batch_coverage_data()
 
             test_executions_fingerprints = self.testmon_data.get_tests_fingerprints(
-                nodes_files_lines, self.reports
+                nodes_files_lines,
+                self.reports,
+                self.testmon.import_graph.nodes_imports(nodes_files_lines),
             )
             self.testmon_data.save_test_execution_file_fps(test_executions_fingerprints)
             self.testmon.close()

@@ -35,8 +35,10 @@ from testmon.process_code import (
     create_fingerprint,
     methods_to_checksums,
     get_source_sha,
+    root_fingerprint,
     Module,
 )
+from testmon.imports import ImportGraph
 
 from testmon.common import DepsNOutcomes, TestExecutions
 
@@ -381,8 +383,11 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
     def all_tests(self):
         return self.db.all_test_executions(self.exec_id)
 
-    def get_tests_fingerprints(self, nodes_files_lines, reports) -> TestExecutions:
+    def get_tests_fingerprints(
+        self, nodes_files_lines, reports, nodes_imports=None
+    ) -> TestExecutions:
         test_executions_fingerprints = {}
+        nodes_imports = nodes_imports or {}
         for context in nodes_files_lines:
             deps_n_outcomes: DepsNOutcomes = {"deps": []}
 
@@ -398,6 +403,9 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
                             "method_checksums": fingerprint,
                         }
                     )
+            deps_n_outcomes["deps"].extend(
+                self.import_dependencies(nodes_imports.get(context, ()))
+            )
 
             deps_n_outcomes.update(process_result(reports[context]))
             deps_n_outcomes["forced"] = context in self.stable_test_names and (
@@ -405,6 +413,20 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
             )
             test_executions_fingerprints[context] = deps_n_outcomes
         return test_executions_fingerprints
+
+    def import_dependencies(self, imported_files):
+        """Modules a test imported without executing a line there (see
+        testmon.imports): it depends on their module-level code."""
+        for filename in imported_files:
+            module = self.source_tree.get_file(filename)
+            fingerprint = root_fingerprint(module) if module else None
+            if fingerprint:
+                yield {
+                    "filename": filename,
+                    "mtime": module.mtime,
+                    "fsha": module.fs_fsha,
+                    "method_checksums": fingerprint,
+                }
 
     def sync_db_fs_tests(self, retain):
         collected = retain.union(set(self.stable_test_names))
@@ -575,6 +597,7 @@ class TestmonCollector:
         if testmon_labels is None:
             testmon_labels = {"singleprocess"}
         self.rootdir = rootdir
+        self.import_graph = ImportGraph(rootdir)
         self.testmon_labels = testmon_labels
         self.cov: Coverage = None
         self.sub_cov_file = None
