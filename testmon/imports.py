@@ -14,43 +14,44 @@ defines `name`, instead of depending on everything the package imports.
 import ast
 import os
 import sys
+import sysconfig
 from importlib.util import resolve_name
 from pathlib import Path
 
-from testmon.process_code import read_source_sha
+from testmon.process_code import import_records, read_source_sha
 
 STAR = "*"
 
 
-def parse_imports(source_code):
-    """Return (imports, exports) for the import statements in source_code.
+def imports_exports(records):
+    """Return (imports, exports) for the records of process_code.import_records.
 
-    imports is a list of (module, level, name): `import a.b` gives
-    ("a.b", 0, None); `from .m import x as y` gives ("m", 1, "x");
-    `from m import *` gives ("m", 0, STAR).
-    exports maps a name bound by `from ... import` to its record, and STAR to
-    the list of star imports.
+    imports is a list of (module, level, name).
+    exports maps a name bound by `from ... import` to its import, and STAR to
+    the list of star imports; it is used to follow re-exports.
     """
+    imports = []
+    exports = {}
+    for module, level, name, asname in records:
+        record = (module, level, name)
+        imports.append(record)
+        if name == STAR:
+            exports.setdefault(STAR, []).append(record)
+        elif name:
+            exports[asname or name] = record
+    return imports, exports
+
+
+def parse_imports(source_code):
     try:
         tree = ast.parse(source_code)
     except (SyntaxError, ValueError):
         return [], {}
-    imports = []
-    # What a name bound at module level stands for; used to follow re-exports.
-    exports = {}
+    records = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                imports.append((alias.name, 0, None))
-        elif isinstance(node, ast.ImportFrom):
-            for alias in node.names:
-                record = (node.module or "", node.level, alias.name)
-                imports.append(record)
-                if alias.name == STAR:
-                    exports.setdefault(STAR, []).append(record)
-                else:
-                    exports[alias.asname or alias.name] = record
-    return imports, exports
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            records.extend(import_records(node))
+    return imports_exports(records)
 
 
 class ImportGraph:
@@ -58,10 +59,26 @@ class ImportGraph:
 
     Has to live in the process that ran the tests (under xdist: the worker),
     because only its sys.modules knows the imported modules.
+
+    With a source_tree, the import statements come from the parse that testmon
+    does anyway for the fingerprints of the same process.
     """
 
-    def __init__(self, rootdir):
-        self.rootdir = os.path.realpath(rootdir)
+    def __init__(self, rootdir, source_tree=None):
+        self.rootdir = str(rootdir)
+        self.source_tree = source_tree
+        # Module files are matched by prefix: resolving every path is too slow.
+        self._prefixes = {
+            os.path.join(root, "")
+            for root in (self.rootdir, os.path.realpath(self.rootdir))
+        }
+        # Installed packages are not project files, also when the virtualenv
+        # is inside rootdir (the collector omits the same paths from coverage).
+        self._omit = tuple(
+            os.path.join(path, "")
+            for key, path in sysconfig.get_paths().items()
+            if key.endswith("lib")
+        )
         self._parsed = {}
         self._names = None
         self._files = None
@@ -80,10 +97,14 @@ class ImportGraph:
             filename = getattr(module, "__file__", None)
             if not filename or not filename.endswith(".py"):
                 continue
-            path = os.path.realpath(filename)
-            if not path.startswith(self.rootdir + os.sep):
+            if filename.startswith(self._omit):
                 continue
-            relpath = os.path.relpath(path, self.rootdir).replace(os.sep, "/")
+            for prefix in self._prefixes:
+                if filename.startswith(prefix):
+                    break
+            else:
+                continue
+            relpath = filename[len(prefix) :].replace(os.sep, "/")
             self._files[name] = relpath
             if hasattr(module, "__path__"):
                 package = name
@@ -95,8 +116,14 @@ class ImportGraph:
 
     def _parse(self, filename):
         if filename not in self._parsed:
-            source_code = read_source_sha(Path(self.rootdir) / filename)[0]
-            self._parsed[filename] = parse_imports(source_code or "")
+            module = self.source_tree and self.source_tree.get_file(filename)
+            if module:
+                module.blocks  # parses; pylint: disable=pointless-statement
+                parsed = imports_exports(module.import_records)
+            else:
+                source_code = read_source_sha(Path(self.rootdir) / filename)[0]
+                parsed = parse_imports(source_code or "")
+            self._parsed[filename] = parsed
         return self._parsed[filename]
 
     def _absolute(self, module, level, package):

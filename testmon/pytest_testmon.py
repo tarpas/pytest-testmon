@@ -243,6 +243,12 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
                     testmon_labels=testmon_options(config),
                     cov_plugin=cov_plugin,
                     track_imports=config.getoption("testmon_imports"),
+                    # A worker doesn't compute fingerprints, so it has no parse to share.
+                    source_tree=(
+                        None
+                        if get_running_as(config) == "worker"
+                        else config.testmon_data.source_tree
+                    ),
                 ),
                 config.testmon_data,
                 running_as=get_running_as(config),

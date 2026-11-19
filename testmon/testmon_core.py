@@ -584,7 +584,12 @@ class TestmonCollector:
     coverage_stack: [Coverage] = []
 
     def __init__(
-        self, rootdir, testmon_labels=None, cov_plugin=None, track_imports=True
+        self,
+        rootdir,
+        testmon_labels=None,
+        cov_plugin=None,
+        track_imports=True,
+        source_tree=None,
     ):  # TODO remove cov_plugin
         try:
             from testmon.testmon_core import (  # pylint: disable=import-outside-toplevel
@@ -597,7 +602,7 @@ class TestmonCollector:
         if testmon_labels is None:
             testmon_labels = {"singleprocess"}
         self.rootdir = rootdir
-        self.import_graph = ImportGraph(rootdir) if track_imports else None
+        self.import_graph = ImportGraph(rootdir, source_tree) if track_imports else None
         self.testmon_labels = testmon_labels
         self.cov: Coverage = None
         self.sub_cov_file = None

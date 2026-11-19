@@ -1,4 +1,8 @@
-from testmon.imports import STAR, parse_imports
+import sys
+
+import pytest
+
+from testmon.imports import STAR, ImportGraph, parse_imports
 
 
 def test_parse_imports():
@@ -30,3 +34,10 @@ def test_parse_imports():
 
 def test_parse_imports_syntax_error():
     assert parse_imports("def (:") == ([], {})
+
+
+def test_installed_packages_are_not_project_files():
+    graph = ImportGraph(sys.prefix)
+    graph._index_modules()
+    assert "pytest" in sys.modules
+    assert pytest.__name__ not in graph._files
