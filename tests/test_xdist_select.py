@@ -1,4 +1,8 @@
+import socket
+
 import pytest
+
+from testmon.testmon_core import get_data_file_path
 
 pytest_plugins = ("pytester",)
 
@@ -39,3 +43,18 @@ def test_selecting_workers_get_the_controller_execution(testdir):
         "--testmon-nocollect", "--testmon-forceselect", "-n", "2"
     )
     result.assert_outcomes(passed=1)
+
+
+def test_workers_follow_the_controller_to_local_storage(pytester, monkeypatch):
+    """testmon.net unreachable: the controller falls back to .testmondata and so do the workers."""
+    with socket.socket() as free:  # a port nobody listens on
+        free.bind(("127.0.0.1", 0))
+        port = free.getsockname()[1]
+    pytester.makeini(f"[pytest]\ntmnet_url = http://127.0.0.1:{port}/\n")
+    monkeypatch.setenv("TMNET_API_KEY", "irrelevant")
+    pytester.makepyfile(test_a="def test_a():\n    pass\n")
+
+    result = pytester.runpytest_inprocess("--tmnet", "-n", "2")
+
+    result.assert_outcomes(passed=1)
+    assert (pytester.path / get_data_file_path()).exists()

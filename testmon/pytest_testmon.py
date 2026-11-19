@@ -27,6 +27,7 @@ from testmon.testmon_core import (
     get_test_execution_class_name,
     get_test_execution_module_name,
     cached_relpath,
+    timeout_transport,
 )
 from testmon import configure
 from testmon.common import get_logger, get_system_packages
@@ -146,6 +147,12 @@ def testmon_options(config):
 
 
 def init_testmon_data(config: Config):
+    if get_running_as(config) == "worker":
+        # The controller decides what to run and saves the results (TestmonXdistSync);
+        # a worker has no storage, so all workers collect the same tests.
+        config.testmon_data = None
+        return
+
     environment = config.getoption("environment_expression") or eval_environment(
         config.getini("environment_expression")
     )
@@ -182,41 +189,17 @@ def init_testmon_data(config: Config):
             rpc_proxy = xmlrpc.client.ServerProxy(
                 url,
                 allow_none=True,
-                headers=[("x-api-key", tmnet_api_key.strip())],
+                transport=timeout_transport(
+                    url, headers=[("x-api-key", tmnet_api_key.strip())]
+                ),
             )
 
-    # Check if we're a worker and have exec_id from controller
-    running_as = get_running_as(config)
-    exec_id = None
-    system_packages_change = None
-    files_of_interest = None
-
-    if running_as == "worker" and hasattr(config, "workerinput"):
-        # Use exec_id sent from controller
-        exec_id = config.workerinput.get("testmon_exec_id")
-        system_packages_change = config.workerinput.get(
-            "testmon_system_packages_change"
-        )
-        files_of_interest = config.workerinput.get("testmon_files_of_interest")
-
-    if running_as == "worker" and exec_id is not None:
-        # Initialize for xdist worker run
-        testmon_data: TestmonData = TestmonData.for_worker(
-            rootdir=str(config.rootpath),
-            exec_id=exec_id,
-            database=rpc_proxy,
-            system_packages_change=system_packages_change,
-            files_of_interest=files_of_interest,
-            environment=environment,
-        )
-    else:
-        # Initialize for local run (controller or single process)
-        testmon_data: TestmonData = TestmonData.for_local_run(
-            rootdir=str(config.rootpath),
-            database=rpc_proxy,
-            environment=environment,
-            system_packages=system_packages,
-        )
+    testmon_data: TestmonData = TestmonData.for_local_run(
+        rootdir=str(config.rootpath),
+        database=rpc_proxy,
+        environment=environment,
+        system_packages=system_packages,
+    )
     testmon_data.determine_stable()
     config.testmon_data = testmon_data
 
@@ -234,7 +217,12 @@ def get_running_as(config):
 def register_plugins(config, should_select, should_collect, cov_plugin):
     if should_select or should_collect:
         config.pluginmanager.register(
-            TestmonSelect(config, config.testmon_data), "TestmonSelect"
+            TestmonSelect(
+                config,
+                config.testmon_data,
+                selection=getattr(config, "workerinput", {}).get("testmon_selection"),
+            ),
+            "TestmonSelect",
         )
 
     if should_collect:
@@ -286,6 +274,11 @@ def pytest_configure(config):
 
 def pytest_report_header(config):
     tm_conf = config.testmon_config
+
+    if (
+        getattr(config, "testmon_data", None) is None
+    ):  # an xdist worker: nobody reads it
+        return tm_conf.message
 
     if tm_conf.collect or tm_conf.select:
         unstable_files = getattr(config.testmon_data, "unstable_files", set())
@@ -355,7 +348,7 @@ def changed_message(
 
 
 def pytest_unconfigure(config):
-    if hasattr(config, "testmon_data"):
+    if getattr(config, "testmon_data", None):
         config.testmon_data.close_connection()
 
 
@@ -449,55 +442,34 @@ class TestmonXdistSync:
     def __init__(self, sync=True):
         self.await_nodes = 0
         self.sync = sync
+        self._selection = None
 
     def pytest_configure_node(self, node):
-        """
-        Send exec_id and related data from controller to worker during xdist initialization.
-        This avoids each worker having to independently determine the environment and check
-        for package changes.
+        """Controller side, once per worker: send it what to deselect and how to order.
 
-        Note: This hook is called on the controller side for each worker node.
-        The node.config here is the controller's config, not the worker's config.
+        Deciding once here, instead of each worker asking the storage, keeps the workers'
+        collections identical (xdist requires it) whatever happens to testmon.net meanwhile.
         """
-        # Verify we're on the controller (not a worker)
-        # node.config in this hook is the controller's config
-        running_as = get_running_as(node.config)
-        if running_as != "controller":
-            return  # Safety check: only run on controller
-
         # Count the node here, before it starts: counting it when it reports ready would let a
-        # fast worker's collection trigger sync_db_fs_tests while a slow one is still determining
-        # stability, which then sees the placeholder rows as stable tests and collects nothing.
+        # fast worker's collection trigger sync_db_fs_tests while a slow one is still collecting.
         self.await_nodes += 1
 
-        # Only proceed if testmon_data has been initialized and workerinput exists
-        if hasattr(node.config, "testmon_data") and hasattr(node, "workerinput"):
-            testmon_data: TestmonData = node.config.testmon_data
-            node.workerinput["testmon_exec_id"] = testmon_data.exec_id
-            node.workerinput["testmon_system_packages_change"] = (
-                testmon_data.system_packages_change
+        if self._selection is None:
+            select: TestmonSelect = node.config.pluginmanager.get_plugin(
+                "TestmonSelect"
             )
-            node.workerinput["testmon_files_of_interest"] = (
-                testmon_data.files_of_interest
-            )
+            self._selection = {
+                "deselected_files": select.deselected_files,
+                "deselected_tests": select.deselected_tests,
+                "avg_durations": dict(select.avg_durations),
+            }
+        node.workerinput["testmon_exec_id"] = node.config.testmon_data.exec_id
+        node.workerinput["testmon_selection"] = self._selection
 
     def pytest_xdist_node_collection_finished(self, node, ids):  # pylint: disable=invalid-name
         self.await_nodes += -1
         if self.await_nodes == 0 and self.sync:
             node.config.testmon_data.sync_db_fs_tests(retain=set(ids))
-
-
-def did_fail(reports):
-    return reports["failed"]
-
-
-def get_failing(all_test_executions):
-    failing_files, failing_tests = set(), {}
-    for test_name, result in all_test_executions.items():
-        if did_fail(all_test_executions[test_name]):
-            failing_files.add(home_file(test_name))
-            failing_tests[test_name] = result
-    return failing_files, failing_tests
 
 
 def sort_items_by_duration(items, avg_durations) -> None:
@@ -519,11 +491,21 @@ def format_time_saved(seconds):
 
 
 class TestmonSelect:
-    def __init__(self, config, testmon_data: TestmonData):
+    def __init__(self, config, testmon_data: TestmonData, selection=None):
+        """`selection`: on an xdist worker, the controller's decision (no testmon_data)."""
         self.testmon_data: TestmonData = testmon_data
         self.config = config
+        self._interrupted = False
+        self._avg_durations = None
 
-        failing_files, failing_test_names = get_failing(testmon_data.all_tests)
+        if selection is not None:
+            self.deselected_files = selection["deselected_files"]
+            self.deselected_tests = selection["deselected_tests"]
+            self._avg_durations = defaultdict(int, selection["avg_durations"])
+            return
+
+        failing_test_names = testmon_data.failed_test_names
+        failing_files = {home_file(test_name) for test_name in failing_test_names}
 
         self.deselected_files = [
             file for file in testmon_data.stable_files if file not in failing_files
@@ -533,7 +515,12 @@ class TestmonSelect:
             for test_name in testmon_data.stable_test_names
             if test_name not in failing_test_names
         ]
-        self._interrupted = False
+
+    @property
+    def avg_durations(self):
+        if self._avg_durations is None:
+            self._avg_durations = self.testmon_data.avg_durations
+        return self._avg_durations
 
     def pytest_ignore_collect(self, collection_path: Path, config):
         strpath = cached_relpath(str(collection_path), str(config.rootpath))
@@ -551,7 +538,7 @@ class TestmonSelect:
             else:
                 selected.append(item)
 
-        sort_items_by_duration(selected, self.testmon_data.avg_durations)
+        sort_items_by_duration(selected, self.avg_durations)
 
         if self.config.testmon_config.select:
             items[:] = selected
@@ -559,7 +546,7 @@ class TestmonSelect:
                 items=([FakeItemFromTestmon(session.config)] * len(deselected))
             )
         else:
-            sort_items_by_duration(deselected, self.testmon_data.avg_durations)
+            sort_items_by_duration(deselected, self.avg_durations)
             items[:] = selected + deselected
 
     @pytest.hookimpl(trylast=True)
@@ -569,7 +556,7 @@ class TestmonSelect:
 
     @pytest.hookimpl(trylast=True)
     def pytest_terminal_summary(self):
-        if self._interrupted:
+        if self._interrupted or self.testmon_data is None:
             return
 
         if not self.config.option.verbose >= 2:

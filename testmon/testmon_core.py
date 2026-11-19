@@ -6,8 +6,10 @@ import sysconfig
 import textwrap
 from functools import lru_cache
 from collections import defaultdict
-from xmlrpc.client import Fault, ProtocolError, ServerProxy
-from socket import gaierror
+import http.client
+import xmlrpc.client
+from xml.parsers.expat import ExpatError
+from xmlrpc.client import ServerProxy
 
 from typing import TypeVar
 
@@ -154,6 +156,79 @@ def collect_mhashes(source_tree, new_changed_file_data):
     return files_mhashes
 
 
+# Whatever a call to testmon.net can fail with: no connection, a reset, a timeout, TLS (all
+# OSError), an HTTP error such as 502 or a server-side exception (xmlrpc.client.Error), a broken
+# or non-XML response.
+REMOTE_ERRORS = (OSError, xmlrpc.client.Error, http.client.HTTPException, ExpatError)
+REMOTE_TIMEOUT = 60  # seconds, for the connect and for each read
+
+
+def timeout_transport(url, headers=()):
+    """An xmlrpc transport for `url` that gives up after REMOTE_TIMEOUT instead of hanging.
+
+    ServerProxy ignores its own `headers` when given a transport, so they come here.
+    """
+    base = (
+        xmlrpc.client.SafeTransport
+        if url.startswith("https")
+        else xmlrpc.client.Transport
+    )
+
+    class TimeoutTransport(base):
+        def make_connection(self, host):
+            connection = super().make_connection(host)
+            connection.timeout = REMOTE_TIMEOUT
+            return connection
+
+    return TimeoutTransport(headers=headers)
+
+
+class RemoteDB:
+    """testmon.net (an xmlrpc proxy) behind the interface of db.DB.
+
+    Until the tests to run are determined, a failed call raises and TestmonData falls back to
+    the local .testmondata. After that (`lenient`) the pytest run must go on: the first failure
+    is logged, nothing more is sent, and every call returns "no data".
+    """
+
+    NO_DATA = {
+        "all_test_executions": dict,
+        "fetch_saving_stats": lambda: (0,) * 8,
+    }
+
+    def __init__(self, proxy):
+        self._proxy = proxy
+        self.lenient = False
+        self.failed = False
+
+    def __getattr__(self, name):
+        def call(*args):
+            if not self.failed:
+                try:
+                    return getattr(self._proxy, name)(*args)
+                except REMOTE_ERRORS as exc:
+                    if not self.lenient:
+                        raise
+                    self.failed = True
+                    logger.error(
+                        "%r error when communicating with testmon.net. The run continues,"
+                        " its results are not saved.",
+                        exc,
+                    )
+            return self.NO_DATA.get(name, lambda: None)()
+
+        return call
+
+    def close(self):
+        try:
+            if isinstance(self._proxy, ServerProxy):
+                self._proxy("close")()  # attribute access would be a remote call
+            else:
+                self._proxy.close()
+        except REMOTE_ERRORS:
+            pass
+
+
 class TestmonData:  # pylint: disable=too-many-instance-attributes
     __test__ = False
 
@@ -167,7 +242,7 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         self.source_tree = SourceTree(rootdir=self.rootdir)
 
         if database:
-            self.db = database  # pylint: disable=invalid-name
+            self.db = RemoteDB(database)  # pylint: disable=invalid-name
         else:
             self.db = db.DB(
                 os.path.join(self.rootdir, get_data_file_path()), readonly=readonly
@@ -184,6 +259,7 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         self.stable_test_names = None
         self.stable_files = None
         self.failing_tests = None
+        self.failed_test_names = None
 
     @classmethod
     def for_local_run(
@@ -214,31 +290,34 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         if not python_version:
             python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
+        self._initiate_args = (self.environment, system_packages, python_version)
         # Initiate execution (controller or single process)
         try:
             result = self.db.initiate_execution(
-                self.environment,
-                system_packages,
-                python_version,
+                *self._initiate_args,
                 {
                     "tm_client_version": TM_CLIENT_VERSION,
                     "git_head_sha": git_current_head(),
                     "ci": os.environ.get("CI"),
                 },
             )
-        except (ConnectionRefusedError, Fault, ProtocolError, gaierror) as exc:
-            logger.error(
-                (
-                    "%s error when communication with testmon.net. (falling back to"
-                    " .testmondata locally)"
-                ),
-                exc,
-            )
-            self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))  # pylint: disable=invalid-name
-            result = self.db.initiate_execution(
-                self.environment, system_packages, python_version, {}
-            )
+            self._set_execution(result)
+        except REMOTE_ERRORS as exc:
+            if not isinstance(self.db, RemoteDB):
+                raise
+            self._fall_back_to_local(exc)
 
+    def _fall_back_to_local(self, exc):
+        logger.error(
+            "%r error when communicating with testmon.net. (falling back to"
+            " .testmondata locally)",
+            exc,
+        )
+        self.db.close()
+        self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))
+        self._set_execution(self.db.initiate_execution(*self._initiate_args, {}))
+
+    def _set_execution(self, result):
         self.exec_id = result["exec_id"]
         self.system_packages_change = result["packages_changed"]
         self.files_of_interest = result["filenames"]
@@ -290,10 +369,7 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         database, self.db = self.db, None
         if database is None:
             return
-        if isinstance(database, ServerProxy):
-            database("close")()  # attribute access would be a remote call
-        else:
-            database.close()
+        database.close()
 
     def __enter__(self):
         return self
@@ -354,6 +430,19 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         self.db.delete_test_executions(to_delete, self.exec_id)
 
     def determine_stable(self):
+        """Decide which tests are affected; with testmon.net, any failure means .testmondata."""
+        if not isinstance(self.db, RemoteDB):
+            self._determine_stable()
+            return
+        try:
+            self._determine_stable()
+        except REMOTE_ERRORS as exc:
+            self._fall_back_to_local(exc)
+            self._determine_stable()
+        else:
+            self.db.lenient = True
+
+    def _determine_stable(self):
         files_fshas = {}
         for filename in self.files_of_interest:
             module = self.source_tree.get_file(filename)
@@ -378,7 +467,13 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
             self.unstable_test_names.add(fingerprint_miss)
             self.unstable_files.add(fingerprint_miss.split("::", 1)[0])
 
-        self.stable_test_names = set(self.all_tests) - self.unstable_test_names
+        # Everything the selection needs is read here, while a failure of testmon.net still
+        # means falling back; a later, lenient read would return "no tests failed".
+        all_tests = self.all_tests
+        self.failed_test_names = {
+            test_name for test_name, result in all_tests.items() if result["failed"]
+        }
+        self.stable_test_names = set(all_tests) - self.unstable_test_names
         self.stable_files = set(self.all_files) - self.unstable_files
 
     @property
