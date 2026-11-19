@@ -28,7 +28,7 @@ from testmon.testmon_core import (
     get_test_execution_module_name,
     cached_relpath,
 )
-from testmon import configure
+from testmon import configure, db
 from testmon.common import get_logger, get_system_packages
 
 SURVEY_NOTIFICATION_INTERVAL = timedelta(days=28)
@@ -153,10 +153,30 @@ def init_testmon_data(config: Config):
 
     system_packages = get_system_packages(ignore=ignore_dependencies)
 
+    # Check if we're a worker and have exec_id from controller
+    running_as = get_running_as(config)
+    exec_id = None
+    system_packages_change = None
+    files_of_interest = None
+    controller_is_local = False
+
+    if running_as == "worker" and hasattr(config, "workerinput"):
+        # Use exec_id sent from controller
+        exec_id = config.workerinput.get("testmon_exec_id")
+        system_packages_change = config.workerinput.get(
+            "testmon_system_packages_change"
+        )
+        files_of_interest = config.workerinput.get("testmon_files_of_interest")
+        # The controller's exec_id is only valid in the controller's storage: when the
+        # controller fell back to .testmondata, the worker must not talk to testmon.net.
+        controller_is_local = config.workerinput.get("testmon_local", False)
+
     url = config.getini("tmnet_url")
     rpc_proxy = None
 
-    if config.testmon_config.tmnet or getattr(config, "tmnet", None):
+    if (
+        config.testmon_config.tmnet or getattr(config, "tmnet", None)
+    ) and not controller_is_local:
         rpc_proxy = getattr(config, "tmnet", None)
 
         if not url:
@@ -184,20 +204,6 @@ def init_testmon_data(config: Config):
                 allow_none=True,
                 headers=[("x-api-key", tmnet_api_key.strip())],
             )
-
-    # Check if we're a worker and have exec_id from controller
-    running_as = get_running_as(config)
-    exec_id = None
-    system_packages_change = None
-    files_of_interest = None
-
-    if running_as == "worker" and hasattr(config, "workerinput"):
-        # Use exec_id sent from controller
-        exec_id = config.workerinput.get("testmon_exec_id")
-        system_packages_change = config.workerinput.get(
-            "testmon_system_packages_change"
-        )
-        files_of_interest = config.workerinput.get("testmon_files_of_interest")
 
     if running_as == "worker" and exec_id is not None:
         # Initialize for xdist worker run
@@ -480,6 +486,7 @@ class TestmonXdistSync:
             node.workerinput["testmon_files_of_interest"] = (
                 testmon_data.files_of_interest
             )
+            node.workerinput["testmon_local"] = isinstance(testmon_data.db, db.DB)
 
     def pytest_xdist_node_collection_finished(self, node, ids):  # pylint: disable=invalid-name
         self.await_nodes += -1
