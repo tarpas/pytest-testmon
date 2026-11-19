@@ -218,6 +218,17 @@ class TestImportDependencies:
         result = package.runpytest_inprocess("--testmon")
         result.assert_outcomes()
 
+    def test_switched_off(self, package):
+        package.runpytest_inprocess(
+            "--testmon", "--testmon-noimports", "--testmon-noselect"
+        )
+        changepyfile(
+            package.testdir,
+            **{"pkg/types": PKG_TYPES + "        flag: bool = False\n"},
+        )
+        result = package.runpytest_inprocess("--testmon", "--testmon-noimports")
+        result.assert_outcomes()
+
     def test_dataclass_default(self, local_remote):
         source = """
             from dataclasses import dataclass
