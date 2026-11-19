@@ -108,11 +108,6 @@ class TestCoreTestmon:
 
 
 class TestFundamental:
-    @pytest.mark.xfail(
-        strict=True,
-        reason="consts.py runs at import time during collection, not inside test_add, "
-        "so it is not recorded as a dependency and the change is missed",
-    )
     def test_changed_constants_module(self, testdir):
         testdir.makepyfile(
             consts="""
@@ -135,6 +130,146 @@ class TestFundamental:
         )
         result = testdir.runpytest_inprocess("--testmon")
         result.reprec.assertoutcome(failed=1)
+
+
+PKG_TYPES = """
+    from typing import NamedTuple
+
+    class Entry(NamedTuple):
+        identifier: int
+"""
+
+
+class TestImportDependencies:
+    """A test depends on the module-level code of the modules imported by the
+    files it executed, also when it executes no line there."""
+
+    @pytest.fixture
+    def package(self, local_remote):
+        local_remote.makepyfile(
+            **{
+                "pkg/__init__": """
+                    from .types import Entry
+                    from .other import LIMIT
+                """,
+                "pkg/types": PKG_TYPES,
+                "pkg/other": """
+                    LIMIT = 1
+
+                    def helper():
+                        return 1
+                """,
+                "pkg/callbacks": """
+                    from pkg import Entry
+
+                    def make():
+                        return Entry(1)
+                """,
+                "test_a": """
+                    from pkg.callbacks import make
+
+                    def test_entry():
+                        assert make() == (1,)
+                """,
+            }
+        )
+        local_remote.runpytest_inprocess("--testmon").assert_outcomes(passed=1)
+        return local_remote
+
+    def test_generated_method_through_reexport(self, package):
+        changepyfile(
+            package.testdir,
+            **{"pkg/types": PKG_TYPES + "        flag: bool = False\n"},
+        )
+        result = package.runpytest_inprocess("--testmon")
+        result.assert_outcomes(failed=1)
+
+    def test_function_body_of_imported_module(self, package):
+        changepyfile(
+            package.testdir,
+            **{
+                "pkg/types": PKG_TYPES
+                + "\n        def text(self):\n            return 'a'\n"
+            },
+        )
+        package.runpytest_inprocess("--testmon").assert_outcomes(passed=1)
+        changepyfile(
+            package.testdir,
+            **{
+                "pkg/types": PKG_TYPES
+                + "\n        def text(self):\n            return 'b'\n"
+            },
+        )
+        result = package.runpytest_inprocess("--testmon")
+        result.assert_outcomes()
+
+    def test_module_not_named_by_the_import(self, package):
+        changepyfile(
+            package.testdir,
+            **{
+                "pkg/other": """
+                    LIMIT = 2
+
+                    def helper():
+                        return 1
+                """
+            },
+        )
+        result = package.runpytest_inprocess("--testmon")
+        result.assert_outcomes()
+
+    def test_switched_off(self, package):
+        package.runpytest_inprocess(
+            "--testmon", "--testmon-noimports", "--testmon-noselect"
+        )
+        changepyfile(
+            package.testdir,
+            **{"pkg/types": PKG_TYPES + "        flag: bool = False\n"},
+        )
+        result = package.runpytest_inprocess("--testmon", "--testmon-noimports")
+        result.assert_outcomes()
+
+    def test_dataclass_default(self, local_remote):
+        source = """
+            from dataclasses import dataclass
+
+            @dataclass
+            class Config:
+                retries: int = {}
+        """
+        local_remote.makepyfile(
+            settings=source.format(1),
+            test_a="""
+                from settings import Config
+
+                def test_retries():
+                    assert Config().retries == 1
+            """,
+        )
+        local_remote.runpytest_inprocess("--testmon").assert_outcomes(passed=1)
+        changepyfile(local_remote.testdir, settings=source.format(2))
+        result = local_remote.runpytest_inprocess("--testmon")
+        result.assert_outcomes(failed=1)
+
+    def test_relative_and_star_imports(self, local_remote):
+        local_remote.makepyfile(
+            **{
+                "app/__init__": "",
+                "app/consts": "A = 1\n",
+                "app/api": "from .consts import *\n",
+                "app/tests/__init__": "",
+                "app/tests/test_a": """
+                    from ..api import A
+
+                    def test_a():
+                        assert A == 1
+                """,
+            }
+        )
+        local_remote.runpytest_inprocess("--testmon").assert_outcomes(passed=1)
+        changepyfile(local_remote.testdir, **{"app/consts": "A = 2\n"})
+        result = local_remote.runpytest_inprocess("--testmon")
+        result.assert_outcomes(failed=1)
 
 
 class TestPytestReportHeader:

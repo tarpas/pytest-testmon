@@ -114,6 +114,16 @@ def pytest_addoption(parser):
         help="Don't track subprocesses",
     )
     group.addoption(
+        "--testmon-noimports",
+        action="store_false",
+        dest="testmon_imports",
+        help=(
+            "Don't record imported modules as dependencies of a test. By default a test "
+            "depends on the module-level code of the modules imported by the files it "
+            "executed, also when it executes no line there (constants, class attributes)."
+        ),
+    )
+    group.addoption(
         "--tmnet",
         action="store_true",
         dest="tmnet",
@@ -232,6 +242,13 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
                     str(config.rootpath),
                     testmon_labels=testmon_options(config),
                     cov_plugin=cov_plugin,
+                    track_imports=config.getoption("testmon_imports"),
+                    # A worker doesn't compute fingerprints, so it has no parse to share.
+                    source_tree=(
+                        None
+                        if get_running_as(config) == "worker"
+                        else config.testmon_data.source_tree
+                    ),
                 ),
                 config.testmon_data,
                 running_as=get_running_as(config),
@@ -399,6 +416,7 @@ class TestmonCollect:
         if call.when == "teardown":
             report = result.get_result()
             report.nodes_files_lines = self.testmon.get_batch_coverage_data()
+            report.nodes_imports = self.testmon.nodes_imports(report.nodes_files_lines)
             result.force_result(
                 report
             )  # under xdist, report is serialized on the worker and sent to the controller
@@ -412,7 +430,9 @@ class TestmonCollect:
         if report.when == "teardown" and hasattr(report, "nodes_files_lines"):
             if report.nodes_files_lines:
                 test_executions_fingerprints = self.testmon_data.get_tests_fingerprints(
-                    report.nodes_files_lines, self.reports
+                    report.nodes_files_lines,
+                    self.reports,
+                    getattr(report, "nodes_imports", None),
                 )
                 self.testmon_data.save_test_execution_file_fps(
                     test_executions_fingerprints
@@ -423,7 +443,9 @@ class TestmonCollect:
             nodes_files_lines = self.testmon.get_batch_coverage_data()
 
             test_executions_fingerprints = self.testmon_data.get_tests_fingerprints(
-                nodes_files_lines, self.reports
+                nodes_files_lines,
+                self.reports,
+                self.testmon.nodes_imports(nodes_files_lines),
             )
             self.testmon_data.save_test_execution_file_fps(test_executions_fingerprints)
             self.testmon.close()

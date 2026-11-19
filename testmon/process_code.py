@@ -111,6 +111,20 @@ def _next_lineno(nodes, i, end):
         return None
 
 
+def import_records(node):
+    """[(module, level, name, asname)] for one Import or ImportFrom node.
+
+    `import a.b` gives ("a.b", 0, None, None); `from .m import x as y` gives
+    ("m", 1, "x", "y"); `from m import *` gives ("m", 0, "*", None).
+    """
+    if isinstance(node, ast.Import):
+        return [(alias.name, 0, None, None) for alias in node.names]
+    return [
+        (node.module or "", node.level, alias.name, alias.asname)
+        for alias in node.names
+    ]
+
+
 class Module:
     def __init__(  # pylint: disable=too-many-arguments
         self,
@@ -124,6 +138,7 @@ class Module:
         self.filename = filename
         self.rootdir = rootdir
         self._blocks = None
+        self.import_records = []
         self.counter = 0
         self.mtime = mtime
         self._source_code = (
@@ -147,6 +162,8 @@ class Module:
 
         if isinstance(node, ast.AST):
             class_name = node.__class__.__name__
+            if class_name in ("Import", "ImportFrom"):
+                self.import_records.extend(import_records(node))
             fields = []
             for field_name, field_value in ast.iter_fields(node):
                 transform_into_block = (
@@ -288,6 +305,14 @@ def match_fingerprint(module: Module, fingerprint):
     if set(fingerprint) - set(module.checksums):
         return False
     return True
+
+
+def root_fingerprint(module) -> [int]:
+    """Checksum of the module-level code (function bodies excluded)."""
+    if module.ext != "py" or not module.blocks:
+        return []
+    # dump_and_block appends the block of the module body last.
+    return methods_to_checksums([module.blocks[-1].code])
 
 
 def create_fingerprint_source(source_code, lines, ext="py"):
