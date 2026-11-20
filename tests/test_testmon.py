@@ -8,6 +8,7 @@ import sys
 import textwrap
 import time
 import pytest
+from coverage import env as coverage_env
 
 from testmon import db
 from testmon.process_code import (
@@ -38,6 +39,13 @@ from tests.lib4tests import GetTestmonDataPlugin, LocalRemote  # noqa: F401
 from testmon.common import get_system_packages
 
 pytest_plugins = ("pytester",)
+
+# The coverage core the tests run under: the sys.monitoring one has no dynamic
+# contexts, so testmon measures, and saves, one test at a time.
+CORE_HAS_CONTEXTS = (
+    os.environ.get("COVERAGE_CORE", "sysmon" if coverage_env.SYSMON_DEFAULT else "ctrace")
+    != "sysmon"
+)
 
 
 def two_lines_function():
@@ -770,6 +778,7 @@ def test_add():    assert add(1, 2) == 3
             assert td.unstable_test_names == {"test_a.py::test_1"}
 
     @pytest.mark.xfail(
+        CORE_HAS_CONTEXTS,
         strict=True,
         reason="under xdist results are saved in batches of 100; a KeyboardInterrupt loses the "
         "batch in progress, so tests that already ran stay unstable",

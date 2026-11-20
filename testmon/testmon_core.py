@@ -19,7 +19,6 @@ except ImportError:
     pass
 import pytest
 from coverage import Coverage, CoverageData
-from coverage.exceptions import CoverageException
 
 from testmon import db
 from testmon import TESTMON_VERSION as TM_CLIENT_VERSION
@@ -544,18 +543,12 @@ def cached_relpath(path, basepath):
 
 # coverage 7.10+ defaults to the sys.monitoring core on CPython 3.14+. That core
 # doesn't support dynamic contexts: sys.monitoring disables a line event once the
-# line has been recorded, so a line executed by several tests of one batch is
-# attributed to the first test only and the other tests lose the dependency.
-# testmon relies on contexts_by_lineno, so it needs the C tracer.
-COVERAGE_CORE = "ctrace"
-
-
-def force_context_capable_core(cov: Coverage):
-    try:
-        cov.set_option("run:core", COVERAGE_CORE)
-    except CoverageException:
-        # coverage < 7.10 has no core option and never defaults to sys.monitoring.
-        pass
+# line has been recorded, so contexts would credit a line executed by several tests
+# of one batch to the first test only. Under such a core a batch holds one test,
+# and every Coverage.start() restarts the disabled events for the next one.
+def supports_contexts(cov: Coverage) -> bool:
+    core = getattr(cov, "_core", None)  # coverage before 7.4 has no core choice
+    return core is None or getattr(core, "supports_dynamic_contexts", True)
 
 
 class TestmonCollector:
@@ -641,7 +634,6 @@ class TestmonCollector:
             self.setup_subprocess(params["include"])
         self.cov = Coverage(data_file=self.sub_cov_file, config_file=False, **params)
         self.cov._warn_no_data = False
-        force_context_capable_core(self.cov)
         if TestmonCollector.coverage_stack:
             TestmonCollector.coverage_stack[-1].stop()
 
@@ -656,7 +648,8 @@ class TestmonCollector:
 
         self.start_cov()
         self._test_name = test_name
-        self.cov.switch_context(test_name)
+        if supports_contexts(self.cov):
+            self.cov.switch_context(test_name)
         self.check_stack = TestmonCollector.coverage_stack.copy()
 
     def discard_current(self):
@@ -677,6 +670,7 @@ class TestmonCollector:
 
         if self.cov and (
             len(self.batched_test_names) >= TEST_BATCH_SIZE
+            or not supports_contexts(self.cov)
             or self._next_test_name is None
             or self._interrupted_at
         ):
@@ -698,7 +692,10 @@ class TestmonCollector:
                     filtered_lines_data
                 )
 
-            self.cov.erase()
+            # Erase the data, not the Coverage: Coverage.erase() makes the next start()
+            # rebuild the collector and the file matchers, which, once per test, costs
+            # more than the tests.
+            self.cov.get_data().erase()
             self.cov.start()
             self.batched_test_names = set()
         return nodes_files_lines
@@ -708,6 +705,10 @@ class TestmonCollector:
         files = cov_data.measured_files()
         nodes_files_lines = {}
         files_lines = {}
+        # Without contexts the batch is one test, and every line measured is its.
+        only_test = (
+            None if supports_contexts(self.cov) else next(iter(self.batched_test_names), None)
+        )
         for file in files:
             relfilename = cached_relpath(file, self.rootdir)
 
@@ -715,6 +716,8 @@ class TestmonCollector:
 
             for lineno, contexts in contexts_by_lineno.items():
                 for context in contexts:
+                    if not context and only_test:
+                        context = only_test
                     nodes_files_lines.setdefault(context, {}).setdefault(
                         relfilename, set()
                     ).add(lineno)
@@ -740,7 +743,6 @@ class TestmonCollector:
             TestmonCollector.coverage_stack.pop()
         if self.sub_cov_file:
             os.remove(self.sub_cov_file + "_rc")
-            os.environ.pop("COVERAGE_CORE", None)
         os.environ.pop("COVERAGE_PROCESS_START", None)
         self.cov = None
         if TestmonCollector.coverage_stack:
@@ -767,7 +769,6 @@ class TestmonCollector:
             )
             subprocess_rc.write(rc_content)
         os.environ["COVERAGE_PROCESS_START"] = self.sub_cov_file + "_rc"
-        os.environ["COVERAGE_CORE"] = COVERAGE_CORE
 
 
 def eval_environment(environment, **kwargs):
