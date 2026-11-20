@@ -23,10 +23,10 @@ from testmon.testmon_core import (
 )
 from testmon.process_code import blob_to_checksums
 
-from testmon.testmon_core import TestmonCollector as CoreTestmon
+from testmon.collector.ctrace import CtraceCollector as CoreTestmon
 from testmon.testmon_core import TestmonData as CoreTestmonData
 from tests.coveragepy import coveragetest
-from tests.test_core import CoreTestmonDataForTest, git_repo  # noqa: F401
+from tests.test_core import COLLECTORS, CoreTestmonDataForTest, git_repo  # noqa: F401
 
 
 from threading import Thread, Condition
@@ -368,6 +368,34 @@ class TestmonDeselect(object):
                 "*passed*",
             ]
         )
+
+    @pytest.mark.parametrize("coverage_core", [None, "sysmon", "ctrace"])
+    @pytest.mark.parametrize("collector", COLLECTORS)
+    def test_shared_dependency_change_reselects_every_test(
+        self, local_remote, monkeypatch, collector, coverage_core
+    ):
+        # https://github.com/tarpas/pytest-testmon/issues/277: with coverage's
+        # sys.monitoring core only the first test running shared() depended on it.
+        if coverage_core == "sysmon" and sys.version_info < (3, 12):
+            pytest.skip("coverage's sysmon core needs Python 3.12+")
+        monkeypatch.setenv("TESTMON_CORE", collector)
+        if coverage_core:
+            monkeypatch.setenv("COVERAGE_CORE", coverage_core)
+        local_remote.makepyfile(lib="def shared():\n    return 1\n")
+        for name in ("a", "b", "c"):
+            local_remote.makepyfile(
+                **{
+                    f"test_{name}": f"from lib import shared\ndef test_{name}():\n    shared()\n"
+                }
+            )
+        result = local_remote.runpytest_inprocess("--testmon")
+        result.assert_outcomes(passed=3)
+
+        lib = local_remote.makepyfile(lib="def shared():\n    return 2\n")
+        lib.setmtime(1424880935)
+
+        result = local_remote.runpytest_inprocess("--testmon")
+        result.assert_outcomes(passed=3)  # none deselected
 
     def test_status_code_tests_deselected(self, local_remote):
         local_remote.makepyfile(
