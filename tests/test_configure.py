@@ -1,4 +1,7 @@
+from types import SimpleNamespace
+
 import pytest
+from coverage import Coverage
 
 from testmon.configure import TmConf
 from testmon import configure
@@ -95,3 +98,23 @@ class TestConfigure:
         assert configure._header_collect_select(
             options, coverage=True, cov_plugin=True
         ) == TmConf("testmon: ", True, True)
+
+    def test_is_coverage_detects_outer_measurement(self, monkeypatch):
+        monkeypatch.setattr(Coverage, "current", classmethod(lambda cls: None))
+        assert not configure._is_coverage()
+        monkeypatch.setattr(Coverage, "current", classmethod(lambda cls: object()))
+        assert configure._is_coverage()
+
+    @pytest.mark.parametrize("started, collect", [(False, False), (True, True)])
+    def test_cov_plugin_counts_only_when_started(
+        self, options, monkeypatch, started, collect
+    ):
+        options["testmon"] = True
+        monkeypatch.setattr(configure, "_is_coverage", lambda: True)
+        monkeypatch.setattr(configure, "_is_debugger", lambda: False)
+        config = SimpleNamespace(option=SimpleNamespace(**options))
+        cov_plugin = SimpleNamespace(_started=started)
+
+        tm_conf = configure.header_collect_select(config, None, cov_plugin=cov_plugin)
+
+        assert tm_conf.collect is collect
