@@ -8,8 +8,7 @@ Usage: python bench.py <venv python> <work dir> <reps> [scenario...]
                   put first on PYTHONPATH for the "main ctrace" variant
   <work dir>      holds more-itertools/ (git clone --depth 1 --branch v10.5.0
                   https://github.com/more-itertools/more-itertools) and
-                  tiny/ is generated
-                  there on first use
+                  tiny/ is generated there on first use
   [scenario...]   only these scenarios (names as printed)
 
 BENCH_VARIANTS="plain,branch sysmon" limits the variants.
@@ -19,6 +18,7 @@ Every run starts from an empty .testmondata (full collection run). Variants
 are interleaved within each repetition to spread machine noise.
 """
 
+import json
 import os
 import shutil
 import statistics
@@ -78,7 +78,9 @@ def run(cwd, args, extra_env, opts):
     return elapsed, tail
 
 
-print(f"python: {subprocess.check_output([py, '-c', 'import sys;print(sys.version.split()[0])'], text=True).strip()}, reps={reps}")
+pyver = subprocess.check_output([py, "-c", "import sys;print(sys.version.split()[0])"], text=True).strip()
+print(f"python: {pyver}, reps={reps}")
+results = {}
 print(f"{'scenario':24} " + " ".join(f"{v:>15}" for v in VARIANTS))
 for scen, (cwd, args) in SCENARIOS.items():
     if only and scen not in only:
@@ -87,4 +89,9 @@ for scen, (cwd, args) in SCENARIOS.items():
     for _ in range(reps):  # interleave variants to spread machine noise
         for v, (extra_env, opts) in VARIANTS.items():
             times[v].append(run(cwd, args, extra_env, opts)[0])
+    results[scen] = times
     print(f"{scen:24} " + " ".join(f"{statistics.median(t):6.2f} (min{min(t):5.2f})" for t in times.values()), flush=True)
+
+if os.environ.get("BENCH_JSON"):
+    with open(os.environ["BENCH_JSON"], "w") as fh:
+        json.dump({"python": pyver, "reps": reps, "results": results}, fh, indent=2)
