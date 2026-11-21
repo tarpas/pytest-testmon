@@ -103,10 +103,7 @@ class SysmonCollector:
         return DISABLE
 
     def _on_line(self, code, line_number):
-        lines = self._current_lines.get(code.co_filename)
-        if lines is None:
-            lines = self._current_lines.setdefault(code.co_filename, set())
-        lines.add(line_number)
+        self._current_lines.setdefault(code.co_filename, set()).add(line_number)
         return DISABLE
 
     def _start_monitoring(self):
