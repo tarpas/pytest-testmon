@@ -1,14 +1,8 @@
 name: bench
 on:
-  workflow_dispatch:
-    inputs:
-      reps:
-        default: "5"
-      scenarios:
-        description: "Space-separated scenario names (empty = all)"
-        default: ""
+  push:
+    branches: ['**']
   pull_request:
-    # paths: ["testmon/**", "bench/**"]
 
 jobs:
   bench:

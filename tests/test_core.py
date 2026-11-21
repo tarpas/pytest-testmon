@@ -135,7 +135,9 @@ class TestMakeCollector:
         import testmon.collector.sysmon  # pylint: disable=import-outside-toplevel
 
         monkeypatch.delenv("TESTMON_CORE", raising=False)
-        monkeypatch.setattr(testmon.collector.sysmon, "free_tool_id", lambda: None)
+        monkeypatch.setattr(
+            testmon.collector.sysmon, "search_free_tool_id", lambda: None
+        )
         assert isinstance(make_collector(""), CoreTestmon)
 
 
