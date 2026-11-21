@@ -58,12 +58,12 @@ def make_collector(rootdir, testmon_labels=None, cov_plugin=None) -> Collector:
         core = ""
     if core != "ctrace":
         try:
-            from testmon.collector.sysmon import SysmonCollector, free_tool_id
+            from testmon.collector.sysmon import SysmonCollector, search_free_tool_id
         except ImportError:
             if core == "sysmon":
                 logger.warning("TESTMON_CORE=sysmon needs CPython 3.12+, using ctrace")
         else:
-            if free_tool_id() is not None:
+            if search_free_tool_id() is not None:
                 return SysmonCollector(rootdir, testmon_labels, cov_plugin)
             logger.warning("no free sys.monitoring tool id, using ctrace")
     from testmon.collector.ctrace import CtraceCollector

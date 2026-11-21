@@ -20,11 +20,14 @@ sysmon = sys.monitoring
 EV = sysmon.events
 DISABLE = sysmon.DISABLE
 
-# CPython reserves 0 (debugger), 1 (coverage), 2 (profiler), 5 (optimizer).
-_PREFERRED_TOOL_IDS = (3, 4, 2, 5)
+# https://peps.python.org/pep-0669/#tool-identifiers
+# CPython suggests in PEP 669: 0 (debugger), 1 (coverage), 2 (profiler), 5 (optimizer).
+# These are conventions, not enforced. We aren't a debugger, profiler or optimizer, and
+# we avoid 1 so coverage keeps working, so we prefer 3 and 4.
+_PREFERRED_TOOL_IDS = (3, 4, 5, 2)
 
 
-def free_tool_id():
+def search_free_tool_id():
     """The first free tool id testmon may use, or None."""
     for tool_id in _PREFERRED_TOOL_IDS:
         if sysmon.get_tool(tool_id) is None:
@@ -33,7 +36,7 @@ def free_tool_id():
 
 
 def _acquire_tool_id(name):
-    tool_id = free_tool_id()
+    tool_id = search_free_tool_id()
     if tool_id is None:
         raise RuntimeError("testmon: no free sys.monitoring tool id")
     sysmon.use_tool_id(tool_id, name)
@@ -54,8 +57,6 @@ class SysmonCollector:
         self._real_root = os.path.realpath(rootdir)
         self._root_prefix = _dir_prefix(self._real_root)
 
-        # Same omit rule as CtraceCollector: stdlib and site-packages,
-        # which matters when the virtualenv lives inside the project.
         self._omit_prefixes = tuple(
             _dir_prefix(os.path.realpath(path))
             for key, path in sysconfig.get_paths().items()
@@ -75,7 +76,6 @@ class SysmonCollector:
         self.batched_test_names = set()
         self._interrupted_at = None
 
-    # ---------------------------------------------------------------- scope
     @lru_cache(maxsize=None)  # noqa: B019 (one collector per session)
     def _in_scope(self, filename):
         if not filename or filename[0] == "<":  # <string>, <frozen ...>
@@ -96,39 +96,27 @@ class SysmonCollector:
             os.sep, "/"
         )
 
-    # ------------------------------------------------------------ callbacks
     def _on_py_start(self, code, instruction_offset):  # pylint: disable=unused-argument
-        # Fires once per function per test (restart_events re-arms it).
         if id(code) not in self._armed and self._in_scope(code.co_filename):
             sysmon.set_local_events(self._tool_id, code, EV.LINE)
             self._armed[id(code)] = code
         return DISABLE
 
     def _on_line(self, code, line_number):
-        # Fires once per line per test.
         lines = self._current_lines.get(code.co_filename)
         if lines is None:
-            # setdefault, not "d[k] = set()": two threads (free-threaded build,
-            # or a GIL switch in between) could each create a set, and the lines
-            # added to the overwritten one would be lost.
             lines = self._current_lines.setdefault(code.co_filename, set())
         lines.add(line_number)
         return DISABLE
 
-    # ------------------------------------------------------------ lifecycle
     def _start_monitoring(self):
         self._tool_id = _acquire_tool_id("testmon")
         sysmon.register_callback(self._tool_id, EV.PY_START, self._on_py_start)
         sysmon.register_callback(self._tool_id, EV.LINE, self._on_line)
-        # A previous user of this tool id may have left locations DISABLEd.
         sysmon.restart_events()
         sysmon.set_events(self._tool_id, EV.PY_START)
 
     def _flush_current(self):
-        # Threads a test left running may still add lines while we flush:
-        # swap the dict out first and iterate over a snapshot (list() and
-        # set.update() are atomic, also on free-threaded builds), so this
-        # never raises "changed size during iteration".
         current, self._current_lines = self._current_lines, {}
         if self._test_name is not None and current:
             per_test = self._batch.setdefault(self._test_name, {})
@@ -138,8 +126,8 @@ class SysmonCollector:
     def start_testmon(self, test_name, next_test_name=None):
         if self._tool_id is None:
             self._start_monitoring()
-        self._flush_current()  # == cov.switch_context(test_name)
-        sysmon.restart_events()  # every line/function may fire once more
+        self._flush_current()
+        sysmon.restart_events()
         self._test_name = test_name
         self._next_test_name = next_test_name
         self.batched_test_names.add(test_name)
@@ -165,7 +153,6 @@ class SysmonCollector:
                 continue
             per_test = nodes_files_lines[test_name] = {}
             for filename, lines in files.items():
-                # Several co_filenames may resolve to the same file.
                 per_test.setdefault(self._relpath(filename), set()).update(lines)
         self.batched_test_names.discard(self._interrupted_at)
         for test_name in self.batched_test_names:
@@ -186,6 +173,6 @@ class SysmonCollector:
         self._armed.clear()
         sysmon.register_callback(tool_id, EV.PY_START, None)
         sysmon.register_callback(tool_id, EV.LINE, None)
-        if hasattr(sysmon, "clear_tool_id"):  # 3.14+
+        if hasattr(sysmon, "clear_tool_id"):
             sysmon.clear_tool_id(tool_id)
         sysmon.free_tool_id(tool_id)
