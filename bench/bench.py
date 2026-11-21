@@ -1,6 +1,6 @@
-"""Benchmark: plain pytest vs main (ctrace) vs branch ctrace vs branch sysmon.
+"""Benchmark: plain pytest vs branch ctrace vs branch sysmon.
 
-Usage: python bench.py <venv python> <main worktree> <work dir> <reps> [scenario...]
+Usage: python bench.py <venv python> <work dir> <reps> [scenario...]
 
   <venv python>   python of a venv with the branch installed (pip install -e .),
                   plus pytest-cov and pytest-xdist
@@ -26,8 +26,8 @@ import subprocess
 import sys
 import time
 
-py, main_wt, work, reps = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
-only = sys.argv[5:]
+py, work, reps = sys.argv[1], sys.argv[2], int(sys.argv[3])
+only = sys.argv[4:]
 MITER = os.path.join(work, "more-itertools")
 
 
@@ -55,7 +55,6 @@ base_env = {k: v for k, v in os.environ.items() if not k.startswith(("TESTMON", 
 base_env["PYTHONDONTWRITEBYTECODE"] = "1"
 VARIANTS = {
     "plain": ({}, ["-p", "no:testmon"]),
-    "main ctrace": ({"PYTHONPATH": main_wt}, ["--testmon"]),
     "branch ctrace": ({"TESTMON_CORE": "ctrace"}, ["--testmon"]),
     "branch sysmon": ({"TESTMON_CORE": "sysmon"}, ["--testmon"]),
 }
@@ -68,8 +67,7 @@ def run(cwd, args, extra_env, opts):
         if name.startswith(".testmondata") or name in (".coverage", ".pytest_cache"):
             p = os.path.join(cwd, name)
             shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
-    env = dict(base_env, PYTHONPATH=os.pathsep.join(filter(None, [extra_env.get("PYTHONPATH"), cwd])))
-    env.update({k: v for k, v in extra_env.items() if k != "PYTHONPATH"})
+    env = dict(base_env, PYTHONPATH=cwd, **extra_env)
     t = time.perf_counter()
     r = subprocess.run([py, "-m", "pytest", "-q", "-p", "no:cacheprovider", *opts, *args],
                        cwd=cwd, env=env, capture_output=True, text=True)

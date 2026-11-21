@@ -1,4 +1,4 @@
-name: bench
+name: Benchmark pytest-testmon
 on:
   push:
     branches: ['**']
@@ -10,16 +10,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.14"]
+        python: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4            # the branch under test
         with:
           path: branch
-      - uses: actions/checkout@v4            # upstream main for the "main ctrace" variant
-        with:
-          repository: tarpas/pytest-testmon
-          ref: main
-          path: main-wt
 
       - uses: actions/setup-python@v5
         with:
@@ -49,7 +44,7 @@ jobs:
           SCEN="${{ inputs.scenarios }}"
           # scenario names contain spaces, so pass them one per line
           mapfile -t ARGS < <(printf '%s\n' "$SCEN" | tr ',' '\n' | sed '/^$/d')
-          venv/bin/python branch/bench/bench.py "$PWD/venv/bin/python" "$PWD/main-wt" "$PWD/work" "${{ inputs.reps || 5 }}" "${ARGS[@]}" \
+          venv/bin/python branch/bench/bench.py "$PWD/venv/bin/python" "$PWD/work" "${{ inputs.reps || 5 }}" "${ARGS[@]}" \
             | tee bench.txt
           { echo "### Python ${{ matrix.python }}"; echo '```'; cat bench.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
