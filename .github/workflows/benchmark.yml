@@ -8,7 +8,7 @@ on:
         description: "Space-separated scenario names (empty = all)"
         default: ""
   pull_request:
-    paths: ["testmon/**", "bench/**"]
+    # paths: ["testmon/**", "bench/**"]
 
 jobs:
   bench:
