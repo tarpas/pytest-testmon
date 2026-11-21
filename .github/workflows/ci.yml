@@ -30,6 +30,13 @@ jobs:
           - { os: ubuntu-latest, python-version: '3.14' }
           - { os: ubuntu-latest, python-version: '3.15' }
           - { os: windows-latest, python-version: '3.11' }
+          # free-threaded build: the collectors' callbacks run truly in parallel
+          - { os: ubuntu-latest, python-version: '3.14t' }
+          - { os: ubuntu-latest, python-version: '3.15t' }
+          # both collectors on Windows and macOS: SysmonCollector's path handling
+          # (drive letters and case on Windows, /var -> /private/var on macOS)
+          - { os: windows-latest, python-version: '3.14' }
+          - { os: macos-latest, python-version: '3.14' }
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
@@ -38,6 +45,9 @@ jobs:
     - uses: astral-sh/setup-uv@v6
       with:
         enable-cache: true
+    # uv skips free-threaded interpreters unless asked for one explicitly
+    - if: endsWith(matrix.python-version, 't')
+      run: echo "UV_PYTHON=${{ matrix.python-version }}" >> "$GITHUB_ENV"
     - run: uv sync --locked
     # tox-gh-actions picks the envs for this interpreter from [gh-actions] in tox.ini
     - run: uv run tox

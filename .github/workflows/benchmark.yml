@@ -1,0 +1,76 @@
+name: Benchmark
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  bench:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14", "3.15"]
+    steps:
+      - uses: actions/checkout@v4            # the branch under test
+        with:
+          path: branch
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Venv with the branch
+        run: |
+          python -m venv venv
+          venv/bin/pip install -e ./branch pytest-cov pytest-xdist
+
+      - name: Benchmark projects (cached)
+        uses: actions/cache@v4
+        id: projects
+        with:
+          path: work
+          key: bench-projects-miter-10.5.0-nx-3.4.2
+      - if: steps.projects.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p work
+          git clone --depth 1 --branch v10.5.0 https://github.com/more-itertools/more-itertools work/more-itertools
+          # the projects' own test deps
+          true
+
+      - name: Runner info
+        shell: bash
+        run: |
+          {
+            echo "#### Runner"
+            echo '```'
+            echo "image:   ${ImageOS:-?} ${ImageVersion:-?}"
+            echo "runner:  ${RUNNER_NAME} (${RUNNER_ENVIRONMENT}, ${RUNNER_OS}/${RUNNER_ARCH})"
+            echo "cpu:     $(lscpu | awk -F: '/Model name/ {gsub(/^ +/,"",$2); print $2}')"
+            echo "vcpus:   $(nproc), threads/core: $(lscpu | awk -F: '/Thread\(s\) per core/ {gsub(/ /,"",$2); print $2}')"
+            echo "mem:     $(free -g | awk '/Mem:/ {print $2" GB"}')"
+            echo "kernel:  $(uname -r)"
+            echo '```'
+          } | tee runner.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run bench
+        shell: bash
+        env:
+          BENCH_JSON: ${{ github.workspace }}/bench.json
+        run: |
+          venv/bin/pip install -q -r work/more-itertools/requirements/test.txt 2>/dev/null || true
+          venv/bin/python branch/bench/bench.py "$PWD/venv/bin/python" "$PWD/work" "${{ inputs.reps || 5 }}" \
+            | tee bench.txt
+          { echo "### Python ${{ matrix.python }}"; echo '```'; cat bench.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Delta
+        shell: bash
+        run: python branch/bench/delta.py bench.json | tee bench-delta.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-py${{ matrix.python }}
+          path: |
+            bench.txt
+            bench.json
+            bench-delta.md

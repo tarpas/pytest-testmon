@@ -18,8 +18,8 @@ from _pytest.terminal import TerminalReporter
 
 from testmon.configure import TmConf
 
+from testmon.collector import Collector, make_collector
 from testmon.testmon_core import (
-    TestmonCollector,
     eval_environment,
     TestmonData,
     home_file,
@@ -228,7 +228,7 @@ def register_plugins(config, should_select, should_collect, cov_plugin):
     if should_collect:
         config.pluginmanager.register(
             TestmonCollect(
-                TestmonCollector(
+                make_collector(
                     str(config.rootpath),
                     testmon_labels=testmon_options(config),
                     cov_plugin=cov_plugin,
@@ -357,7 +357,7 @@ class TestmonCollect:
         self, testmon, testmon_data: TestmonData, running_as="single", cov_plugin=None
     ):
         self.testmon_data: TestmonData = testmon_data
-        self.testmon: TestmonCollector = testmon
+        self.testmon: Collector = testmon
         self._running_as = running_as
 
         self.reports = defaultdict(lambda: {})
