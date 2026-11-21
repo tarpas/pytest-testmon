@@ -161,6 +161,7 @@ class SysmonCollector:
 
         self._batch = {}
         self.batched_test_names = set()
+        self._interrupted_at = None
         return nodes_files_lines
 
     def close(self):
