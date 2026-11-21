@@ -1,4 +1,4 @@
-name: Benchmark pytest-testmon
+name: Benchmark
 on:
   push:
     branches: ['**']
@@ -37,6 +37,21 @@ jobs:
           git clone --depth 1 --branch v10.5.0 https://github.com/more-itertools/more-itertools work/more-itertools
           # the projects' own test deps
           true
+
+      - name: Runner info
+        shell: bash
+        run: |
+          {
+            echo "#### Runner"
+            echo '```'
+            echo "image:   ${ImageOS:-?} ${ImageVersion:-?}"
+            echo "runner:  ${RUNNER_NAME} (${RUNNER_ENVIRONMENT}, ${RUNNER_OS}/${RUNNER_ARCH})"
+            echo "cpu:     $(lscpu | awk -F: '/Model name/ {gsub(/^ +/,"",$2); print $2}')"
+            echo "vcpus:   $(nproc), threads/core: $(lscpu | awk -F: '/Thread\(s\) per core/ {gsub(/ /,"",$2); print $2}')"
+            echo "mem:     $(free -g | awk '/Mem:/ {print $2" GB"}')"
+            echo "kernel:  $(uname -r)"
+            echo '```'
+          } | tee runner.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run bench
         shell: bash
