@@ -37,11 +37,8 @@ def connection_options(connection):
 def check_fingerprint_db(
     files_methods_checksums, file_name, fingerprint: ChangedFileData
 ):  # filename name method_checksums id failed
-    if file_name in files_methods_checksums and files_methods_checksums[file_name]:
-        if set(fingerprint) - set(files_methods_checksums[file_name]):
-            return False
-        return True
-    return False
+    checksums = files_methods_checksums.get(file_name)
+    return bool(checksums) and set(fingerprint).issubset(checksums)
 
 
 def check_data_version(connection, datafile, data_version):
@@ -534,9 +531,13 @@ class DB:  # pylint: disable=too-many-public-methods
                     ]
                 )
 
+            # one set per changed file, not one per test depending on it
+            files_checksums = {
+                file: set(mhashes) for file, mhashes in files_mhashes.items() if mhashes
+            }
             method_misses = []
             for result in results:
-                if not check_fingerprint_db(files_mhashes, result[0], result[2]):
+                if not check_fingerprint_db(files_checksums, result[0], result[2]):
                     method_misses.append(result[1])
 
             failing_tests = [
