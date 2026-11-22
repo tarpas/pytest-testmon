@@ -12,6 +12,9 @@ import sysconfig
 from testmon.collector import NodesFilesLines
 from testmon.testmon_core import TEST_BATCH_SIZE, home_file
 
+# a batch also ends at this many (test, file) pairs: its data peaks at ~420 B each
+BATCH_PAIRS = 1_000_000
+
 if not hasattr(sys, "monitoring"):  # CPython < 3.12
     raise ImportError("sys.monitoring requires CPython 3.12+")
 
@@ -82,6 +85,7 @@ class SysmonCollector:
         self._test_name = None
         self._next_test_name = None
         self._batch = {}  # {test name: {abs filename: set(lineno)}}
+        self._batch_pairs = 0
         self.batched_test_names = set()
         self._interrupted_at = None
 
@@ -157,11 +161,14 @@ class SysmonCollector:
             else None
         )
         # list(): a callback in another thread may still add to current
+        files_before = len(per_test) if per_test is not None else 0
         for code_id, lines in list(current.items()):
             code = self._armed[code_id]
             if per_test is not None:
                 per_test.setdefault(code.co_filename, set()).update(lines)
             self._arm(code)
+        if per_test is not None:
+            self._batch_pairs += len(per_test) - files_before
 
     def start_testmon(self, test_name, next_test_name=None):
         if self._tool_id is None:
@@ -177,6 +184,7 @@ class SysmonCollector:
     def get_batch_coverage_data(self) -> NodesFilesLines:
         if self._tool_id is None or not (
             len(self.batched_test_names) >= TEST_BATCH_SIZE
+            or self._batch_pairs >= BATCH_PAIRS
             or self._next_test_name is None
             or self._interrupted_at
         ):
@@ -198,6 +206,7 @@ class SysmonCollector:
             per_test.setdefault(home_file(test_name), {1})
 
         self._batch = {}
+        self._batch_pairs = 0
         self.batched_test_names = set()
         self._interrupted_at = None
         return nodes_files_lines
