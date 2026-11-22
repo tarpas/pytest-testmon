@@ -410,6 +410,7 @@ class TestmonCollect:
                 self.testmon_data.save_test_execution_file_fps(
                     test_executions_fingerprints
                 )
+            del report.nodes_files_lines
 
     def pytest_keyboard_interrupt(self, excinfo):  # pylint: disable=unused-argument
         if self._running_as == "single":
