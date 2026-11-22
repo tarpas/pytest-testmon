@@ -308,6 +308,30 @@ class TestTestmonRecursive:
         assert "one_line_dep.py" not in results["2"]
         assert results["3"]["one_line_dep.py"] == {1}
 
+    @pytest.mark.parametrize("collector_class", COLLECTORS.values(), ids=COLLECTORS)
+    def test_last_of_batch_keeps_its_lines(self, testdir, collector_class, monkeypatch):
+        # The last test of a batch is still current when the next one starts.
+        monkeypatch.setattr(
+            sys.modules[collector_class.__module__], "TEST_BATCH_SIZE", 2
+        )
+        testdir.makepyfile(batch_dep="def inc(x):\n    return x + 1\n")
+        testdir.syspathinsert()
+        import batch_dep  # pylint: disable=import-error,import-outside-toplevel
+
+        testmon = collector_class(rootdir=str(testdir.tmpdir))
+        results = {}
+        for name, nxt in (("1", "2"), ("2", "3"), ("3", None)):
+            testmon.start_testmon(name, next_test_name=nxt)
+            batch_dep.inc(1)
+            results.update(testmon.get_batch_coverage_data())
+        testmon.close()
+
+        assert {name: results[name]["batch_dep.py"] for name in "123"} == {
+            "1": {2},
+            "2": {2},
+            "3": {2},
+        }
+
     @pytest.mark.skipif(
         sys.platform == "win32", reason="creating symlinks needs privileges"
     )

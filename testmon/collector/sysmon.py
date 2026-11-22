@@ -43,6 +43,13 @@ def _acquire_tool_id(name):
     return tool_id
 
 
+def _single_line(code):
+    """The line of a code object whose instructions are all on one line
+    (lambda x: x + 1, def f(x): return x), else None."""
+    lines = {line for _, _, line in code.co_lines() if line is not None}
+    return lines.pop() if len(lines) == 1 else None
+
+
 def _dir_prefix(path):
     """Normalized "path/" for prefix tests: case and slashes don't matter on
     Windows (normcase), and "/root" doesn't match "/root2"."""
@@ -64,12 +71,15 @@ class SysmonCollector:
         )
 
         self._tool_id = None
-        # Code objects with local LINE events enabled, keyed by id(): code
+        # Code objects armed with local events (see _arm), keyed by id(): code
         # objects compare *equal* when only co_filename differs (e.g. the same
         # test function in two modules), so a set() would silently skip one.
         # Values keep them alive, so ids are never reused.
         self._armed = {}
-        self._current_lines = {}  # {abs filename: set(lineno)} of current test
+        # {id(code): line} for the armed single-line codes (see _arm)
+        self._one_line = {}
+        # {id(code): set(lineno)} of the current test; the codes are in _armed
+        self._current_lines = {}
         self._test_name = None
         self._next_test_name = None
         self._batch = {}  # {test name: {abs filename: set(lineno)}}
@@ -96,35 +106,61 @@ class SysmonCollector:
             os.sep, "/"
         )
 
-    def _on_py_start(self, code, instruction_offset):  # pylint: disable=unused-argument
+    def _on_py_start(self, code, _offset):
         if id(code) not in self._armed and self._in_scope(code.co_filename):
-            sysmon.set_local_events(self._tool_id, code, EV.LINE)
             self._armed[id(code)] = code
+            line = _single_line(code)
+            if line is not None:
+                self._one_line[id(code)] = line
+            self._arm(code)
         return DISABLE
 
+    def _arm(self, code):
+        # Resetting to 0 first is what clears the locations that returned
+        # DISABLE. Single-line codes (lambda x: x + 1) get INSTRUCTION: on
+        # 3.14+ they report no LINE once re-armed.
+        sysmon.set_local_events(self._tool_id, code, 0)
+        events = EV.INSTRUCTION if id(code) in self._one_line else EV.LINE
+        sysmon.set_local_events(self._tool_id, code, events)
+
     def _on_line(self, code, line_number):
-        self._current_lines.setdefault(code.co_filename, set()).add(line_number)
+        self._current_lines.setdefault(id(code), set()).add(line_number)
+        return DISABLE
+
+    def _on_instruction(self, code, _offset):
+        self._current_lines.setdefault(id(code), set()).add(self._one_line[id(code)])
         return DISABLE
 
     def _start_monitoring(self):
         self._tool_id = _acquire_tool_id("testmon")
         sysmon.register_callback(self._tool_id, EV.PY_START, self._on_py_start)
         sysmon.register_callback(self._tool_id, EV.LINE, self._on_line)
+        sysmon.register_callback(self._tool_id, EV.INSTRUCTION, self._on_instruction)
         sysmon.restart_events()
         sysmon.set_events(self._tool_id, EV.PY_START)
 
     def _flush_current(self):
+        """Move the current test's lines to the batch and re-arm only the code
+        that ran: restart_events() would re-enable PY_START for every function
+        seen so far, pytest's own included, at a callback each per test."""
         current, self._current_lines = self._current_lines, {}
-        if self._test_name is not None and current:
-            per_test = self._batch.setdefault(self._test_name, {})
-            for filename, lines in list(current.items()):
-                per_test.setdefault(filename, set()).update(lines)
+        # An empty entry would erase the lines of a test that closed a batch.
+        per_test = (
+            self._batch.setdefault(self._test_name, {})
+            if self._test_name is not None and current
+            else None
+        )
+        # list(): a callback in another thread may still add to current
+        for code_id, lines in list(current.items()):
+            code = self._armed[code_id]
+            if per_test is not None:
+                per_test.setdefault(code.co_filename, set()).update(lines)
+            self._arm(code)
 
     def start_testmon(self, test_name, next_test_name=None):
         if self._tool_id is None:
             self._start_monitoring()
         self._flush_current()
-        sysmon.restart_events()
         self._test_name = test_name
         self._next_test_name = next_test_name
         self.batched_test_names.add(test_name)
@@ -139,10 +175,9 @@ class SysmonCollector:
             or self._interrupted_at
         ):
             return {}
-        self._flush_current()
         # Lines executed after this point (until the next switch) stay with the
         # current test and are reported in the next batch, like with contexts.
-        sysmon.restart_events()
+        self._flush_current()
 
         nodes_files_lines = {}
         for test_name, files in self._batch.items():
@@ -169,8 +204,10 @@ class SysmonCollector:
         for code in self._armed.values():
             sysmon.set_local_events(tool_id, code, 0)
         self._armed.clear()
+        self._one_line.clear()
         sysmon.register_callback(tool_id, EV.PY_START, None)
         sysmon.register_callback(tool_id, EV.LINE, None)
+        sysmon.register_callback(tool_id, EV.INSTRUCTION, None)
         if hasattr(sysmon, "clear_tool_id"):
             sysmon.clear_tool_id(tool_id)
         sysmon.free_tool_id(tool_id)
