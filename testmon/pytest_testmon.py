@@ -507,14 +507,12 @@ class TestmonSelect:
         failing_test_names = testmon_data.failed_test_names
         failing_files = {home_file(test_name) for test_name in failing_test_names}
 
-        self.deselected_files = [
-            file for file in testmon_data.stable_files if file not in failing_files
-        ]
-        self.deselected_tests = [
-            test_name
-            for test_name in testmon_data.stable_test_names
-            if test_name not in failing_test_names
-        ]
+        # sets: pytest_ignore_collect and pytest_collection_modifyitems check
+        # every collected path and item against them
+        self.deselected_files = set(testmon_data.stable_files) - failing_files
+        self.deselected_tests = set(testmon_data.stable_test_names) - set(
+            failing_test_names
+        )
 
     @property
     def avg_durations(self):
