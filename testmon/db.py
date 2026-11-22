@@ -104,8 +104,9 @@ class DB:  # pylint: disable=too-many-public-methods
     def vacuum_file_fp(self, con):
         con.execute(
             """ DELETE FROM file_fp
-                WHERE id NOT IN (
-                    SELECT DISTINCT fingerprint_id FROM test_execution_file_fp) """
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM test_execution_file_fp
+                    WHERE fingerprint_id = file_fp.id) """
         )
 
     def fetch_current_run_stats(self, exec_id):
@@ -460,20 +461,26 @@ class DB:  # pylint: disable=too-many-public-methods
             )
             return self._fetch_unknown_files_from_one_v(con, exec_id, exec_id)
 
+    def _used_by_exec(self, fingerprint_id, exec_id):
+        # per fingerprint, not a join over every (test, file) row
+        return f"""EXISTS (
+            SELECT 1 FROM test_execution_file_fp te_ffp, test_execution te
+            WHERE te_ffp.fingerprint_id = {fingerprint_id} AND
+                te.id = te_ffp.test_execution_id AND
+                te.{self._test_execution_fk_column()} = {exec_id})"""
+
     def _fetch_unknown_files_from_one_v(self, con, exec_id, files_shas_id):
         result = []
         for row in con.execute(
             f"""
                 SELECT DISTINCT
                     f.filename
-                FROM test_execution te, test_execution_file_fp te_ffp, file_fp f
+                FROM file_fp f
                 LEFT OUTER JOIN changed_files_fshas chff
                 ON f.filename = chff.filename and f.fsha = chff.fsha AND chff.exec_id = :files_shas_id
                 WHERE
-                    te.{self._test_execution_fk_column()} = :exec_id AND
-                    te.id = te_ffp.test_execution_id AND
-                    te_ffp.fingerprint_id = f.id AND
-                    (f.fsha IS NULL OR chff.fsha IS NULL)
+                    (f.fsha IS NULL OR chff.fsha IS NULL) AND
+                    {self._used_by_exec("f.id", ":exec_id")}
                 """,
             {"files_shas_id": files_shas_id, "exec_id": exec_id},
         ):
@@ -508,7 +515,11 @@ class DB:  # pylint: disable=too-many-public-methods
                     f.method_checksums,
                     te.failed,
                     te.duration
-                FROM test_execution te, test_execution_file_fp te_ffp, file_fp f, changed_files_mhashes chfm
+                -- CROSS JOIN keeps this order: from the changed files only
+                FROM changed_files_mhashes chfm
+                CROSS JOIN file_fp f
+                CROSS JOIN test_execution_file_fp te_ffp
+                CROSS JOIN test_execution te
                 WHERE
                     chfm.exec_id = ? AND
                     te.{self._test_execution_fk_column()} = ? AND
@@ -583,11 +594,9 @@ class DB:  # pylint: disable=too-many-public-methods
             SELECT DISTINCT
                 f.filename
             FROM
-                file_fp f, test_execution_file_fp te_ffp, test_execution te
+                file_fp f
             WHERE
-                te.id = te_ffp.test_execution_id AND
-                te_ffp.fingerprint_id = f.id AND
-                te.{self._test_execution_fk_column()} = ?
+                {self._used_by_exec("f.id", "?")}
                 """,
             (exec_id,),
         )
