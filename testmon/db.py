@@ -248,13 +248,6 @@ class DB:  # pylint: disable=too-many-public-methods
             cursor = con.cursor()
 
             cursor.executemany(
-                f"DELETE FROM test_execution_file_fp "
-                f"WHERE test_execution_id in "
-                f"      (SELECT id FROM test_execution WHERE {self._test_execution_fk_column()}=? AND test_name=?)",
-                [(exec_id, test_name) for test_name in tests_deps_n_outcomes],
-            )
-
-            cursor.executemany(
                 f"DELETE FROM test_execution WHERE {self._test_execution_fk_column()}=? AND test_name=?",
                 [(exec_id, test_name) for test_name in tests_deps_n_outcomes],
             )
@@ -559,15 +552,6 @@ class DB:  # pylint: disable=too-many-public-methods
 
     def delete_test_executions(self, test_names, exec_id):
         with self.con as con:
-            con.executemany(
-                f"""
-                DELETE
-                FROM test_execution_file_fp
-                WHERE test_execution_id IN
-                    (SELECT id FROM test_execution WHERE {self._test_execution_fk_column()} = ? AND test_name = ?)
-                    """,
-                [(exec_id, test_name) for test_name in test_names],
-            )
             con.executemany(
                 f"""
                 DELETE
