@@ -4,6 +4,9 @@ on:
     branches: ['**']
   pull_request:
 
+env:
+  MITER_TAG: v10.5.0  # more-itertools release benchmarked
+
 jobs:
   bench:
     runs-on: ubuntu-24.04
@@ -25,18 +28,14 @@ jobs:
           python -m venv venv
           venv/bin/pip install -e ./branch pytest-cov pytest-xdist
 
-      - name: Benchmark projects (cached)
+      - name: more-itertools checkout (cached)
         uses: actions/cache@v4
         id: projects
         with:
-          path: work
-          key: bench-projects-miter-10.5.0-nx-3.4.2
+          path: work/more-itertools
+          key: bench-more-itertools-${{ env.MITER_TAG }}
       - if: steps.projects.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p work
-          git clone --depth 1 --branch v10.5.0 https://github.com/more-itertools/more-itertools work/more-itertools
-          # the projects' own test deps
-          true
+        run: git clone --depth 1 --branch "$MITER_TAG" https://github.com/more-itertools/more-itertools work/more-itertools
 
       - name: Runner info
         shell: bash
@@ -51,17 +50,13 @@ jobs:
             echo "mem:     $(free -g | awk '/Mem:/ {print $2" GB"}')"
             echo "kernel:  $(uname -r)"
             echo '```'
-          } | tee runner.md >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run bench
         shell: bash
         env:
           BENCH_JSON: ${{ github.workspace }}/bench.json
-        run: |
-          venv/bin/pip install -q -r work/more-itertools/requirements/test.txt 2>/dev/null || true
-          venv/bin/python branch/bench/bench.py "$PWD/venv/bin/python" "$PWD/work" "${{ inputs.reps || 5 }}" \
-            | tee bench.txt
-          { echo "### Python ${{ matrix.python }}"; echo '```'; cat bench.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+        run: venv/bin/python branch/bench/bench.py "$PWD/venv/bin/python" "$PWD/work" 5
 
       - name: Delta
         shell: bash
@@ -71,6 +66,5 @@ jobs:
         with:
           name: bench-py${{ matrix.python }}
           path: |
-            bench.txt
             bench.json
             bench-delta.md
