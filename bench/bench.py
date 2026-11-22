@@ -6,7 +6,7 @@ Usage: python bench.py <venv python> <work dir> <reps> ["scenario" ...]
                   (pip install -e .), plus pytest-cov and pytest-xdist
   <work dir>      holds a more-itertools/ clone (tag: MITER_TAG in
                   .github/workflows/benchmark.yml); the synthetic projects
-                  (tiny/, param/) are regenerated there on every run
+                  (tiny/, param/, wide/) are regenerated there on every run
   <reps>          timed runs per scenario and variant
   "scenario"      only these scenarios, names exactly as printed, e.g.
                   python bench.py .venv/bin/python work 3 "full: 5000 tiny tests"
@@ -42,6 +42,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 PARAM_SIZE = 10000
+WIDE_MODULES = 1000
+WIDE_TESTS = 200
 # pytest's exit code when no test ran: fine for a testmon rerun with no change,
 # a failure anywhere else
 NO_TESTS_COLLECTED = 5
@@ -106,14 +108,55 @@ def make_param(root):
         )
 
 
+def make_wide(root):
+    """WIDE_MODULES modules of 10 functions and WIDE_TESTS tests, each running
+    one function of every module (f0, f1 or f2, by test number).
+
+    Every test depends on every module: testmon's work grows with the number
+    of (test, file) pairs, which the other projects keep at 1 to 3 per test.
+    A large codebase has thousands of files per test."""
+    os.makedirs(os.path.join(root, "app"), exist_ok=True)
+    os.makedirs(os.path.join(root, "tests"), exist_ok=True)
+    with open(os.path.join(root, "app", "__init__.py"), "w") as fh:
+        fh.write("")
+    for m in range(WIDE_MODULES):
+        with open(os.path.join(root, "app", f"m{m}.py"), "w") as fh:
+            fh.write(f'"""Module {m}."""\n\nCONST = {m}\n')
+            for f in range(10):
+                fh.write(
+                    f"\n\ndef f{f}(x):\n"
+                    f"    y = x + {f}\n"
+                    "    if y > 10**9:\n"
+                    "        return 0\n"
+                    "    return y * CONST\n"
+                )
+    with open(os.path.join(root, "app", "fan.py"), "w") as fh:
+        fh.write(
+            "import importlib\n\n"
+            f"MODULES = [importlib.import_module(f'app.m{{i}}') for i in range({WIDE_MODULES})]\n\n\n"
+            "def run(x, k):\n"
+            "    total = 0\n"
+            "    for module in MODULES:\n"
+            "        total += getattr(module, f'f{k}')(x)\n"
+            "    return total\n"
+        )
+    for t in range(10):
+        with open(os.path.join(root, "tests", f"test_w{t}.py"), "w") as fh:
+            fh.write("from app.fan import run\n")
+            for i in range(WIDE_TESTS // 10):
+                fh.write(f"\n\ndef test_{i}():\n    assert run({i}, {i % 3}) >= 0\n")
+
+
 def build_scenarios(work_dir):
     miter = os.path.join(work_dir, "more-itertools")
     tiny = os.path.join(work_dir, "tiny")
     param = os.path.join(work_dir, "param")
+    wide = os.path.join(work_dir, "wide")
     # Always regenerated (cheap): CI caches <work dir>, and a cached copy would
     # not follow changes to the generators.
     make_tiny(tiny)
     make_param(param)
+    make_wide(wide)
     return {
         "full: more-itertools": Scenario(miter, ["tests"]),
         "full: more-itertools --cov": Scenario(
@@ -122,6 +165,9 @@ def build_scenarios(work_dir):
         "full: more-itertools -n 4": Scenario(miter, ["tests", "-n", "4"]),
         "full: 5000 tiny tests": Scenario(tiny, ["tests"]),
         f"full: {PARAM_SIZE} params": Scenario(param, ["."]),
+        f"full: wide, {WIDE_TESTS} tests x {WIDE_MODULES} files": Scenario(
+            wide, ["tests"]
+        ),
         "rerun: more-itertools, no change": Scenario(miter, ["tests"], rerun=True),
         "rerun: more-itertools, edit chunked()": Scenario(
             miter,
@@ -149,6 +195,14 @@ def build_scenarios(work_dir):
             ["."],
             rerun=True,
             edit=Edit("test_param.py", "assert True\n", "assert not False\n"),
+        ),
+        "rerun: wide, edit 1 function": Scenario(
+            wide,
+            ["tests"],
+            rerun=True,
+            # f0 of one module: the third of the tests that run f0 is selected,
+            # and they still depend on all the unchanged modules
+            edit=Edit("app/m0.py", "y = x + 0\n", "y = x + 0 * 1\n"),
         ),
     }
 
