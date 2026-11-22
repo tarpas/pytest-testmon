@@ -8,7 +8,6 @@ omitted) without going through coverage.
 import os
 import sys
 import sysconfig
-from functools import lru_cache
 
 from testmon.collector import NodesFilesLines
 from testmon.testmon_core import TEST_BATCH_SIZE, home_file
@@ -86,25 +85,32 @@ class SysmonCollector:
         self.batched_test_names = set()
         self._interrupted_at = None
 
-    @lru_cache(maxsize=None)  # noqa: B019 (one collector per session)
-    def _in_scope(self, filename):
-        if not filename or filename[0] == "<":  # <string>, <frozen ...>
-            return False
-        path = os.path.normcase(os.path.realpath(filename))
-        return path.startswith(self._root_prefix) and not path.startswith(
-            self._omit_prefixes
-        )
+        self._in_scope_cache = {}
+        self._relpath_cache = {}
 
-    @lru_cache(maxsize=None)  # noqa: B019 (one collector per session)
+    def _in_scope(self, filename):
+        if filename not in self._in_scope_cache:
+            if not filename or filename[0] == "<":  # <string>, <frozen ...>
+                in_scope = False
+            else:
+                path = os.path.normcase(os.path.realpath(filename))
+                in_scope = path.startswith(self._root_prefix) and not path.startswith(
+                    self._omit_prefixes
+                )
+            self._in_scope_cache[filename] = in_scope
+        return self._in_scope_cache[filename]
+
     def _relpath(self, filename):
         # What coverage reports for CtraceCollector: the file's realpath
         # relative to rootdir's. co_filename itself may go through a symlink
         # (macOS /var -> /private/var, a symlinked sys.path entry). On Windows
         # relpath compares case-insensitively and realpath restores the on-disk
         # case, as coverage does.
-        return os.path.relpath(os.path.realpath(filename), self._real_root).replace(
-            os.sep, "/"
-        )
+        if filename not in self._relpath_cache:
+            self._relpath_cache[filename] = os.path.relpath(
+                os.path.realpath(filename), self._real_root
+            ).replace(os.sep, "/")
+        return self._relpath_cache[filename]
 
     def _on_py_start(self, code, _offset):
         if id(code) not in self._armed and self._in_scope(code.co_filename):
