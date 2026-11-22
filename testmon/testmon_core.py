@@ -384,6 +384,7 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
     def get_tests_fingerprints(self, nodes_files_lines, reports) -> TestExecutions:
         test_executions_fingerprints = {}
         exists = {}
+        fingerprints = {}  # tests often cover the same lines of a file
         for context in nodes_files_lines:
             deps_n_outcomes: DepsNOutcomes = {"deps": []}
 
@@ -394,7 +395,12 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
                     )
                 if exists[filename]:
                     module = self.source_tree.get_file(filename)
-                    fingerprint = create_fingerprint(module, covered)
+                    key = (filename, frozenset(covered))
+                    fingerprint = fingerprints.get(key)
+                    if fingerprint is None:
+                        fingerprint = fingerprints[key] = create_fingerprint(
+                            module, covered
+                        )
                     deps_n_outcomes["deps"].append(
                         {
                             "filename": filename,
