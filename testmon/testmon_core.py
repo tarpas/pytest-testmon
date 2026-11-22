@@ -383,11 +383,16 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
 
     def get_tests_fingerprints(self, nodes_files_lines, reports) -> TestExecutions:
         test_executions_fingerprints = {}
+        exists = {}
         for context in nodes_files_lines:
             deps_n_outcomes: DepsNOutcomes = {"deps": []}
 
             for filename, covered in nodes_files_lines[context].items():
-                if os.path.exists(os.path.join(self.rootdir, filename)):
+                if filename not in exists:
+                    exists[filename] = os.path.exists(
+                        os.path.join(self.rootdir, filename)
+                    )
+                if exists[filename]:
                     module = self.source_tree.get_file(filename)
                     fingerprint = create_fingerprint(module, covered)
                     deps_n_outcomes["deps"].append(
