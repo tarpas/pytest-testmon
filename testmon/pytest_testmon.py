@@ -365,16 +365,16 @@ class TestmonCollect:
         self.cov_plugin = cov_plugin
         self._sessionstarttime = time.time()
 
-    @pytest.hookimpl(tryfirst=True, hookwrapper=True)
+    @pytest.hookimpl(tryfirst=True, wrapper=True)
     def pytest_pycollect_makeitem(self, collector, name, obj):  # pylint: disable=unused-argument
-        makeitem_result = yield
-        items = makeitem_result.get_result() or []
+        result = yield
         try:
             self.raw_test_names.extend(
-                [item.nodeid for item in items if isinstance(item, pytest.Item)]
+                [item.nodeid for item in result or [] if isinstance(item, pytest.Item)]
             )
         except TypeError:  # 'Class' object is not iterable
             pass
+        return result
 
     @pytest.hookimpl(tryfirst=True)
     def pytest_collection_modifyitems(self, session, config, items):  # pylint: disable=unused-argument
@@ -385,26 +385,19 @@ class TestmonCollect:
         if should_sync:
             config.testmon_data.sync_db_fs_tests(retain=set(self.raw_test_names))
 
-    @pytest.hookimpl(hookwrapper=True)
+    @pytest.hookimpl(wrapper=True)
     def pytest_runtest_protocol(self, item, nextitem):  # pylint: disable=unused-argument
         self.testmon.start_testmon(item.nodeid, nextitem.nodeid if nextitem else None)
-        result = yield
-        if result.excinfo and issubclass(result.excinfo[0], BaseException):
+        try:
+            return (yield)
+        except BaseException:
             self.testmon.discard_current()
+            raise
 
-    @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_makereport(self, item, call):  # pylint: disable=unused-argument
-        result = yield
-
-        if call.when == "teardown":
-            report = result.get_result()
-            report.nodes_files_lines = self.testmon.get_batch_coverage_data()
-            result.force_result(
-                report
-            )  # under xdist, report is serialized on the worker and sent to the controller
-
-    @pytest.hookimpl
+    @pytest.hookimpl(tryfirst=True)
     def pytest_runtest_logreport(self, report):
+        if report.when == "teardown" and self._running_as != "controller":
+            report.nodes_files_lines = self.testmon.get_batch_coverage_data()
         if self._running_as == "worker":
             return
 

@@ -320,6 +320,7 @@ name = "pytest-testmon"
 source = { editable = "." }
 dependencies = [
     { name = "coverage" },
+    { name = "pluggy" },
     { name = "pytest" },
 ]
 
@@ -338,7 +339,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "coverage", specifier = ">=6,<8" },
-    { name = "pytest", specifier = ">=5,<10" },
+    { name = "pluggy", specifier = ">=1.2" },
+    { name = "pytest", specifier = ">=7,<10" },
 ]
 
 [package.metadata.requires-dev]
