@@ -124,6 +124,8 @@ class Module:
         self.filename = filename
         self.rootdir = rootdir
         self._blocks = None
+        self._checksums = None
+        self._sorted_blocks = None
         self.counter = 0
         self.mtime = mtime
         self._source_code = (
@@ -192,7 +194,24 @@ class Module:
 
     @property
     def checksums(self):
-        return methods_to_checksums([block.checksum for block in self.blocks])
+        if self._checksums is None:
+            self._checksums = methods_to_checksums(
+                [block.checksum for block in self.blocks]
+            )
+        return self._checksums
+
+    @property
+    def sorted_blocks(self):
+        """[(start, end, checksum)] of the blocks, by start line."""
+        if self._sorted_blocks is None:
+            self._sorted_blocks = sorted(
+                (
+                    (block.start, block.end, checksum)
+                    for block, checksum in zip(self.blocks, self.checksums)
+                ),
+                key=lambda block: block[0],
+            )
+        return self._sorted_blocks
 
     @property
     def blocks(self):
@@ -219,7 +238,7 @@ class Module:
 
     @property
     def method_checksums(self):
-        return methods_to_checksums([block.checksum for block in self.blocks])
+        return self.checksums
 
 
 def read_source_sha(filename: str):
@@ -296,18 +315,17 @@ def create_fingerprint_source(source_code, lines, ext="py"):
 
 
 def create_fingerprint(module, covered_lines) -> [int]:
-    blocks: [Block] = module.blocks
-    method_reprs = []
+    fingerprint = []
     line_index = 0
     sorted_lines = sorted(covered_lines)
 
-    for current_block in sorted(blocks, key=lambda x: x.start):
+    for start, end, checksum in module.sorted_blocks:
         try:
-            while sorted_lines[line_index] < current_block.start:
+            while sorted_lines[line_index] < start:
                 line_index += 1
-            if sorted_lines[line_index] <= current_block.end:
-                method_reprs.append(current_block.code)
+            if sorted_lines[line_index] <= end:
+                fingerprint.append(checksum)
         except IndexError:
             break
 
-    return methods_to_checksums(method_reprs)
+    return fingerprint
