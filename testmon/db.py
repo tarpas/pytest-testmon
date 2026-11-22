@@ -3,7 +3,6 @@ import os
 import sqlite3
 
 from collections import namedtuple
-from functools import lru_cache
 
 from testmon.common import TestExecutions
 from testmon.process_code import blob_to_checksums, checksums_to_blob
@@ -99,7 +98,6 @@ class DB:  # pylint: disable=too-many-public-methods
 
     def finish_execution(self, exec_id, duration=None, select=True):  # pylint: disable=unused-argument
         self.update_saving_stats(exec_id, select)
-        self.fetch_or_create_file_fp.cache_clear()
         with self.con as con:
             self.vacuum_file_fp(con)
 
@@ -187,7 +185,6 @@ class DB:  # pylint: disable=too-many-public-methods
             total_all_tests,
         )
 
-    @lru_cache(1000)
     def fetch_or_create_file_fp(self, filename, fsha, method_checksums):  # pylint: disable=R0801
         cursor = self.con.cursor()
         try:
@@ -253,6 +250,7 @@ class DB:  # pylint: disable=too-many-public-methods
             )
 
             test_execution_file_fps = []
+            fingerprint_ids = {}
             for test_name, deps_n_outcomes in tests_deps_n_outcomes.items():
                 te_id = self._insert_test_execution(
                     con,
@@ -266,11 +264,16 @@ class DB:  # pylint: disable=too-many-public-methods
                 fingerprints = deps_n_outcomes["deps"]
                 files_fshas = set()
                 for record in fingerprints:
-                    fingerprint_id = self.fetch_or_create_file_fp(
+                    key = (
                         record["filename"],
                         record["fsha"],
                         checksums_to_blob(record["method_checksums"]),
                     )
+                    fingerprint_id = fingerprint_ids.get(key)
+                    if fingerprint_id is None:
+                        fingerprint_id = fingerprint_ids[key] = (
+                            self.fetch_or_create_file_fp(*key)
+                        )
 
                     test_execution_file_fps.append((te_id, fingerprint_id))
                     files_fshas.add((record["filename"], record["fsha"]))
@@ -279,7 +282,6 @@ class DB:  # pylint: disable=too-many-public-methods
                     "INSERT INTO test_execution_file_fp VALUES (?, ?)",
                     test_execution_file_fps,
                 )
-                self.fetch_or_create_file_fp.cache_clear()
                 self.insert_into_suite_files_fshas(con, exec_id, files_fshas)
 
     def insert_into_suite_files_fshas(self, con, exec_id, files_fshas):
