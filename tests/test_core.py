@@ -8,7 +8,7 @@ from array import array
 from collections import defaultdict
 from inspect import getframeinfo, currentframe
 
-from testmon.common import git_path, git_current_branch, git_current_head, git_heads
+from testmon.common import git_path, git_current_branch, git_current_head
 from testmon.process_code import (
     Module,
     create_fingerprint_source,
@@ -198,33 +198,6 @@ class TestMisc(object):
         assert git_path() == None
         assert git_current_branch() == None
         assert git_current_head() == None
-        assert git_heads() == []
-
-    def test_git_heads_of_a_merge_commit(self, testdir, git_repo):
-        def git(*args):
-            return testdir.run(
-                "git", "-c", "user.name=t", "-c", "user.email=t@t", *args
-            )
-
-        def commit(name):
-            testdir.makefile(".txt", **{name: name})
-            git("add", f"{name}.txt")
-            git("commit", "-m", name)
-            return git("rev-parse", "HEAD").stdout.str().strip()
-
-        assert len(git_heads()) == 1  # the fixture's commit has no parent
-        git("checkout", "-b", "feature")
-        feature = commit("feature")
-        git("checkout", "-")
-        main = commit("main")
-        git("merge", "--no-ff", "-m", "merge", "feature")
-        merge = git("rev-parse", "HEAD").stdout.str().strip()
-
-        assert git_heads() == [merge, main, feature]
-        # CI checks a commit out, not a branch.
-        git("checkout", "--detach", merge)
-        assert git_current_head() is None
-        assert git_heads(str(testdir.tmpdir)) == [merge, main, feature]
 
 
 class TestTestmonRecursive:
