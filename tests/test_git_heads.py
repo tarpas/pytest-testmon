@@ -110,7 +110,7 @@ def test_heads_go_to_testmon_net_only(merged, monkeypatch):
     assert metadata["git_heads"] == heads
     assert metadata["git_head_sha"] == heads[0]
 
-    # A run with .testmondata has no use for the commits: it must not start git.
+    # A run with .testmondata has no use for the commits: it must not ask git for them.
     monkeypatch.setattr(
         "testmon.testmon_core.git_heads", mock.Mock(side_effect=AssertionError)
     )
