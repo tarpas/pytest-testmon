@@ -721,6 +721,47 @@ def test_add():    assert add(1, 2) == 3
         testmon_data.determine_stable()
         assert not bool(testmon_data.system_packages_change)
 
+    def test_partial_run_keeps_affected_tests_of_other_files(self, local_remote):
+        source = local_remote.mkpydir("source")
+        a = write_source_code_to_a_file(source / "a.py", "def value():\n    return 1\n")
+        write_source_code_to_a_file(source / "b.py", "def other():\n    return 1\n")
+        write_source_code_to_a_file(
+            local_remote.mkpydir("tx") / "test_x.py",
+            """
+            from source import a
+            def test_x():
+                assert a.value()
+            """,
+        )
+        write_source_code_to_a_file(
+            local_remote.mkpydir("ty") / "test_y.py",
+            """
+            from source import a, b
+            def test_uses_a():
+                assert a.value()
+            def test_uses_b():
+                assert b.other()
+            """,
+        )
+        result = local_remote.runpytest_inprocess("--testmon")
+        result.stdout.fnmatch_lines(["*3 passed*"])
+
+        write_source_code_to_a_file(a, "def value():\n    return 2\n")
+        a.setmtime(1424880935)
+        # test_uses_a is affected too, but only tx is run: its file is not collected.
+        result = local_remote.runpytest_inprocess("--testmon", "tx")
+        result.stdout.fnmatch_lines(["*1 passed*"])
+
+        # Forgetting test_uses_a there would leave ty/test_y.py with its stable test alone,
+        # so the file would be skipped at collection and test_uses_a would never run again.
+        result = local_remote.runpytest_inprocess("--testmon", "-v")
+        result.stdout.re_match_lines(
+            [".*(test_y.py::test_uses_a PASSED|PASSED ty/test_y.py::test_uses_a).*"]
+        )
+        result.stdout.fnmatch_lines(["*1 passed*"])
+        result = local_remote.runpytest_inprocess("--testmon")
+        result.assert_outcomes(passed=0, failed=0)
+
     def test_packages_hit(self, testdir):
         testdir.makepyfile(
             test_a="""

@@ -431,8 +431,33 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         if test_execution_file_fps:
             self.save_test_execution_file_fps(test_execution_file_fps)
 
-        to_delete = list(set(self.all_tests) - collected)
-        self.db.delete_test_executions(to_delete, self.exec_id)
+        self.db.delete_test_executions(
+            self._tests_to_forget(retain, collected), self.exec_id
+        )
+
+    def _tests_to_forget(self, retain, collected):
+        """The known tests that are neither collected nor stable: they are gone.
+
+        Except in a file this run may not have collected at all (pytest was started for
+        another path) which still has stable tests. Forgetting only the affected tests of
+        such a file would leave it with stable tests alone: it would be skipped at collection
+        from then on, and the forgotten tests would never run with the change that affected
+        them.
+        """
+        collected_files = {home_file(test_name) for test_name in retain}
+        files_with_stable_tests = {
+            home_file(test_name) for test_name in self.stable_test_names
+        }
+        to_forget = []
+        for test_name in set(self.all_tests) - collected:
+            file = home_file(test_name)
+            if (
+                file in collected_files
+                or file not in files_with_stable_tests
+                or not os.path.exists(os.path.join(self.rootdir, file))
+            ):
+                to_forget.append(test_name)
+        return to_forget
 
     def determine_stable(self):
         """Decide which tests are affected; with testmon.net, any failure means .testmondata."""
