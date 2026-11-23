@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from subprocess import CalledProcessError, DEVNULL, PIPE, run
 
 try:
     # Python >= 3.8
@@ -125,17 +126,16 @@ def git_current_branch(path=None):
 
 
 def git_current_head(path=None):
-    path = git_path(path)
-    if not path:
-        return None
-    current_branch = git_current_branch(path)
-    if not current_branch:
-        return None
-    git_branch_file = os.path.join(path, "refs", "heads", current_branch)
     try:
-        with open(git_branch_file, "r", encoding="utf8") as branch_file:
-            head_sha = branch_file.read().strip()
-        return head_sha
-    except FileNotFoundError:
-        pass
-    return None
+        result = run(
+            ["git", "rev-parse", "--verify", "HEAD"],
+            cwd=path or None,
+            check=True,
+            stdout=PIPE,
+            stderr=DEVNULL,
+            text=True,
+            encoding="ascii",
+        )
+    except (OSError, CalledProcessError):
+        return None
+    return result.stdout.strip()
