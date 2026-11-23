@@ -28,6 +28,7 @@ from testmon.common import (
     get_system_packages,
     drop_patch_version,
     git_current_head,
+    git_heads,
 )
 
 from testmon.process_code import (
@@ -291,13 +292,17 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
             python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
         self._initiate_args = (self.environment, system_packages, python_version)
+        # Only testmon.net uses the commits, so only then `git` is asked for them.
+        heads = git_heads(self.rootdir) if isinstance(self.db, RemoteDB) else []
         # Initiate execution (controller or single process)
         try:
             result = self.db.initiate_execution(
                 *self._initiate_args,
                 {
                     "tm_client_version": TM_CLIENT_VERSION,
-                    "git_head_sha": git_current_head(),
+                    "git_head_sha": heads[0] if heads else git_current_head(),
+                    # A server that does not know a key ignores it.
+                    "git_heads": heads,
                     "ci": os.environ.get("CI"),
                 },
             )
