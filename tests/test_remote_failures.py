@@ -152,6 +152,49 @@ def test_mirror_keeps_the_local_database_accurate(tmnet_run, pytester):
     pytester.runpytest_inprocess("--testmon").assert_outcomes(passed=1)
 
 
+LIBS = {"lib_a": "def a():\n    return 1\n", "lib_b": "def b():\n    return 1\n"}
+TWO_TESTS = (
+    "import lib_a, lib_b\n\n"
+    "def test_a():\n    assert lib_a.a()\n\n"
+    "def test_b():\n    assert lib_b.b()\n"
+)
+
+
+def test_mirror_started_by_a_run_that_selects_part_of_a_file(tmnet_run, pytester):
+    pytester.makepyfile(test_both=TWO_TESTS, **LIBS)
+    tmnet_run("--testmon").assert_outcomes(passed=4)
+    pytester.makepyfile(lib_a="def a():\n    return 2\n")
+    tmnet_run("--testmon", "--tmnet-mirror").assert_outcomes(passed=1)
+
+    # testmon.net is down. The mirror has a result of test_a only: everything else runs,
+    # test_b too, although its file looks unchanged to the mirror
+    pytester.makepyfile(lib_b="def b():\n    return 2\n")
+    tmnet_run(
+        "--testmon", "--tmnet-mirror", failing=("initiate_execution",)
+    ).assert_outcomes(passed=3)
+
+
+def test_mirror_that_missed_the_run_which_added_a_test(tmnet_run, pytester):
+    pytester.makepyfile(test_both=TWO_TESTS, **LIBS)
+    tmnet_run("--testmon", "--tmnet-mirror").assert_outcomes(passed=4)
+    pytester.makepyfile(
+        lib_c="def c():\n    return 1\n",
+        test_both=TWO_TESTS.replace("lib_b\n", "lib_b, lib_c\n")
+        + "\ndef test_c():\n    assert lib_c.c()\n",
+    )
+    tmnet_run("--testmon").assert_outcomes(passed=3)  # not mirrored
+    # the next two runs bring the mirror's test_a and test_b up to date, not test_c
+    pytester.makepyfile(lib_a="def a():\n    return 2\n")
+    tmnet_run("--testmon", "--tmnet-mirror").assert_outcomes(passed=1)
+    pytester.makepyfile(lib_b="def b():\n    return 2\n")
+    tmnet_run("--testmon", "--tmnet-mirror").assert_outcomes(passed=1)
+
+    pytester.makepyfile(lib_c="def c():\n    return 2\n")
+    tmnet_run(
+        "--testmon", "--tmnet-mirror", failing=("initiate_execution",)
+    ).assert_outcomes(passed=1)
+
+
 def test_no_local_database_without_the_mirror_option(tmnet_run, pytester):
     tmnet_run("--testmon").assert_outcomes(passed=2)
 
@@ -167,6 +210,13 @@ def test_mirror_keeps_recording_when_testmon_net_fails_while_saving(
 
     pytester.makepyfile(lib="def value():\n    return 2\n")
     pytester.runpytest_inprocess("--testmon").assert_outcomes(passed=1)
+
+
+def test_a_mirror_that_cannot_be_opened_fails_like_a_local_run(tmnet_run, pytester):
+    (pytester.path / get_data_file_path()).mkdir()
+    local = pytester.runpytest_inprocess("--testmon")
+
+    assert tmnet_run("--testmon", "--tmnet-mirror").ret == local.ret != 0
 
 
 def test_failure_while_selecting_with_a_mirror_falls_back_to_one_local_database(

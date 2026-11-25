@@ -126,7 +126,10 @@ def pytest_addoption(parser):
         "--tmnet-mirror",
         action="store_true",
         dest="tmnet_mirror",
-        help="With --tmnet, also record every result in the local .testmondata.",
+        help=(
+            "With --tmnet, also record every result in the local .testmondata. "
+            "Deprecated, to be removed in pytest-testmon 3.1."
+        ),
     )
 
     parser.addini("environment_expression", "environment expression", default="")

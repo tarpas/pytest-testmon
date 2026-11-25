@@ -60,6 +60,24 @@ def home_file(test_execution_name):
     return test_execution_name.split("::", 1)[0]
 
 
+def not_run_yet(test_names):
+    """Records for tests without a result: their fingerprint matches no file, so they run."""
+    return {
+        test_name: {
+            "deps": (
+                {
+                    "filename": home_file(test_name),
+                    "method_checksums": methods_to_checksums(["0match"]),
+                    "mtime": None,
+                    "fsha": None,
+                },
+            )
+        }
+        for test_name in test_names
+        if is_python_file(home_file(test_name))
+    }
+
+
 def is_python_file(file_path):
     return file_path[-3:] == ".py"
 
@@ -318,7 +336,11 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
                 raise
             self._fall_back_to_local(exc)
         else:
-            self.transports = self._open_transports(mirror)
+            try:
+                self.transports = self._open_transports(mirror)
+            except Exception:
+                self._close_storage()  # testmon.net is open, and nobody else closes it
+                raise
 
     def _open_transports(self, mirror) -> Transports:
         """Write to the storage in use; with `mirror`, testmon.net also to .testmondata."""
@@ -437,23 +459,11 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
 
     def sync_db_fs_tests(self, retain):
         collected = retain.union(set(self.stable_test_names))
-        add = list(collected - set(self.all_tests))
-        test_execution_file_fps = {
-            test_name: {
-                "deps": (
-                    {
-                        "filename": home_file(test_name),
-                        "method_checksums": methods_to_checksums(["0match"]),
-                        "mtime": None,
-                        "fsha": None,
-                    },
-                )
-            }
-            for test_name in add
-            if is_python_file(home_file(test_name))
-        }
+        known = set(self.all_tests)
+        test_execution_file_fps = not_run_yet(collected - known)
         if test_execution_file_fps:
             self.save_test_execution_file_fps(test_execution_file_fps)
+        self.transports.insert_tests_unknown_to_mirrors(collected | known, not_run_yet)
 
         self.transports.delete_test_executions(self._tests_to_forget(retain, collected))
 
