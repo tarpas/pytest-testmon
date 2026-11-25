@@ -122,6 +122,16 @@ def pytest_addoption(parser):
         ),
     )
 
+    group.addoption(
+        "--tmnet-mirror",
+        action="store_true",
+        dest="tmnet_mirror",
+        help=(
+            "With --tmnet, also record every result in the local .testmondata. "
+            "Deprecated, to be removed in pytest-testmon 3.1."
+        ),
+    )
+
     parser.addini("environment_expression", "environment expression", default="")
     parser.addini(
         "testmon_ignore_dependencies",
@@ -199,6 +209,7 @@ def init_testmon_data(config: Config):
         database=rpc_proxy,
         environment=environment,
         system_packages=system_packages,
+        mirror=config.getoption("tmnet_mirror"),
     )
     testmon_data.determine_stable()
     config.testmon_data = testmon_data
@@ -430,8 +441,7 @@ class TestmonCollect:
 
     def pytest_sessionfinish(self, session):  # pylint: disable=unused-argument
         if self._running_as in ("single", "controller"):
-            self.testmon_data.db.finish_execution(
-                self.testmon_data.exec_id,
+            self.testmon_data.finish_execution(
                 time.time() - self._sessionstarttime,
                 session.config.testmon_config.select,
             )

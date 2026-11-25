@@ -40,6 +40,7 @@ from testmon.process_code import (
 )
 
 from testmon.common import DepsNOutcomes, TestExecutions
+from testmon.transports import Transport, Transports
 
 T = TypeVar("T")
 
@@ -57,6 +58,24 @@ def get_data_file_path():
 
 def home_file(test_execution_name):
     return test_execution_name.split("::", 1)[0]
+
+
+def not_run_yet(test_names):
+    """Records for tests without a result: their fingerprint matches no file, so they run."""
+    return {
+        test_name: {
+            "deps": (
+                {
+                    "filename": home_file(test_name),
+                    "method_checksums": methods_to_checksums(["0match"]),
+                    "mtime": None,
+                    "fsha": None,
+                },
+            )
+        }
+        for test_name in test_names
+        if is_python_file(home_file(test_name))
+    }
 
 
 def is_python_file(file_path):
@@ -261,18 +280,22 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         self.stable_files = None
         self.failing_tests = None
         self.failed_test_names = None
+        self.transports = None
 
     @classmethod
-    def for_local_run(
+    def for_local_run(  # pylint: disable=too-many-arguments
         cls,
         rootdir,
         database=None,
         environment=None,
         system_packages=None,
         python_version=None,
+        mirror=False,
     ):
         instance = cls(rootdir, database=database, readonly=False)
-        instance._init_for_local_run(environment, system_packages, python_version)
+        instance._init_for_local_run(
+            environment, system_packages, python_version, mirror
+        )
         return instance
 
     def _init_for_local_run(
@@ -280,6 +303,7 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         environment=None,
         system_packages=None,
         python_version=None,
+        mirror=False,
     ):
         """Internal method to initialize for local run."""
         self.environment = environment if environment else "default"
@@ -311,6 +335,30 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
             if not isinstance(self.db, RemoteDB):
                 raise
             self._fall_back_to_local(exc)
+        else:
+            try:
+                self.transports = self._open_transports(mirror)
+            except Exception:
+                self._close_storage()  # testmon.net is open, and nobody else closes it
+                raise
+
+    def _open_transports(self, mirror) -> Transports:
+        """Write to the storage in use; with `mirror`, testmon.net also to .testmondata."""
+        transports = [Transport(self.db, self.exec_id)]
+        if mirror and isinstance(self.db, RemoteDB):
+            local = db.DB(os.path.join(self.rootdir, get_data_file_path()))
+            local_exec = local.initiate_execution(*self._initiate_args, {})
+            transports.append(Transport(local, local_exec["exec_id"]))
+        return Transports(transports)
+
+    def _close_storage(self):
+        """Close what the run writes to; before the transports exist, only the database."""
+        transports, self.transports = self.transports, None
+        database, self.db = self.db, None
+        if transports is not None:
+            transports.close()
+        elif database is not None:
+            database.close()
 
     def _fall_back_to_local(self, exc):
         logger.error(
@@ -318,9 +366,10 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
             " .testmondata locally)",
             exc,
         )
-        self.db.close()
+        self._close_storage()
         self.db = db.DB(os.path.join(self.rootdir, get_data_file_path()))
         self._set_execution(self.db.initiate_execution(*self._initiate_args, {}))
+        self.transports = self._open_transports(mirror=False)
 
     def _set_execution(self, result):
         self.exec_id = result["exec_id"]
@@ -371,10 +420,7 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
 
         Idempotent. Tests that inspect the data after a run reopen it (see tests/lib4tests.py).
         """
-        database, self.db = self.db, None
-        if database is None:
-            return
-        database.close()
+        self._close_storage()
 
     def __enter__(self):
         return self
@@ -413,27 +459,13 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
 
     def sync_db_fs_tests(self, retain):
         collected = retain.union(set(self.stable_test_names))
-        add = list(collected - set(self.all_tests))
-        test_execution_file_fps = {
-            test_name: {
-                "deps": (
-                    {
-                        "filename": home_file(test_name),
-                        "method_checksums": methods_to_checksums(["0match"]),
-                        "mtime": None,
-                        "fsha": None,
-                    },
-                )
-            }
-            for test_name in add
-            if is_python_file(home_file(test_name))
-        }
+        known = set(self.all_tests)
+        test_execution_file_fps = not_run_yet(collected - known)
         if test_execution_file_fps:
             self.save_test_execution_file_fps(test_execution_file_fps)
+        self.transports.insert_tests_unknown_to_mirrors(collected | known, not_run_yet)
 
-        self.db.delete_test_executions(
-            self._tests_to_forget(retain, collected), self.exec_id
-        )
+        self.transports.delete_test_executions(self._tests_to_forget(retain, collected))
 
     def _tests_to_forget(self, retain, collected):
         """The known tests that are neither collected nor stable: they are gone.
@@ -537,7 +569,10 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
         return durations
 
     def save_test_execution_file_fps(self, test_executions_fingerprints):
-        self.db.insert_test_file_fps(test_executions_fingerprints, self.exec_id)
+        self.transports.insert_test_file_fps(test_executions_fingerprints)
+
+    def finish_execution(self, duration, select):
+        self.transports.finish_execution(duration, select)
 
     def fetch_saving_stats(self, select):
         return self.db.fetch_saving_stats(self.exec_id, select)
