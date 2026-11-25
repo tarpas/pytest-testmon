@@ -120,3 +120,62 @@ def test_failure_after_selecting_does_not_hide_a_failing_test(run, pytester):
     result = run("all_test_executions", healthy_calls=1)
 
     result.assert_outcomes(failed=1)
+
+
+@pytest.fixture(params=RUNS)
+def tmnet_run(pytester, request):
+    """tmnet_run(*args, failing=()) -> RunResult of `pytest *args` against a remote failing those calls."""
+    pytester.makepyfile(
+        lib="def value():\n    return 1\n",
+        test_lib="import lib\n\ndef test_lib():\n    assert lib.value()\n",
+        test_other="def test_other():\n    pass\n",
+    )
+
+    def run_with(*args, failing=()):
+        class Plugin:
+            @pytest.hookimpl(tryfirst=True)
+            def pytest_configure(self, config):
+                config.tmnet = FlakyRemote(str(pytester.path / "remote.db"), failing)
+
+        return pytester.runpytest_inprocess(*args, *request.param, plugins=[Plugin()])
+
+    return run_with
+
+
+def test_mirror_keeps_the_local_database_accurate(tmnet_run, pytester):
+    tmnet_run("--testmon", "--tmnet-mirror").assert_outcomes(passed=2)
+    pytester.makepyfile(lib="def value():\n    return 2\n")
+    tmnet_run("--testmon", "--tmnet-mirror").assert_outcomes(passed=1)
+
+    # the local database alone selects what changed since: only test_lib depends on lib
+    pytester.makepyfile(lib="def value():\n    return 3\n")
+    pytester.runpytest_inprocess("--testmon").assert_outcomes(passed=1)
+
+
+def test_no_local_database_without_the_mirror_option(tmnet_run, pytester):
+    tmnet_run("--testmon").assert_outcomes(passed=2)
+
+    assert not (pytester.path / get_data_file_path()).exists()
+
+
+def test_mirror_keeps_recording_when_testmon_net_fails_while_saving(
+    tmnet_run, pytester
+):
+    tmnet_run(
+        "--testmon", "--tmnet-mirror", failing=("insert_test_file_fps",)
+    ).assert_outcomes(passed=2)
+
+    pytester.makepyfile(lib="def value():\n    return 2\n")
+    pytester.runpytest_inprocess("--testmon").assert_outcomes(passed=1)
+
+
+def test_failure_while_selecting_with_a_mirror_falls_back_to_one_local_database(
+    tmnet_run, pytester, caplog
+):
+    tmnet_run(
+        "--testmon", "--tmnet-mirror", failing=("determine_tests",)
+    ).assert_outcomes(passed=2)
+
+    assert "falling back to .testmondata" in caplog.text
+    pytester.makepyfile(lib="def value():\n    return 2\n")
+    pytester.runpytest_inprocess("--testmon").assert_outcomes(passed=1)
