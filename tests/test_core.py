@@ -1,8 +1,11 @@
+import importlib
 import os
+import sys
 import sqlite3
 import copy
 import pytest
 import textwrap
+import threading
 
 from array import array
 from collections import defaultdict
@@ -16,6 +19,8 @@ from testmon.process_code import (
     methods_to_checksums,
     bytes_to_string_and_fsha,
 )
+from testmon.collector import make_collector
+from testmon.collector.ctrace import CtraceCollector as CoreTestmon
 from testmon.testmon_core import (
     TestmonData as CoreTestmonData,
     SourceTree,
@@ -25,7 +30,6 @@ from testmon.testmon_core import (
     check_fingerprint,
     check_fsha,
     get_new_mtimes,
-    TestmonCollector as CoreTestmon,
     collect_mhashes,
     split_filter,
 )
@@ -101,6 +105,40 @@ def git_repo(testdir):
     testdir.makepyfile(testfile="'''Test content'''")
     testdir.run("git", "add", ".")
     testdir.run("git", "commit", "-m", "Test commit")
+
+
+COLLECTORS = {"ctrace": CoreTestmon}
+if sys.version_info >= (3, 12):
+    from testmon.collector.sysmon import SysmonCollector
+
+    COLLECTORS["sysmon"] = SysmonCollector
+
+
+class TestMakeCollector:
+    def test_default(self, monkeypatch):
+        monkeypatch.delenv("TESTMON_CORE", raising=False)
+        expected = "sysmon" if sys.version_info >= (3, 12) else "ctrace"
+        assert isinstance(make_collector(""), COLLECTORS[expected])
+
+    @pytest.mark.parametrize("core", COLLECTORS)
+    def test_forced(self, monkeypatch, core):
+        monkeypatch.setenv("TESTMON_CORE", core)
+        assert isinstance(make_collector(""), COLLECTORS[core])
+
+    def test_unknown_value_uses_default(self, monkeypatch):
+        monkeypatch.setenv("TESTMON_CORE", "nope")
+        expected = "sysmon" if sys.version_info >= (3, 12) else "ctrace"
+        assert isinstance(make_collector(""), COLLECTORS[expected])
+
+    @pytest.mark.skipif(sys.version_info < (3, 12), reason="needs sys.monitoring")
+    def test_no_free_tool_id_falls_back_to_ctrace(self, monkeypatch):
+        import testmon.collector.sysmon  # pylint: disable=import-outside-toplevel
+
+        monkeypatch.delenv("TESTMON_CORE", raising=False)
+        monkeypatch.setattr(
+            testmon.collector.sysmon, "search_free_tool_id", lambda: None
+        )
+        assert isinstance(make_collector(""), CoreTestmon)
 
 
 class TestMisc(object):
@@ -223,16 +261,18 @@ class TestTestmonRecursive:
         parent_testmon.discard_current()
         assert not parent_testmon.cov.get_data().measured_files()
 
-    def test_shared_line_recorded_for_every_test_in_batch(self, testdir):
+    @pytest.mark.parametrize("collector_class", COLLECTORS.values(), ids=COLLECTORS)
+    def test_shared_line_recorded_for_every_test_in_batch(
+        self, testdir, collector_class
+    ):
         # coverage's sys.monitoring core (its default on CPython 3.14+) records a
-        # line only for the first dynamic context that executes it. testmon must
-        # pick a core where every test of a batch gets its lines.
+        # line only for the first dynamic context that executes it. Every
+        # collector must pick a core where every test of a batch gets its lines.
         testdir.makepyfile(shared_dep="def f(x):\n    return x + 1\n")
         testdir.syspathinsert()
         import shared_dep  # pylint: disable=import-error,import-outside-toplevel
 
-        testmon = CoreTestmon(rootdir=str(testdir.tmpdir))
-        testmon.setup_coverage()
+        testmon = collector_class(rootdir=str(testdir.tmpdir))
         testmon.start_testmon("1", next_test_name="2")
         shared_dep.f(1)
         assert testmon.get_batch_coverage_data() == {}
@@ -244,11 +284,174 @@ class TestTestmonRecursive:
         assert nodes_files_lines["1"]["shared_dep.py"] == {2}
         assert nodes_files_lines["2"]["shared_dep.py"] == {2}
 
+    @pytest.mark.parametrize("collector_class", COLLECTORS.values(), ids=COLLECTORS)
+    def test_one_line_function_recorded_for_every_test_in_batch(
+        self, testdir, collector_class
+    ):
+        # On CPython 3.14+, re-arming a one-line function's LINE event with
+        # set_local_events() doesn't bring it back: only the first test that
+        # ran the lambda would get its line.
+        testdir.makepyfile(one_line_dep="inc = lambda x: x + 1\n")
+        testdir.syspathinsert()
+        import one_line_dep  # pylint: disable=import-error,import-outside-toplevel
+
+        testmon = collector_class(rootdir=str(testdir.tmpdir))
+        results = {}
+        for name, nxt in (("1", "2"), ("2", "3"), ("3", None)):
+            testmon.start_testmon(name, next_test_name=nxt)
+            if name != "2":
+                one_line_dep.inc(1)
+            results.update(testmon.get_batch_coverage_data())
+        testmon.close()
+
+        assert results["1"]["one_line_dep.py"] == {1}
+        assert "one_line_dep.py" not in results["2"]
+        assert results["3"]["one_line_dep.py"] == {1}
+
+    @pytest.mark.parametrize("collector_class", COLLECTORS.values(), ids=COLLECTORS)
+    def test_last_of_batch_keeps_its_lines(self, testdir, collector_class, monkeypatch):
+        # The last test of a batch is still current when the next one starts.
+        monkeypatch.setattr(
+            sys.modules[collector_class.__module__], "TEST_BATCH_SIZE", 2
+        )
+        testdir.makepyfile(batch_dep="def inc(x):\n    return x + 1\n")
+        testdir.syspathinsert()
+        import batch_dep  # pylint: disable=import-error,import-outside-toplevel
+
+        testmon = collector_class(rootdir=str(testdir.tmpdir))
+        results = {}
+        for name, nxt in (("1", "2"), ("2", "3"), ("3", None)):
+            testmon.start_testmon(name, next_test_name=nxt)
+            batch_dep.inc(1)
+            results.update(testmon.get_batch_coverage_data())
+        testmon.close()
+
+        assert {name: results[name]["batch_dep.py"] for name in "123"} == {
+            "1": {2},
+            "2": {2},
+            "3": {2},
+        }
+
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="creating symlinks needs privileges"
+    )
+    @pytest.mark.parametrize("collector_class", COLLECTORS.values(), ids=COLLECTORS)
+    def test_file_imported_through_symlink(self, testdir, collector_class):
+        # A module imported through a symlink to rootdir (macOS /var ->
+        # /private/var, a symlinked PYTHONPATH or editable install) must be
+        # reported relative to rootdir, as coverage does after realpath().
+        project = testdir.mkdir("project")
+        project.join("sym_dep.py").write("def f(x):\n    return x + 1\n")
+        link = testdir.tmpdir.join("link")
+        link.mksymlinkto(project)
+        sys.path.insert(0, str(link))
+        try:
+            import sym_dep  # pylint: disable=import-error,import-outside-toplevel
+
+            assert sym_dep.__file__.startswith(str(link))
+            testmon = collector_class(rootdir=str(project))
+            testmon.start_testmon("1", next_test_name=None)
+            sym_dep.f(1)
+            nodes_files_lines = testmon.get_batch_coverage_data()
+            testmon.close()
+        finally:
+            sys.path.remove(str(link))
+            sys.modules.pop("sym_dep", None)
+
+        assert nodes_files_lines["1"]["sym_dep.py"] == {2}
+
+    @pytest.mark.parametrize("collector_class", COLLECTORS.values(), ids=COLLECTORS)
+    def test_lines_run_by_concurrent_threads(self, testdir, collector_class):
+        # Several threads of one test run the same fresh code at once. On a
+        # free-threaded build (3.13t+) they really run in parallel, and racy
+        # bookkeeping in the callbacks silently loses lines.
+        n_mods, n_funcs, n_threads, n_tests = 10, 50, 8, 10
+        for m in range(n_mods):
+            testdir.makepyfile(
+                **{
+                    f"thr_dep{m}": "".join(
+                        f"def f{i}(x):\n    return x + {i}\n" for i in range(n_funcs)
+                    )
+                }
+            )
+        testdir.syspathinsert()
+        mods = [importlib.import_module(f"thr_dep{m}") for m in range(n_mods)]
+        funcs = [getattr(mod, f"f{i}") for mod in mods for i in range(n_funcs)]
+
+        testmon = collector_class(rootdir=str(testdir.tmpdir))
+        results = {}
+        for t in range(n_tests):
+            last = t == n_tests - 1
+            testmon.start_testmon(str(t), next_test_name=None if last else str(t + 1))
+            barrier = threading.Barrier(n_threads)
+
+            def run(k, barrier=barrier):
+                barrier.wait()
+                for func in funcs if k % 2 else funcs[::-1]:
+                    func(k)
+
+            threads = [
+                threading.Thread(target=run, args=(k,)) for k in range(n_threads)
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            results.update(testmon.get_batch_coverage_data())
+        testmon.close()
+
+        expected = {2 * i + 2 for i in range(n_funcs)}
+        for t in range(n_tests):
+            for m in range(n_mods):
+                assert results[str(t)][f"thr_dep{m}.py"] == expected, (t, m)
+
+    @pytest.mark.parametrize("collector_class", COLLECTORS.values(), ids=COLLECTORS)
+    def test_thread_outliving_its_test(self, testdir, collector_class):
+        # Background threads keep running new code while tests switch: the
+        # collector must not iterate over a dict another thread is growing.
+        n_mods, n_funcs = 50, 20
+        for m in range(n_mods):
+            testdir.makepyfile(
+                **{
+                    f"bg_dep{m}": "".join(
+                        f"def f{i}(x):\n    return x + {i}\n" for i in range(n_funcs)
+                    )
+                }
+            )
+        testdir.syspathinsert()
+        mods = [importlib.import_module(f"bg_dep{m}") for m in range(n_mods)]
+        funcs = [getattr(mod, f"f{i}") for mod in mods for i in range(n_funcs)]
+        stop = threading.Event()
+
+        def spin():
+            while not stop.is_set():
+                for func in funcs:
+                    func(1)
+
+        testmon = collector_class(rootdir=str(testdir.tmpdir))
+        testmon.start_testmon("0", next_test_name="1")
+        threads = [threading.Thread(target=spin, daemon=True) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        try:
+            n_tests = 300
+            for t in range(1, n_tests):
+                last = t == n_tests - 1
+                testmon.start_testmon(
+                    str(t), next_test_name=None if last else str(t + 1)
+                )
+                testmon.get_batch_coverage_data()
+        finally:
+            stop.set()
+            for thread in threads:
+                thread.join()
+            testmon.close()
+
     def test_easy(self, testdir):
         testdir.makepyfile(
             test_a="""
             import os
-            from testmon.testmon_core import TestmonCollector as CoreTestmon
+            from testmon.collector.ctrace import CtraceCollector as CoreTestmon
 
             def one():
                 return getframeinfo(currentframe()).lineno

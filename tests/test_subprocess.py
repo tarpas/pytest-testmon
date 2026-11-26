@@ -2,7 +2,7 @@ import os
 import sys
 import pytest
 from tests.coveragepy.coveragetest import CoverageTest
-from testmon.testmon_core import TestmonCollector as CoreTestmon
+from testmon.collector.ctrace import CtraceCollector as CoreTestmon
 
 
 class TestCoverageSubprocess(CoverageTest):

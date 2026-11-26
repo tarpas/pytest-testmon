@@ -8,6 +8,7 @@ import os.path
 import platform
 import random
 import shlex
+import subprocess
 import sys
 import re
 
@@ -143,7 +144,10 @@ class CoverageTest(
             # get executed as "python3.3 foo.py". This is important because
             # Python 3.x doesn't install as "python", so you might get a Python
             # 2 executable instead if you don't use the executable's basename.
-            command_words = [os.path.basename(sys.executable)]
+            # Full path, not the basename: the basename is looked up on PATH
+            # and may resolve to another interpreter (e.g. a pyenv shim when
+            # the venv isn't activated), one without coverage's startup hook.
+            command_words = [sys.executable]
 
         elif command_name == "coverage":
             if env.JYTHON:  # pragma: only jython  # noqa: F821
@@ -169,7 +173,7 @@ class CoverageTest(
 
         # shlex works only on unix shells: https://docs.python.org/3/library/shlex.html#shlex.quote
         if platform.system() == "Windows":
-            cmd = " ".join(command_words + command_args)
+            cmd = " ".join([subprocess.list2cmdline(command_words)] + command_args)
         else:
             cmd = " ".join([shlex.quote(w) for w in command_words] + command_args)
 

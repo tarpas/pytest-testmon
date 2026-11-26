@@ -39,7 +39,7 @@ Source = "https://github.com/tarpas/pytest-testmon"
 pytest-testmon = "testmon.pytest_testmon"
 
 [tool.setuptools]
-packages = ["testmon"]
+packages = ["testmon", "testmon.collector"]
 
 [tool.setuptools.dynamic]
 version = {attr = "testmon.TESTMON_VERSION"}
