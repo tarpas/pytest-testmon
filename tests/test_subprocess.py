@@ -84,6 +84,7 @@ class TestCoverageSubprocess(CoverageTest):
         testmon.close()
         base = os.path.basename(testmon.sub_cov_file)
         files = os.listdir(os.path.join(os.getcwd(), ".tmontmp"))
-        assert base in files
-        # the subprocess wrote its own parallel-mode data file next to it
+        # the subprocess wrote its own parallel-mode data file. The parent's own file
+        # exists only once switch_context has opened it, which a core without dynamic
+        # contexts never does, so it says nothing about the subprocess.
         assert any(f.startswith(base + ".") for f in files), files
