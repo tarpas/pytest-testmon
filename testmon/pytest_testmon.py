@@ -60,7 +60,7 @@ def pytest_addoption(parser):
         dest="testmon_noselect",
         help=(
             "Reorder and prioritize the tests most likely to fail first, but don't deselect anything. "
-            "Forced if you use -m, -k, -l, -lf, test_file.py::test_name"
+            "Forced if you use -l, -lf, test_file.py::test_name"
         ),
     )
 
@@ -225,6 +225,11 @@ def get_running_as(config):
     return "controller"
 
 
+def deselects_by_expression(config):
+    """-m and -k deselect after collection, so collected but unselected tests must be kept."""
+    return bool(config.option.markexpr or config.option.keyword)
+
+
 def register_plugins(config, should_select, should_collect, cov_plugin):
     if should_select or should_collect:
         config.pluginmanager.register(
@@ -373,6 +378,7 @@ class TestmonCollect:
 
         self.reports = defaultdict(lambda: {})
         self.raw_test_names = []
+        self.collected_items = []
         self.cov_plugin = cov_plugin
         self._sessionstarttime = time.time()
 
@@ -387,6 +393,11 @@ class TestmonCollect:
         except TypeError:  # 'Class' object is not iterable
             pass
 
+    def pytest_itemcollected(self, item):
+        # Covers items not made by pytest_pycollect_makeitem (unittest, custom collectors).
+        self.raw_test_names.append(item.nodeid)
+        self.collected_items.append(item)
+
     @pytest.hookimpl(tryfirst=True)
     def pytest_collection_modifyitems(self, session, config, items):  # pylint: disable=unused-argument
         should_sync = not session.testsfailed and self._running_as in (
@@ -395,6 +406,18 @@ class TestmonCollect:
         )
         if should_sync:
             config.testmon_data.sync_db_fs_tests(retain=set(self.raw_test_names))
+
+    def pytest_collection_finish(self, session):
+        # xdist only reports the ids left after -m/-k; the controller needs all of them. Read the
+        # ids now, after every plugin has added items or rewritten ids (e.g. --dist loadgroup).
+        if (
+            self._running_as == "worker"
+            and deselects_by_expression(session.config)
+            and not session.testsfailed
+        ):
+            session.config.workeroutput["testmon_raw_test_names"] = sorted(
+                {item.nodeid for item in self.collected_items + session.items}
+            )
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_protocol(self, item, nextitem):  # pylint: disable=unused-argument
@@ -451,6 +474,8 @@ class TestmonCollect:
 class TestmonXdistSync:
     def __init__(self, sync=True):
         self.await_nodes = 0
+        self.running_nodes = 0
+        self.raw_test_names = set()
         self.sync = sync
         self._selection = None
 
@@ -463,6 +488,7 @@ class TestmonXdistSync:
         # Count the node here, before it starts: counting it when it reports ready would let a
         # fast worker's collection trigger sync_db_fs_tests while a slow one is still collecting.
         self.await_nodes += 1
+        self.running_nodes += 1
 
         if self._selection is None:
             select: TestmonSelect = node.config.pluginmanager.get_plugin(
@@ -478,8 +504,26 @@ class TestmonXdistSync:
 
     def pytest_xdist_node_collection_finished(self, node, ids):  # pylint: disable=invalid-name
         self.await_nodes += -1
-        if self.await_nodes == 0 and self.sync:
+        if (
+            self.await_nodes == 0
+            and self.sync
+            and not deselects_by_expression(node.config)
+        ):
             node.config.testmon_data.sync_db_fs_tests(retain=set(ids))
+
+    def pytest_testnodedown(self, node, error):
+        # With -m/-k, `ids` above lack the deselected tests, so sync from the workers'
+        # pre-deselection names once every worker is done; skip it if any worker failed.
+        self.running_nodes -= 1
+        if not (self.sync and deselects_by_expression(node.config)):
+            return
+        names = None if error else node.workeroutput.get("testmon_raw_test_names")
+        if names is None:
+            self.sync = False
+            return
+        self.raw_test_names.update(names)
+        if self.running_nodes == 0:
+            node.config.testmon_data.sync_db_fs_tests(retain=self.raw_test_names)
 
 
 def sort_items_by_duration(items, avg_durations) -> None:
