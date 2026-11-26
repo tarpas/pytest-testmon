@@ -102,13 +102,7 @@ def bytes_to_string_and_fsha(byte_stream: bytes) -> Union[str, bytes]:
     return byte_string, hsh.hexdigest()
 
 
-def _next_lineno(nodes, i, end):
-    try:
-        return nodes[i + 1].lineno - 1
-    except IndexError:
-        return end
-    except AttributeError:
-        return None
+_BLOCK_CLASSES = frozenset(("AsyncFunctionDef", "FunctionDef", "Module"))
 
 
 class Module:
@@ -124,6 +118,8 @@ class Module:
         self.filename = filename
         self.rootdir = rootdir
         self._blocks = None
+        self._checksums = None
+        self._sorted_blocks = None
         self.counter = 0
         self.mtime = mtime
         self._source_code = (
@@ -146,30 +142,34 @@ class Module:
         """
 
         if isinstance(node, ast.AST):
-            class_name = node.__class__.__name__
+            class_name = type(node).__name__
+            blocky = class_name in _BLOCK_CLASSES
+            node_name = getattr(node, "name", "unknown")
             fields = []
-            for field_name, field_value in ast.iter_fields(node):
-                transform_into_block = (
-                    class_name in ("AsyncFunctionDef", "FunctionDef", "Module")
-                ) and field_name == "body"
+            for field_name in node._fields:
+                try:
+                    field_value = getattr(node, field_name)
+                except AttributeError:  # what ast.iter_fields skips
+                    continue
                 fields.append(
-                    (
-                        field_name,
-                        self.dump_and_block(
-                            field_value,
-                            end,
-                            name=getattr(node, "name", "unknown"),
-                            into_block=transform_into_block,
-                        ),
+                    self.dump_and_block(
+                        field_value,
+                        end,
+                        name=node_name,
+                        into_block=blocky and field_name == "body",
                     )
                 )
-            return f"{class_name}({', '.join((field_value for field_name, field_value in fields))})"
+            return f"{class_name}({', '.join(fields)})"
         if isinstance(node, list):
             representations = []
+            last = len(node) - 1
             for i, item in enumerate(node):
-                representations.append(
-                    self.dump_and_block(item, _next_lineno(node, i, end))
-                )
+                if i < last:
+                    next_lineno = getattr(node[i + 1], "lineno", None)
+                    item_end = None if next_lineno is None else next_lineno - 1
+                else:
+                    item_end = end
+                representations.append(self.dump_and_block(item, item_end))
             if into_block and node:
                 # Use last child's end_lineno only if end is not available (None)
                 if end is None:
@@ -192,7 +192,24 @@ class Module:
 
     @property
     def checksums(self):
-        return methods_to_checksums([block.checksum for block in self.blocks])
+        if self._checksums is None:
+            self._checksums = methods_to_checksums(
+                [block.checksum for block in self.blocks]
+            )
+        return self._checksums
+
+    @property
+    def sorted_blocks(self):
+        """[(start, end, checksum)] of the blocks, by start line."""
+        if self._sorted_blocks is None:
+            self._sorted_blocks = sorted(
+                (
+                    (block.start, block.end, checksum)
+                    for block, checksum in zip(self.blocks, self.checksums)
+                ),
+                key=lambda block: block[0],
+            )
+        return self._sorted_blocks
 
     @property
     def blocks(self):
@@ -219,7 +236,7 @@ class Module:
 
     @property
     def method_checksums(self):
-        return methods_to_checksums([block.checksum for block in self.blocks])
+        return self.checksums
 
 
 def read_source_sha(filename: str):
@@ -296,18 +313,17 @@ def create_fingerprint_source(source_code, lines, ext="py"):
 
 
 def create_fingerprint(module, covered_lines) -> [int]:
-    blocks: [Block] = module.blocks
-    method_reprs = []
+    fingerprint = []
     line_index = 0
     sorted_lines = sorted(covered_lines)
 
-    for current_block in sorted(blocks, key=lambda x: x.start):
+    for start, end, checksum in module.sorted_blocks:
         try:
-            while sorted_lines[line_index] < current_block.start:
+            while sorted_lines[line_index] < start:
                 line_index += 1
-            if sorted_lines[line_index] <= current_block.end:
-                method_reprs.append(current_block.code)
+            if sorted_lines[line_index] <= end:
+                fingerprint.append(checksum)
         except IndexError:
             break
 
-    return methods_to_checksums(method_reprs)
+    return fingerprint

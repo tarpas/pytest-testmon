@@ -3,7 +3,6 @@ import os
 import sqlite3
 
 from collections import namedtuple
-from functools import lru_cache
 
 from testmon.common import TestExecutions
 from testmon.process_code import blob_to_checksums, checksums_to_blob
@@ -37,11 +36,8 @@ def connection_options(connection):
 def check_fingerprint_db(
     files_methods_checksums, file_name, fingerprint: ChangedFileData
 ):  # filename name method_checksums id failed
-    if file_name in files_methods_checksums and files_methods_checksums[file_name]:
-        if set(fingerprint) - set(files_methods_checksums[file_name]):
-            return False
-        return True
-    return False
+    checksums = files_methods_checksums.get(file_name)
+    return bool(checksums) and set(fingerprint).issubset(checksums)
 
 
 def check_data_version(connection, datafile, data_version):
@@ -102,15 +98,15 @@ class DB:  # pylint: disable=too-many-public-methods
 
     def finish_execution(self, exec_id, duration=None, select=True):  # pylint: disable=unused-argument
         self.update_saving_stats(exec_id, select)
-        self.fetch_or_create_file_fp.cache_clear()
         with self.con as con:
             self.vacuum_file_fp(con)
 
     def vacuum_file_fp(self, con):
         con.execute(
             """ DELETE FROM file_fp
-                WHERE id NOT IN (
-                    SELECT DISTINCT fingerprint_id FROM test_execution_file_fp) """
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM test_execution_file_fp
+                    WHERE fingerprint_id = file_fp.id) """
         )
 
     def fetch_current_run_stats(self, exec_id):
@@ -190,7 +186,6 @@ class DB:  # pylint: disable=too-many-public-methods
             total_all_tests,
         )
 
-    @lru_cache(1000)
     def fetch_or_create_file_fp(self, filename, fsha, method_checksums):  # pylint: disable=R0801
         cursor = self.con.cursor()
         try:
@@ -251,18 +246,12 @@ class DB:  # pylint: disable=too-many-public-methods
             cursor = con.cursor()
 
             cursor.executemany(
-                f"DELETE FROM test_execution_file_fp "
-                f"WHERE test_execution_id in "
-                f"      (SELECT id FROM test_execution WHERE {self._test_execution_fk_column()}=? AND test_name=?)",
-                [(exec_id, test_name) for test_name in tests_deps_n_outcomes],
-            )
-
-            cursor.executemany(
                 f"DELETE FROM test_execution WHERE {self._test_execution_fk_column()}=? AND test_name=?",
                 [(exec_id, test_name) for test_name in tests_deps_n_outcomes],
             )
 
             test_execution_file_fps = []
+            fingerprint_ids = {}
             for test_name, deps_n_outcomes in tests_deps_n_outcomes.items():
                 te_id = self._insert_test_execution(
                     con,
@@ -276,11 +265,16 @@ class DB:  # pylint: disable=too-many-public-methods
                 fingerprints = deps_n_outcomes["deps"]
                 files_fshas = set()
                 for record in fingerprints:
-                    fingerprint_id = self.fetch_or_create_file_fp(
+                    key = (
                         record["filename"],
                         record["fsha"],
                         checksums_to_blob(record["method_checksums"]),
                     )
+                    fingerprint_id = fingerprint_ids.get(key)
+                    if fingerprint_id is None:
+                        fingerprint_id = fingerprint_ids[key] = (
+                            self.fetch_or_create_file_fp(*key)
+                        )
 
                     test_execution_file_fps.append((te_id, fingerprint_id))
                     files_fshas.add((record["filename"], record["fsha"]))
@@ -289,7 +283,6 @@ class DB:  # pylint: disable=too-many-public-methods
                     "INSERT INTO test_execution_file_fp VALUES (?, ?)",
                     test_execution_file_fps,
                 )
-                self.fetch_or_create_file_fp.cache_clear()
                 self.insert_into_suite_files_fshas(con, exec_id, files_fshas)
 
     def insert_into_suite_files_fshas(self, con, exec_id, files_fshas):
@@ -468,20 +461,26 @@ class DB:  # pylint: disable=too-many-public-methods
             )
             return self._fetch_unknown_files_from_one_v(con, exec_id, exec_id)
 
+    def _used_by_exec(self, fingerprint_id, exec_id):
+        # per fingerprint, not a join over every (test, file) row
+        return f"""EXISTS (
+            SELECT 1 FROM test_execution_file_fp te_ffp, test_execution te
+            WHERE te_ffp.fingerprint_id = {fingerprint_id} AND
+                te.id = te_ffp.test_execution_id AND
+                te.{self._test_execution_fk_column()} = {exec_id})"""
+
     def _fetch_unknown_files_from_one_v(self, con, exec_id, files_shas_id):
         result = []
         for row in con.execute(
             f"""
                 SELECT DISTINCT
                     f.filename
-                FROM test_execution te, test_execution_file_fp te_ffp, file_fp f
+                FROM file_fp f
                 LEFT OUTER JOIN changed_files_fshas chff
                 ON f.filename = chff.filename and f.fsha = chff.fsha AND chff.exec_id = :files_shas_id
                 WHERE
-                    te.{self._test_execution_fk_column()} = :exec_id AND
-                    te.id = te_ffp.test_execution_id AND
-                    te_ffp.fingerprint_id = f.id AND
-                    (f.fsha IS NULL OR chff.fsha IS NULL)
+                    (f.fsha IS NULL OR chff.fsha IS NULL) AND
+                    {self._used_by_exec("f.id", ":exec_id")}
                 """,
             {"files_shas_id": files_shas_id, "exec_id": exec_id},
         ):
@@ -516,7 +515,11 @@ class DB:  # pylint: disable=too-many-public-methods
                     f.method_checksums,
                     te.failed,
                     te.duration
-                FROM test_execution te, test_execution_file_fp te_ffp, file_fp f, changed_files_mhashes chfm
+                -- CROSS JOIN keeps this order: from the changed files only
+                FROM changed_files_mhashes chfm
+                CROSS JOIN file_fp f
+                CROSS JOIN test_execution_file_fp te_ffp
+                CROSS JOIN test_execution te
                 WHERE
                     chfm.exec_id = ? AND
                     te.{self._test_execution_fk_column()} = ? AND
@@ -534,9 +537,13 @@ class DB:  # pylint: disable=too-many-public-methods
                     ]
                 )
 
+            # one set per changed file, not one per test depending on it
+            files_checksums = {
+                file: set(mhashes) for file, mhashes in files_mhashes.items() if mhashes
+            }
             method_misses = []
             for result in results:
-                if not check_fingerprint_db(files_mhashes, result[0], result[2]):
+                if not check_fingerprint_db(files_checksums, result[0], result[2]):
                     method_misses.append(result[1])
 
             failing_tests = [
@@ -558,15 +565,6 @@ class DB:  # pylint: disable=too-many-public-methods
 
     def delete_test_executions(self, test_names, exec_id):
         with self.con as con:
-            con.executemany(
-                f"""
-                DELETE
-                FROM test_execution_file_fp
-                WHERE test_execution_id IN
-                    (SELECT id FROM test_execution WHERE {self._test_execution_fk_column()} = ? AND test_name = ?)
-                    """,
-                [(exec_id, test_name) for test_name in test_names],
-            )
             con.executemany(
                 f"""
                 DELETE
@@ -596,11 +594,9 @@ class DB:  # pylint: disable=too-many-public-methods
             SELECT DISTINCT
                 f.filename
             FROM
-                file_fp f, test_execution_file_fp te_ffp, test_execution te
+                file_fp f
             WHERE
-                te.id = te_ffp.test_execution_id AND
-                te_ffp.fingerprint_id = f.id AND
-                te.{self._test_execution_fk_column()} = ?
+                {self._used_by_exec("f.id", "?")}
                 """,
             (exec_id,),
         )

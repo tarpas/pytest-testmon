@@ -27,7 +27,8 @@ classifiers = [
     "Framework :: Pytest",
 ]
 dependencies = [
-    "pytest<10,>=5",
+    "pytest<10,>=7",
+    "pluggy>=1.2",
     "coverage>=6,<8",
 ]
 
