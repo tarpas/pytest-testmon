@@ -1,9 +1,11 @@
+import gzip
 import hashlib
 import os
 import random
 import sys
 import sysconfig
 import textwrap
+import zlib
 from functools import lru_cache
 from collections import defaultdict
 import http.client
@@ -178,9 +180,17 @@ def collect_mhashes(source_tree, new_changed_file_data):
 
 # Whatever a call to testmon.net can fail with: no connection, a reset, a timeout, TLS (all
 # OSError), an HTTP error such as 502 or a server-side exception (xmlrpc.client.Error), a broken
-# or non-XML response.
-REMOTE_ERRORS = (OSError, xmlrpc.client.Error, http.client.HTTPException, ExpatError)
+# or non-XML response, a broken gzip response (zlib.error, EOFError; a bad header is an OSError).
+REMOTE_ERRORS = (
+    OSError,
+    xmlrpc.client.Error,
+    http.client.HTTPException,
+    ExpatError,
+    zlib.error,
+    EOFError,
+)
 REMOTE_TIMEOUT = 60  # seconds, for the connect and for each read
+GZIP_THRESHOLD = 1024  # bytes; a larger request is sent compressed
 
 
 def timeout_transport(url, headers=()):
@@ -195,10 +205,18 @@ def timeout_transport(url, headers=()):
     )
 
     class TimeoutTransport(base):
+        gzip_requests = False  # set once the server announced that it reads them
+
         def make_connection(self, host):
             connection = super().make_connection(host)
             connection.timeout = REMOTE_TIMEOUT
             return connection
+
+        def send_content(self, connection, request_body):
+            if self.gzip_requests and len(request_body) > GZIP_THRESHOLD:
+                connection.putheader("Content-Encoding", "gzip")
+                request_body = gzip.compress(request_body, compresslevel=6)
+            super().send_content(connection, request_body)
 
     return TimeoutTransport(headers=headers)
 
@@ -238,6 +256,11 @@ class RemoteDB:
             return self.NO_DATA.get(name, lambda: None)()
 
         return call
+
+    def use(self, capabilities):
+        """Switch on what the server announced in the result of initiate_execution."""
+        if capabilities.get("gzip_requests") and isinstance(self._proxy, ServerProxy):
+            self._proxy("transport").gzip_requests = True
 
     def close(self):
         try:
@@ -331,6 +354,8 @@ class TestmonData:  # pylint: disable=too-many-instance-attributes
                 },
             )
             self._set_execution(result)
+            if isinstance(self.db, RemoteDB):
+                self.db.use(result)
         except REMOTE_ERRORS as exc:
             if not isinstance(self.db, RemoteDB):
                 raise
